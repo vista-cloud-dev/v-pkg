@@ -1,4 +1,4 @@
-module github.com/vista-cloud-dev/kids-vc
+module github.com/vista-cloud-dev/m-kids
 
 go 1.26.3
 

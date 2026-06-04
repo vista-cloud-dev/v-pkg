@@ -1,6 +1,6 @@
 // Package clikit is the shared CLI convention layer for the m-cli Go toolchain.
 //
-// Every Go CLI in the toolchain (m-cli, irissync, vista-meta, kids-vc,
+// Every Go CLI in the toolchain (m-cli, irissync, vista-meta, m-kids,
 // m-dev-tools-mcp, …) is built on this package so they share one command
 // grammar, one --output/JSON contract, one error/exit-code ladder, and one
 // TTY-gated styling layer. See m-cli-go-toolchain-spec.md §5 / §5.5.

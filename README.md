@@ -1,4 +1,4 @@
-# kids-vc
+# m-kids
 
 **Version control for VistA KIDS distribution files.** Decompose a monolithic
 `.KID` patch into a per-component tree you can track in git, and reassemble that
@@ -17,7 +17,7 @@ output to it on the committed fixtures. The binary is a single static
 KIDS bundles routines, FileMan DD changes, options, protocols, RPCs, and
 install logic into one `.KID` text file. Git's line-based diff/merge is
 destructive on this format because adjacent entries are semantically
-independent. `kids-vc` provides:
+independent. `m-kids` provides:
 
 - **`decompose <kid> <dir>`** — `.KID` → per-component tree (routines as `.m`,
   FileMan DDs as `.zwr`, Kernel components per-entry).
@@ -58,37 +58,37 @@ Patient/Institution?), which is the right granularity for a guardrail.
 > **This command is new in the Go port — it is not in py-kids-vc** (whose
 > ADR-046 explicitly stops short of PIKS classification). The authoritative PIKS
 > model lives in **vista-meta** (Patient/Institution/Knowledge/System over 8,261
-> FileMan files) and is consumed **by reference**, never vendored: `kids-vc`
+> FileMan files) and is consumed **by reference**, never vendored: `m-kids`
 > ships only a small built-in seed of well-known files (e.g. File 2 PATIENT) and
 > accepts the full model via `--piks <tsv>` (a `filenumber<TAB>class` table you
 > can export from vista-meta). Files with no known class are warnings by
 > default; `--strict` treats them as gate failures (fail-closed).
 
 ```sh
-kids-vc lint OR_3.0_484.KID                 # built-in seed only
-kids-vc lint OR_3.0_484.KID --piks piks.tsv # authoritative vista-meta table
-kids-vc lint OR_3.0_484.KID --strict        # fail-closed on unclassified files
+m-kids lint OR_3.0_484.KID                 # built-in seed only
+m-kids lint OR_3.0_484.KID --piks piks.tsv # authoritative vista-meta table
+m-kids lint OR_3.0_484.KID --strict        # fail-closed on unclassified files
 ```
 
 ## Usage
 
 ```sh
-kids-vc parse        OR_3.0_484.KID
-kids-vc decompose    OR_3.0_484.KID ./patches/
-kids-vc assemble     ./patches/ rebuilt.KID
-kids-vc roundtrip    OR_3.0_484.KID
-kids-vc canonicalize ./patches/
-kids-vc lint         OR_3.0_484.KID
-kids-vc schema | jq .
+m-kids parse        OR_3.0_484.KID
+m-kids decompose    OR_3.0_484.KID ./patches/
+m-kids assemble     ./patches/ rebuilt.KID
+m-kids roundtrip    OR_3.0_484.KID
+m-kids canonicalize ./patches/
+m-kids lint         OR_3.0_484.KID
+m-kids schema | jq .
 ```
 
 ## Build
 
 ```sh
-make build        # dist/kids-vc, static + trimmed + version-stamped
+make build        # dist/m-kids, static + trimmed + version-stamped
 make test         # go test -race -cover ./...
 make lint         # golangci-lint
-go build -o kids-vc .
+go build -o m-kids .
 ```
 
 Prerequisites: Go 1.26+. Builds are pure-Go and `CGO_ENABLED=0`.
@@ -96,14 +96,46 @@ Prerequisites: Go 1.26+. Builds are pure-Go and `CGO_ENABLED=0`.
 ## Layout
 
 ```
-kids-vc/
+m-kids/
 ├── main.go                 # CLI grammar (Kong) + command bodies
 ├── clikit/                 # shared convention layer (vendored from go-cli-template)
 ├── internal/kids/          # the port: parser, codec, decompose, assemble, roundtrip, canonicalize, PIKS
 │   └── testdata/*.kid      # the 5 committed fixtures (DG/OR/VMDD/VMTEST/XU)
+├── docs/                   # architecture + automation design docs (see below)
+├── examples/               # runnable end-to-end demo + user guide + sample tree
 ├── Makefile / .golangci.yml / .github/workflows/ci.yml
 └── LICENSE / NOTICE        # Apache-2.0
 ```
+
+## Documentation
+
+- **[`examples/USER_GUIDE.md`](examples/USER_GUIDE.md)** — hands-on end-to-end
+  walkthrough (assemble / disassemble a real Kernel patch). Run
+  `examples/roundtrip-demo.sh` for the live version.
+- **[`docs/architecture.md`](docs/architecture.md)** — how m-kids works: the
+  KIDS format, the data model, and the assembly/disassembly process, with
+  Mermaid diagrams.
+- **[`docs/package-extraction-design.md`](docs/package-extraction-design.md)** —
+  design proposal for automating extraction of a live VistA system's installed
+  packages to the filesystem for analysis.
+- **[`docs/kids-installation-automation.md`](docs/kids-installation-automation.md)**
+  — design + procedure for automating KIDS build installation into a VistA
+  instance.
+
+All docs are grounded in official VA VistA documentation, with references at the
+bottom of each.
+
+### Gold-corpus documentation gap
+
+The docs are built on the gold VistA library (`~/data/vdocs`) plus the current
+(Aug 2025) **Kernel KIDS User Guide**, which was **not** in the gold corpus and
+was fetched directly from the VDL to fill the gap. It is staged for ingest at
+`~/data/vdocs/documents/_staging-fetched/Kernel/krn_8_0_sm_kids_ug.{pdf,txt}`.
+One further authoritative document is still missing and is **recommended for
+the gold library**: the **Kernel 8.0 Developer's Guide: KIDS Developer Tools
+User Guide** (developer build/export options and any non-interactive
+install/transport APIs) — needed to finalize the silent-install (Tier A) and
+S1 re-export paths in the automation docs.
 
 ## Validation
 
@@ -118,7 +150,7 @@ kids-vc/
 
 `install` is **out of scope** — runtime install/verify against a live YottaDB
 VistA lives in the separate `py-kids-install` component. Pipeline:
-`decompose → edit/git → assemble` (kids-vc) → `install → verify`
+`decompose → edit/git → assemble` (m-kids) → `install → verify`
 (py-kids-install).
 
 ## License

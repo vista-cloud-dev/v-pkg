@@ -1,9 +1,9 @@
-# kids-vc — KIDS round-trip CLI. Build conventions inherited from
+# m-kids — KIDS round-trip CLI. Build conventions inherited from
 # go-cli-template: static (CGO_ENABLED=0), -trimpath, version stamped via
 # -ldflags, cross-compile matrix, lint, test, schema.
 
-BIN     ?= kids-vc                     # KIDS round-trip CLI
-PKG     := github.com/vista-cloud-dev/kids-vc
+BIN     ?= m-kids                     # KIDS round-trip CLI
+PKG     := github.com/vista-cloud-dev/m-kids
 LDPKG   := $(PKG)/clikit
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)

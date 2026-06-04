@@ -78,7 +78,7 @@ func NewPIKSClassifier() *PIKSClassifier {
 // TSV (or whitespace-separated) of `filenumber<sep>class` lines; `class` may be
 // a single letter (P/I/K/S) or a full word (Patient/…). Blank lines and lines
 // beginning with '#' are ignored. This is how vista-meta's authoritative PIKS
-// export is supplied — kids-vc never vendors it.
+// export is supplied — m-kids never vendors it.
 func (c *PIKSClassifier) LoadPIKS(path string) error {
 	f, err := os.Open(path)
 	if err != nil {

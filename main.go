@@ -1,4 +1,4 @@
-// Command kids-vc is the VistA KIDS round-trip tool: it decomposes monolithic
+// Command m-kids is the VistA KIDS round-trip tool: it decomposes monolithic
 // .KID distribution files into a per-component tree suitable for git, and
 // reassembles that tree back to an installable .KID. It is a faithful Go port
 // of py-kids-vc (the decompose/assemble/round-trip contract and KIDComponents/
@@ -11,13 +11,13 @@
 //
 // Try:
 //
-//	kids-vc parse OR_3.0_484.KID
-//	kids-vc decompose OR_3.0_484.KID ./patches/
-//	kids-vc assemble ./patches/ rebuilt.KID
-//	kids-vc roundtrip OR_3.0_484.KID        # exit 3 on drift
-//	kids-vc canonicalize ./patches/         # LOSSY IEN substitution
-//	kids-vc lint OR_3.0_484.KID             # PIKS data-class gate (K2)
-//	kids-vc schema | jq .
+//	m-kids parse OR_3.0_484.KID
+//	m-kids decompose OR_3.0_484.KID ./patches/
+//	m-kids assemble ./patches/ rebuilt.KID
+//	m-kids roundtrip OR_3.0_484.KID        # exit 3 on drift
+//	m-kids canonicalize ./patches/         # LOSSY IEN substitution
+//	m-kids lint OR_3.0_484.KID             # PIKS data-class gate (K2)
+//	m-kids schema | jq .
 package main
 
 import (
@@ -29,8 +29,8 @@ import (
 
 	"github.com/willabides/kongplete"
 
-	"github.com/vista-cloud-dev/kids-vc/clikit"
-	"github.com/vista-cloud-dev/kids-vc/internal/kids"
+	"github.com/vista-cloud-dev/m-kids/clikit"
+	"github.com/vista-cloud-dev/m-kids/internal/kids"
 )
 
 // CLI is the root command grammar — one typed struct Kong parses and `schema`
@@ -54,7 +54,7 @@ type CLI struct {
 func main() {
 	cli := &CLI{}
 	os.Exit(clikit.Run(
-		"kids-vc",
+		"m-kids",
 		"VistA KIDS round-trip — decompose / assemble / roundtrip / canonicalize / lint.",
 		cli, &cli.Globals,
 	))

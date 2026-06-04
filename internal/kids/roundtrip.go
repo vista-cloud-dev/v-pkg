@@ -71,7 +71,7 @@ func subsEqual(a, b Subs) bool {
 // roundtrip; the guarantee is semantic equality after line-2 canonicalization,
 // not byte-identity.
 func Roundtrip(kidPath string) (RoundtripResult, error) {
-	tmp, err := os.MkdirTemp("", "kids-vc-rt-")
+	tmp, err := os.MkdirTemp("", "m-kids-rt-")
 	if err != nil {
 		return RoundtripResult{}, err
 	}
