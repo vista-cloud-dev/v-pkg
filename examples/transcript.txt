@@ -1,0 +1,161 @@
+
+=== 1. PARSE — summarize the .KID without unpacking it ===
+{
+  "schemaVersion": "1.0",
+  "command": "parse <kid-file>",
+  "ok": true,
+  "exit": 0,
+  "data": {
+    "installNames": [
+      "XU*8.0*504"
+    ],
+    "builds": [
+      {
+        "name": "XU*8.0*504",
+        "subscripts": 257,
+        "sections": {
+          "BLD": 69,
+          "INIT": 1,
+          "KRN": 84,
+          "MBREQ": 1,
+          "ORD": 6,
+          "PKG": 9,
+          "QUES": 35,
+          "RTN": 51,
+          "VER": 1
+        }
+      }
+    ]
+  }
+}
+
+=== 2. DECOMPOSE — explode the .KID into a per-component tree ===
+{
+  "schemaVersion": "1.0",
+  "command": "decompose <kid-file> <output-dir>",
+  "ok": true,
+  "exit": 0,
+  "data": {
+    "outputDir": "/tmp/claude-1000/tmp.y9yjqu7gS4/tree",
+    "builds": [
+      "XU*8.0*504"
+    ]
+  }
+}
+--- resulting KIDComponents/ tree ---
+./XU_8.0_504/KIDComponents/Build.zwr
+./XU_8.0_504/KIDComponents/InstallQuestions.zwr
+./XU_8.0_504/KIDComponents/KernelFMVersion.zwr
+./XU_8.0_504/KIDComponents/KRN/OPTION/XUCOMMAND.zwr
+./XU_8.0_504/KIDComponents/KRN/OPTION/XUS-KAAJEE-PROXY-LOGON.zwr
+./XU_8.0_504/KIDComponents/KRN/OPTION/XUS-KAAJEE-WEB-LOGON.zwr
+./XU_8.0_504/KIDComponents/KRN/REMOTE-PROCEDURE/XUS-KAAJEE-GET-CCOW-TOKEN.zwr
+./XU_8.0_504/KIDComponents/KRN/REMOTE-PROCEDURE/XUS-KAAJEE-GET-USER-VIA-PROXY.zwr
+./XU_8.0_504/KIDComponents/KRN/SECURITY-KEY/XUKAAJEE_SAMPLE.zwr
+./XU_8.0_504/KIDComponents/ORD.zwr
+./XU_8.0_504/KIDComponents/Package.zwr
+./XU_8.0_504/KIDComponents/PostInstall.zwr
+./XU_8.0_504/KIDComponents/RequiredBuild.zwr
+./XU_8.0_504/KIDComponents/Routines/_index.zwr
+./XU_8.0_504/KIDComponents/Routines/XU8P504.header
+./XU_8.0_504/KIDComponents/Routines/XU8P504.m
+./XU_8.0_504/KIDComponents/Routines/XUSKAAJ1.header
+./XU_8.0_504/KIDComponents/Routines/XUSKAAJ1.m
+
+=== 3. INSPECT — a decomposed routine (.m) and a Kernel component (.zwr) ===
+--- Routines/XU8P504.m (first lines) ---
+XU8P504 ;OOIFO/AC - POST-INIT ROUTINE TO ADD KAAJEE PROXY IN FILE 200. ;10/19/2009
+ ;;8.0;KERNEL;;
+ QUIT
+POST ;Post-install entry point to add Application Proxy
+ N XUNAME,XUFMAC,XUOPT,XUVPID,Y,R
+ D MES^XPDUTL("Begin post-install routine: POST^XU8P504...")
+--- KRN/OPTION/XUS-KAAJEE-WEB-LOGON.zwr ---
+"KRN",19,976,99.1)="59801,31367"
+"KRN",19,976,-1)="0^3"
+"KRN",19,976,0)="XUS KAAJEE WEB LOGON^KAAJEE BROKER CONTEXT^^B^^^^^^^^KERNEL"
+"KRN",19,976,"RPC",0)="^19.05P^6^5"
+"KRN",19,976,"RPC",3,0)="XUS KAAJEE GET USER INFO"
+"KRN",19,976,"RPC",4,0)="XUS KAAJEE LOGOUT"
+"KRN",19,976,"RPC",5,0)="XUS ALLKEYS"
+"KRN",19,976,"RPC",6,0)="XUS KAAJEE GET CCOW TOKEN"
+"KRN",19,976,"U")="KAAJEE BROKER CONTEXT"
+
+=== 4. ASSEMBLE — rebuild an installable .KID from the tree ===
+{
+  "schemaVersion": "1.0",
+  "command": "assemble <input-dir> <output-kid>",
+  "ok": true,
+  "exit": 0,
+  "data": {
+    "outputKid": "/tmp/claude-1000/tmp.y9yjqu7gS4/rebuilt.KID",
+    "installNames": [
+      "XU*8.0*504"
+    ]
+  }
+}
+--- rebuilt header ---
+KIDS Distribution saved by m-kids
+m-kids reassembled output
+**KIDS**:XU*8.0*504^
+
+=== 5. RE-PARSE — the rebuilt .KID carries the same build & subscripts ===
+{
+  "schemaVersion": "1.0",
+  "command": "parse <kid-file>",
+  "ok": true,
+  "exit": 0,
+  "data": {
+    "installNames": [
+      "XU*8.0*504"
+    ],
+    "builds": [
+      {
+        "name": "XU*8.0*504",
+        "subscripts": 257,
+        "sections": {
+          "BLD": 69,
+          "INIT": 1,
+          "KRN": 84,
+          "MBREQ": 1,
+          "ORD": 6,
+          "PKG": 9,
+          "QUES": 35,
+          "RTN": 51,
+          "VER": 1
+        }
+      }
+    ]
+  }
+}
+
+=== 6. ROUNDTRIP — the oracle: decompose→assemble→re-parse, exit 3 on drift ===
+{
+  "schemaVersion": "1.0",
+  "command": "roundtrip <kid-file>",
+  "ok": true,
+  "exit": 0,
+  "data": {
+    "file": "XU_8.0_504.KID",
+    "builds": 1,
+    "pairs": 257,
+    "ok": true
+  }
+}
+roundtrip exit = 0
+
+=== 7. LINT — PIKS data-class gate (exit 3 if operational PHI/PII data present) ===
+{
+  "schemaVersion": "1.0",
+  "command": "lint <kid-file>",
+  "ok": true,
+  "exit": 0,
+  "data": {
+    "blocked": 0,
+    "dataFiles": 0,
+    "unclassified": 0
+  }
+}
+lint exit = 0
+
+=== DONE — the build round-tripped with no drift ===
