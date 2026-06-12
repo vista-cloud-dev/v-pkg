@@ -1,5 +1,7 @@
-# Build output
-/dist/
+# Build output — ignore everything in dist/ EXCEPT the generated, committed
+# contract artifact (drift-gated *.json).
+/dist/*
+!/dist/*.json
 /bin/
 *.test
 # coverage report artifacts — specific/anchored so they never match a source

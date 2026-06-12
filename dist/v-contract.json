@@ -1,0 +1,137 @@
+{
+  "domain": "pkg",
+  "version": "0.1.0",
+  "contractVersion": "1.0",
+  "exits": [
+    {
+      "code": 0,
+      "meaning": "ok"
+    },
+    {
+      "code": 1,
+      "meaning": "runtime error"
+    },
+    {
+      "code": 2,
+      "meaning": "usage error"
+    },
+    {
+      "code": 3,
+      "meaning": "check / gate failed"
+    },
+    {
+      "code": 4,
+      "meaning": "refused / substrate unavailable"
+    }
+  ],
+  "commands": [
+    {
+      "path": [
+        "parse"
+      ],
+      "help": "Parse a .KID file and summarize its builds and sections.",
+      "args": [
+        {
+          "name": "kid-file",
+          "type": "string",
+          "required": true,
+          "help": "Path to the .KID file."
+        }
+      ]
+    },
+    {
+      "path": [
+        "decompose"
+      ],
+      "help": "Split a .KID into a per-component KIDComponents/ tree.",
+      "args": [
+        {
+          "name": "kid-file",
+          "type": "string",
+          "required": true,
+          "help": "Path to the .KID file."
+        },
+        {
+          "name": "output-dir",
+          "type": "string",
+          "required": true,
+          "help": "Output directory for the component tree (replaced if it exists)."
+        }
+      ]
+    },
+    {
+      "path": [
+        "assemble"
+      ],
+      "help": "Reassemble a component tree back into a .KID.",
+      "args": [
+        {
+          "name": "input-dir",
+          "type": "string",
+          "required": true,
+          "help": "Component tree (a directory of \u003cbuild\u003e/KIDComponents/)."
+        },
+        {
+          "name": "output-kid",
+          "type": "string",
+          "required": true,
+          "help": "Output .KID path."
+        }
+      ]
+    },
+    {
+      "path": [
+        "roundtrip"
+      ],
+      "help": "Verify decompose→assemble reproduces the build (exit 3 on drift).",
+      "args": [
+        {
+          "name": "kid-file",
+          "type": "string",
+          "required": true,
+          "help": "Path to the .KID file."
+        }
+      ]
+    },
+    {
+      "path": [
+        "canonicalize"
+      ],
+      "help": "Substitute install-time IENs with \"IEN\" in a tree (LOSSY; review-only).",
+      "args": [
+        {
+          "name": "decomp-dir",
+          "type": "string",
+          "required": true,
+          "help": "A decomposed component tree to rewrite in place (LOSSY)."
+        }
+      ]
+    },
+    {
+      "path": [
+        "lint"
+      ],
+      "help": "Run the PIKS data-class gate over a .KID (exit 3 on a blocked file).",
+      "flags": [
+        {
+          "name": "piks",
+          "type": "string",
+          "help": "Path to an authoritative PIKS classification table (TSV: filenumber\u003cTAB\u003eclass)."
+        },
+        {
+          "name": "strict",
+          "type": "bool",
+          "help": "Treat unclassified data files as gate failures (fail-closed)."
+        }
+      ],
+      "args": [
+        {
+          "name": "kid-file",
+          "type": "string",
+          "required": true,
+          "help": "Path to the .KID file."
+        }
+      ]
+    }
+  ]
+}
