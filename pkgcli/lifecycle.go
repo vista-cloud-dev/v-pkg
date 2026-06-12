@@ -115,6 +115,12 @@ func runMScript(ctx context.Context, cl *mdriver.Client, rtn, body string) (map[
 	if lr.EngineError != nil {
 		return nil, "", fmt.Errorf("stage %s: %s %s", rtn, lr.EngineError.Mnemonic, lr.EngineError.Text)
 	}
+	// A driver that could not stage (e.g. no routine source directory configured)
+	// may report no fault yet load nothing; running EN^<rtn> would then fail with a
+	// confusing link error. Refuse up front so the cause is the staging, not the run.
+	if len(lr.Loaded) == 0 {
+		return nil, "", fmt.Errorf("stage %s: driver loaded no routine (check the engine's routine source path / connection)", rtn)
+	}
 	res, err := cl.ExecRun(ctx, "EN^"+rtn, nil)
 	if err != nil {
 		return nil, "", err

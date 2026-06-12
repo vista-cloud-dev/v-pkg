@@ -21,13 +21,18 @@ type fakeDriver struct {
 	loadArgs, runArgs []string
 	runStdout         string
 	loadEng, runEng   *mdriver.EngineError
+	loadEmpty         bool // driver stages nothing (no fault) — the silent no-op case
 }
 
 func (f *fakeDriver) run(_ context.Context, _ string, args []string) (stdout, stderr []byte, exit int, err error) {
 	switch {
 	case len(args) >= 2 && args[0] == "exec" && args[1] == "load":
 		f.loadArgs = args
-		return envBytes("exec load", mdriver.LoadResult{Loaded: []string{"EN"}}, f.loadEng), nil, 0, nil
+		loaded := []string{"EN"}
+		if f.loadEmpty {
+			loaded = nil
+		}
+		return envBytes("exec load", mdriver.LoadResult{Loaded: loaded}, f.loadEng), nil, 0, nil
 	case len(args) >= 2 && args[0] == "exec" && args[1] == "run":
 		f.runArgs = args
 		return envBytes("exec run", mdriver.ExecResult{Stdout: f.runStdout}, f.runEng), nil, 0, nil
@@ -146,6 +151,19 @@ func TestRunInstall_LoadError(t *testing.T) {
 	_, err := runInstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", "hdr", zzskelPairs())
 	if err == nil || !strings.Contains(err.Error(), "stage") {
 		t.Errorf("want stage error, got %v", err)
+	}
+}
+
+func TestRunInstall_SilentLoadNoOp(t *testing.T) {
+	// Driver reports no fault but stages nothing (e.g. no routine source dir) —
+	// must fail at staging, not proceed to a confusing run-time link error.
+	f := &fakeDriver{loadEmpty: true}
+	_, err := runInstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", "hdr", zzskelPairs())
+	if err == nil || !strings.Contains(err.Error(), "loaded no routine") {
+		t.Errorf("want staging no-op surfaced, got %v", err)
+	}
+	if f.runArgs != nil {
+		t.Errorf("must not run EN after an empty load, ran: %v", f.runArgs)
 	}
 }
 
