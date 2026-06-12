@@ -202,7 +202,7 @@ func rtnLineSubs(name string, line int64) Subs {
 func WriteKID(installNames []string, buildsPairs map[string][]Pair, outPath string) error {
 	var lines []string
 	lines = append(lines,
-		"KIDS Distribution saved by m-kids",
+		"KIDS Distribution saved by v-pkg",
 		"m-kids reassembled output",
 		"**KIDS**:"+strings.Join(installNames, "^")+"^",
 		"",
