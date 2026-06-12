@@ -162,9 +162,9 @@ flowchart LR
     SPEC --> ORCH["installer orchestrator"]
 
     subgraph tierA["Tier A — API-driven (preferred)"]
-        A1["$$LOAD^XPDID / silent load API"]
-        A2["set XPD* answer variables in symbol table"]
-        A3["D INSTALL / silent install entry point"]
+        A1["EN1^XPDIL — load distribution from HFS → ^XTMP + INSTALL #9.7"]
+        A2["pre-seed symbol table: XPDDIQ(\"XPZ1/XPO1/XPI1\")=0, Delay=0, null device"]
+        A3["EN^XPDIJ(xpda) — task install of the loaded build by #9.7 IEN (ICR 2243)"]
     end
     subgraph tierB["Tier B — expect-driven (fallback)"]
         B1["spawn terminal session"]
@@ -178,13 +178,29 @@ flowchart LR
     ENG --> RES["structured result<br/>(read from INSTALL #9.7 + #9.4)"]
 ```
 
-- **Tier A — API/silent install (preferred).** KIDS exposes silent entry points
-  used by automated patching: a build is loaded with a load API, the standard
-  answers are pre-seeded as `XPD*` variables in the M symbol table, and the
-  install is driven without prompting. This is how FORUM/Patchman-style
-  automatic patching (`[XPD AUTOMATIC PATCHING MENU]`) operates. Exact entry
-  points must be confirmed against the KIDS Developer Tools guide (gap — §
-  References [4]).
+- **Tier A — API/silent install (preferred). Entry points confirmed from the
+  GOLD corpus (2026-06-12), closing the prior gap:**
+  - **Load:** `EN1^XPDIL` — the routine behind `[XPD LOAD DISTRIBUTION]`; loads
+    the HFS `.KID` into `^XTMP` and creates an INSTALL (#9.7) entry. It is the
+    *interactive option routine* (prompts "Enter a Host File:") — there is **no**
+    documented param-list silent API (`$$LOAD^XPDID` etc. do **not** exist), so it
+    must be driven with the file/device answers pre-seeded.
+  - **Install:** `EN^XPDIJ(xpda)` — the one documented *programmatic* install call
+    (ICR **#2243**, Controlled Subscription): tasks off the install of an
+    **already-loaded** build, where `xpda` = the build's INSTALL (#9.7) IEN. (The
+    interactive option routine is `EN^XPDI`.)
+  - **Suppress the standard questions** from the env-check via the `XPDDIQ` array:
+    `XPDDIQ("XPZ1")=0` (disable options/protocols → NO) is the documented case;
+    `XPDDIQ("XPO1")=0` (rebuild menu trees) / `XPDDIQ("XPI1")=0` (inhibit logons)
+    follow the same answer-code pattern. Delay = `0`; device = null/non-queued via
+    the Kernel IO context (no single documented `XPD*` device var).
+  - **Phase:** `XPDENV` = `1` during the install-phase env-check, `0` during the
+    load-phase one — guard install-only setup (e.g. `XPDDIQ`) on `XPDENV=1`.
+  - **Caveat:** the exact param signatures + non-interactive driving of these
+    routines are **not confirmable from docs alone** (the corpus has no XPD*
+    routine source) — confirm against a real Kernel routine listing (`%RO`/`ZL`)
+    on a live engine before relying on them. So a live FOIA VistA is still
+    required to finalize + validate the driver (M0a's "deepest unknown").
 - **Tier B — expect-driven (fallback).** When silent APIs are unavailable, drive
   the menu in a pseudo-terminal: send `D ^XUP`/`EVE` → KIDS → `XPD INSTALL
   BUILD`, then a prompt→answer state machine sourced from `install-spec.yaml`.
@@ -316,10 +332,17 @@ Back-out, Rollback guide). Automation should:
 
 ## 11. Open questions
 
-1. **Exact silent-install entry points.** The precise KIDS load/install APIs and
-   the full `XPD*` answer-variable names for fully non-interactive installs need
-   confirmation from the *KIDS Developer Tools User Guide* (§References [4], a
-   gold-corpus gap). Until then, Tier B (expect) is the safe default.
+1. **Exact silent-install entry points. ~~Gap~~ — RESOLVED 2026-06-12 from the
+   GOLD corpus** (Kernel 8.0 DG/SM KIDS UG + TM): load = `EN1^XPDIL`, install =
+   `EN^XPDIJ(xpda)` (ICR 2243) / `EN^XPDI`, answer-suppression via
+   `XPDDIQ("XPZ1"/"XPO1"/"XPI1")`, phase via `XPDENV`, result via INSTALL #9.7
+   `STATUS` (#.02) = "Install Completed" (global `^XPD(9.7,…)`) + PACKAGE #9.4
+   patch history (`^DIC(9.4,ien,22,v,1105,…)`). **No** clean public "silent load
+   from HFS / silent install by name" API exists — `EN1^XPDIL`/`EN^XPDI` are the
+   interactive option routines, driven under a pre-seeded symbol table; `EN^XPDIJ`
+   tasks an already-loaded build. **Remaining live-only:** confirm the routines'
+   param signatures + non-interactive driving via `%RO`/`ZL` on a real engine
+   (corpus has no XPD* source). Tier B (expect) stays the cross-engine fallback.
 2. **Queued-install polling contract.** Standardize how the orchestrator polls
    TaskMan + `#9.7` for queued/background completion.
 3. **Engine parity.** Confirm `^XTMP`, `XINDEX`, and KIDS behave identically
