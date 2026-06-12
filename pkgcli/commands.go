@@ -29,6 +29,9 @@ type Commands struct {
 	Canonicalize canonicalizeCmd `cmd:"" help:"Substitute install-time IENs with \"IEN\" in a tree (LOSSY; review-only)."`
 	Lint         lintCmd         `cmd:"" help:"Run the PIKS data-class gate over a .KID (exit 3 on a blocked file)."`
 	Build        buildCmd        `cmd:"" help:"Build a KIDS transport global from a declarative build spec (deterministic, normalized export)."`
+	Install      installCmd      `cmd:"" help:"Install a built .KID on a live engine over the driver (non-interactive KIDS load+install)."`
+	Verify       verifyCmd       `cmd:"" help:"Verify a .KID's install on a live engine (#9.7 status + per-routine presence)."`
+	Uninstall    uninstallCmd    `cmd:"" help:"Uninstall a .KID from a live engine (routine-only back-out: routines + #9.7/#9.6)."`
 }
 
 // --- parse -------------------------------------------------------------------

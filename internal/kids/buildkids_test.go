@@ -49,3 +49,26 @@ func TestMakeBuildPairs_Deterministic_And_Shape(t *testing.T) {
 		t.Errorf(`"VER") = %q, want a platform version`, v)
 	}
 }
+
+// TestBuild_RoutineNames extracts the RTN component names (the 2-subscript
+// `"RTN",<name>` header pairs), in build order — what `v pkg verify`/`uninstall`
+// need to probe/delete each routine.
+func TestBuild_RoutineNames(t *testing.T) {
+	pairs := MakeBuildPairs(BuildInput{
+		InstallName: "ZZSKEL*1.0*1",
+		Namespace:   "ZZSKEL",
+		Routines: []RoutineSrc{
+			{Name: "ZZSKEL", Lines: []string{"ZZSKEL ;x", " quit"}},
+			{Name: "ZZSKEL1", Lines: []string{"ZZSKEL1 ;y", " quit"}},
+		},
+	})
+	b := newBuild()
+	for _, p := range pairs {
+		b.Set(p.Subs, p.Value)
+	}
+	got := b.RoutineNames()
+	want := []string{"ZZSKEL", "ZZSKEL1"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("RoutineNames = %v, want %v", got, want)
+	}
+}

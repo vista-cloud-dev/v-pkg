@@ -159,6 +159,117 @@
           "help": "Path to the kids/\u003cpkg\u003e.build.json build spec."
         }
       ]
+    },
+    {
+      "path": [
+        "install"
+      ],
+      "help": "Install a built .KID on a live engine over the driver (non-interactive KIDS load+install).",
+      "flags": [
+        {
+          "name": "engine",
+          "type": "enum",
+          "enum": [
+            "ydb",
+            "iris"
+          ],
+          "required": true,
+          "help": "Engine to reach: ydb or iris."
+        },
+        {
+          "name": "transport",
+          "type": "enum",
+          "enum": [
+            "local",
+            "docker",
+            "remote"
+          ],
+          "default": "remote",
+          "help": "Driver transport: local | docker | remote."
+        }
+      ],
+      "args": [
+        {
+          "name": "kid-file",
+          "type": "string",
+          "required": true,
+          "help": "Path to the built .KID transport file to install on the live engine."
+        }
+      ]
+    },
+    {
+      "path": [
+        "verify"
+      ],
+      "help": "Verify a .KID's install on a live engine (#9.7 status + per-routine presence).",
+      "flags": [
+        {
+          "name": "engine",
+          "type": "enum",
+          "enum": [
+            "ydb",
+            "iris"
+          ],
+          "required": true,
+          "help": "Engine to reach: ydb or iris."
+        },
+        {
+          "name": "transport",
+          "type": "enum",
+          "enum": [
+            "local",
+            "docker",
+            "remote"
+          ],
+          "default": "remote",
+          "help": "Driver transport: local | docker | remote."
+        }
+      ],
+      "args": [
+        {
+          "name": "kid-file",
+          "type": "string",
+          "required": true,
+          "help": "Path to the .KID whose install to verify (its name + routines)."
+        }
+      ]
+    },
+    {
+      "path": [
+        "uninstall"
+      ],
+      "help": "Uninstall a .KID from a live engine (routine-only back-out: routines + #9.7/#9.6).",
+      "flags": [
+        {
+          "name": "engine",
+          "type": "enum",
+          "enum": [
+            "ydb",
+            "iris"
+          ],
+          "required": true,
+          "help": "Engine to reach: ydb or iris."
+        },
+        {
+          "name": "transport",
+          "type": "enum",
+          "enum": [
+            "local",
+            "docker",
+            "remote"
+          ],
+          "default": "remote",
+          "help": "Driver transport: local | docker | remote."
+        }
+      ],
+      "args": [
+        {
+          "name": "kid-file",
+          "type": "string",
+          "required": true,
+          "help": "Path to the .KID whose install to reverse (routine-only back-out)."
+        }
+      ]
     }
   ]
 }

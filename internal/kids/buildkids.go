@@ -55,3 +55,17 @@ func MakeBuildPairs(in BuildInput) []Pair {
 	b.Set(Subs{strSub("VER")}, plat)
 	return b.Pairs()
 }
+
+// RoutineNames returns the build's RTN component names in build order — the
+// 2-subscript `"RTN",<name>` header pairs (the per-routine line nodes have 4
+// subscripts, the RTN count node has 1). `v pkg verify`/`uninstall` use these to
+// probe and delete each installed routine.
+func (b *Build) RoutineNames() []string {
+	var names []string
+	for _, p := range b.Pairs() {
+		if len(p.Subs) == 2 && p.Subs[0].IsStr() && p.Subs[0].Str() == "RTN" && p.Subs[1].IsStr() {
+			names = append(names, p.Subs[1].Str())
+		}
+	}
+	return names
+}
