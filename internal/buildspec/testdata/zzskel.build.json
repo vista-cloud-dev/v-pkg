@@ -1,0 +1,15 @@
+{
+  "package": "ZZSKEL",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "routines": ["ZZSKEL"]
+  },
+  "requiredBuilds": [
+    { "name": "STD*1.0*5", "action": "DON'T INSTALL, LEAVE GLOBAL" }
+  ],
+  "envCheck": "ZZSKELEN",
+  "icrs": [
+    { "number": 10063, "name": "$$PSET^%ZTLOAD", "custodian": "KERNEL" }
+  ]
+}
