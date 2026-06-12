@@ -1,0 +1,26 @@
+KIDS Distribution saved by v-pkg
+m-kids reassembled output
+**KIDS**:ZZSKEL*1.0*1^
+
+**INSTALL NAME**
+ZZSKEL*1.0*1
+"BLD",1,0)
+ZZSKEL*1.0*1^ZZSKEL^0^0
+"RTN")
+1
+"RTN","ZZSKEL")
+0^5^0^0
+"RTN","ZZSKEL",1,0)
+ZZSKEL ;VCD/VSL - throwaway test package (M0a ZZSKEL) ;1.0
+"RTN","ZZSKEL",2,0)
+ ;;1.0;ZZSKEL;;
+"RTN","ZZSKEL",3,0)
+ quit
+"RTN","ZZSKEL",4,0)
+PING() ;
+"RTN","ZZSKEL",5,0)
+ quit "pong"
+"VER")
+8.0^22.2
+**END**
+**END**

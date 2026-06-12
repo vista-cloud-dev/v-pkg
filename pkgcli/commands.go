@@ -28,6 +28,7 @@ type Commands struct {
 	Roundtrip    roundtripCmd    `cmd:"" help:"Verify decompose→assemble reproduces the build (exit 3 on drift)."`
 	Canonicalize canonicalizeCmd `cmd:"" help:"Substitute install-time IENs with \"IEN\" in a tree (LOSSY; review-only)."`
 	Lint         lintCmd         `cmd:"" help:"Run the PIKS data-class gate over a .KID (exit 3 on a blocked file)."`
+	Build        buildCmd        `cmd:"" help:"Build a KIDS transport global from a declarative build spec (deterministic, normalized export)."`
 }
 
 // --- parse -------------------------------------------------------------------
