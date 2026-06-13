@@ -1,6 +1,7 @@
 package installspec
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/vista-cloud-dev/v-pkg/internal/kids"
@@ -21,37 +22,77 @@ import (
 // `<<VPKG>>key=value`.
 const ResultMarker = "<<VPKG>>"
 
-// xtmpRoot is the open global reference the per-pair SETs hang off; MRef closes
-// the paren. XPDA is an M variable (the #9.7 IEN), so it is unquoted here.
-const xtmpRoot = `^XTMP("XPDI",XPDA,`
-
-// InstallScript returns the M source that installs the build named name (whose
-// transport-global contents are pairs) into a live VistA, non-interactively.
-// header is the install header text recorded in #9.7 field 6 (cosmetic).
+// The install is delivered in two phases so it never embeds the whole transport
+// global in one routine. A real package's transport global is large (the MSL
+// base is ~6100 nodes / ~560 KB); one routine that big silently truncates when
+// the driver stages it (T0b.2 discoveries P1), installing only a prefix. Instead:
 //
-// The script: (1) sets the KIDS environment + full FM priv and opens HOME for
-// IO(0); (2) refuses if the build is already loaded (INST would otherwise prompt
-// with no stdin); (3) creates the #9.7 entry via $$INST^XPDIL1; (4) populates
-// ^XTMP("XPDI",XPDA,…) from pairs; (5) runs EN^XPDIJ; (6) emits the #9.7 status
-// as a ResultMarker line.
-func InstallScript(name, header string, pairs []kids.Pair) string {
+//  1. StageChunks streams the pairs into a staging global ^XTMP("VPKGI",…) as a
+//     sequence of small, size-bounded routine bodies (each stages reliably).
+//  2. FinalInstallScript verifies the staged node count, then — in ONE process,
+//     so XPDA survives — creates the #9.7 entry, MERGEs the staged tree into
+//     ^XTMP("XPDI",XPDA), and runs EN^XPDIJ.
+//
+// The MERGE makes the install routine constant-size regardless of package size.
+
+// stageOpen is the open global reference the staging SETs hang off (MRef closes
+// the paren); stageGbl is the same global, used to clear/merge/count it whole.
+const (
+	stageOpen = `^XTMP("VPKGI",`
+	stageGbl  = `^XTMP("VPKGI")`
+)
+
+// StageChunks renders the transport-global pairs as M routine bodies that
+// populate the staging global ^XTMP("VPKGI",…). Each body is kept at or below
+// maxBytes (a lone over-long SET is its own chunk), so no single staged routine
+// is large enough to hit the driver's silent-truncation limit. The first body
+// clears any stale staging global. Run each body in order; the global persists
+// across the (stateless) driver processes, accumulating the whole tree.
+func StageChunks(pairs []kids.Pair, maxBytes int) []string {
+	var chunks []string
+	var b strings.Builder
+	b.WriteString("K " + stageGbl + "\n") // clear stale staging before the first batch
+	for _, p := range pairs {
+		line := "S " + p.Subs.MRef(stageOpen) + "=" + kids.MString(p.Value) + "\n"
+		if b.Len() > 0 && b.Len()+len(line) > maxBytes {
+			chunks = append(chunks, b.String())
+			b.Reset()
+		}
+		b.WriteString(line)
+	}
+	if b.Len() > 0 {
+		chunks = append(chunks, b.String())
+	}
+	return chunks
+}
+
+// FinalInstallScript returns the constant-size install routine run after
+// StageChunks has populated ^XTMP("VPKGI",…). nPairs is the expected staged-node
+// count: the routine counts the staging global and refuses to install if it does
+// not match (so a silently-truncated stage fails loudly instead of installing a
+// partial package). header is the #9.7 install header (cosmetic).
+func FinalInstallScript(name, header string, nPairs int) string {
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
-
 	nameLit := kids.MString(name)
 
 	w(`S U="^",DUZ=1,DUZ(0)="@" S:'$D(DT) DT=$$DT^XLFDT`)
 	// Refuse a re-install up front — INST^XPDIL1 prompts "OK to continue with
 	// Load" when the name is already in #9.7, and there is no stdin over Exec.
-	w(`I $D(` + `^XPD(9.7,"B",` + nameLit + `)) W "` + ResultMarker + `error=already-installed",! Q`)
+	w(`I $D(^XPD(9.7,"B",` + nameLit + `)) K ` + stageGbl + ` W "` + ResultMarker + `error=already-installed",! Q`)
+	// Count the staged nodes ($QUERY over the staging subtree) and refuse unless
+	// every pair arrived — guards against a silently-truncated chunk stage.
+	w(`N VC,VR S VC=0,VR=` + kids.MString(stageGbl))
+	w(`F  S VR=$Q(@VR) Q:(VR="")!(VR'[` + kids.MString("VPKGI") + `)  S VC=VC+1`)
+	w(`W "` + ResultMarker + `staged=",VC,!`)
+	w(`I VC'=` + strconv.Itoa(nPairs) + ` K ` + stageGbl + ` W "` + ResultMarker + `error=stage-incomplete",! Q`)
 	w(`D HOME^%ZIS`)
 	w(`S XPDST=0,XPDIT=1,XPDST("H1")=` + kids.MString(header+"  ;Created on "))
 	w(`S XPDA=$$INST^XPDIL1(` + nameLit + `)`)
 	w(`S ^XTMP("XPDI",0)=$$FMADD^XLFDT(DT,7)_U_DT`)
-	for _, p := range pairs {
-		w(`S ` + p.Subs.MRef(xtmpRoot) + `=` + kids.MString(p.Value))
-	}
+	w(`M ^XTMP("XPDI",XPDA)=` + stageGbl) // staged tree → live transport global
 	w(`D EN^XPDIJ`)
+	w(`K ` + stageGbl)
 	w(`W "` + ResultMarker + `status=",$P($G(^XPD(9.7,XPDA,0)),U,9),!`)
 	return b.String()
 }

@@ -351,7 +351,27 @@ the driver `Exec` (subprocess + JSON, no interactive stdin): either drive the tw
 `^XTMP("XPDI",XPDA,…)` + the `#9.7` entry directly from the parsed `.KID` (whose
 node/value pairs are exactly the transport-global contents) and call `EN^XPDIJ`.
 The direct-populate path sidesteps the interactive prompt entirely and is the
-likely automation route.
+chosen automation route.
+
+**Streamed populate (2026-06-12) — the transport global is too big for one
+routine.** The first cut embedded every `^XTMP("XPDI",XPDA,…)` SET in one
+generated routine (`ZVPKGINS`) and ran it. That works for a one-routine fixture
+(ZZSKEL) but **silently partial-installs a real package**: the MSL base
+(15 routines / ~6100 nodes / ~560 KB) produced a ~560 KB install routine, which
+the driver's routine staging **truncates without error** (T0b.2 discoveries P1),
+so only the first ~3 routines landed while `EN^XPDIJ` still reported `#9.7`
+status 3. The fix (`internal/installspec`, `pkgcli/lifecycle.go`): **stream the
+pairs into a staging global `^XTMP("VPKGI",…)` in size-bounded chunks**
+(`StageChunks`, ≤40 KB each — each stages reliably), then a **constant-size
+finalize routine** (`FinalInstallScript`) counts the staged nodes (refusing with
+`error=stage-incomplete` on any mismatch — a silent truncation now fails loudly),
+creates the `#9.7` entry, `MERGE`s the staged tree into `^XTMP("XPDI",XPDA)`, and
+runs `EN^XPDIJ` — all in one process so XPDA survives. Live-proven on the YDB FOIA
+`vehu`: the full 15-routine MSL base installs (all `$T(^STD*)=1`), the m-stdlib
+suites pass **test-in-place** (15/15 suites, 1403 assertions), and uninstall is
+reversible. (A native driver `SetGlobal` would let the host populate `^XTMP`
+without staging routines at all — cleaner, but it is not on the reference
+`mdriver.Client` yet; the chunked-routine path needs no SDK change.)
 
 ---
 

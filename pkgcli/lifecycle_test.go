@@ -3,6 +3,7 @@ package pkgcli
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -22,19 +23,20 @@ type fakeDriver struct {
 	runStdout         string
 	loadEng, runEng   *mdriver.EngineError
 	loadEmpty         bool // driver stages nothing (no fault) — the silent no-op case
+	loads, runs       int  // call counts (the chunked install stages many times)
 }
 
 func (f *fakeDriver) run(_ context.Context, _ string, args []string) (stdout, stderr []byte, exit int, err error) {
 	switch {
 	case len(args) >= 2 && args[0] == "exec" && args[1] == "load":
-		f.loadArgs = args
+		f.loadArgs, f.loads = args, f.loads+1
 		loaded := []string{"EN"}
 		if f.loadEmpty {
 			loaded = nil
 		}
 		return envBytes("exec load", mdriver.LoadResult{Loaded: loaded}, f.loadEng), nil, 0, nil
 	case len(args) >= 2 && args[0] == "exec" && args[1] == "run":
-		f.runArgs = args
+		f.runArgs, f.runs = args, f.runs+1
 		return envBytes("exec run", mdriver.ExecResult{Stdout: f.runStdout}, f.runEng), nil, 0, nil
 	}
 	return envBytes("?", nil, nil), nil, 0, nil
@@ -124,6 +126,36 @@ func TestRunInstall_Success(t *testing.T) {
 	}
 	if !contains(f.runArgs, "EN^"+rtnInstall) {
 		t.Errorf("run argv missing EN^%s: %v", rtnInstall, f.runArgs)
+	}
+}
+
+// A package whose transport global exceeds one chunk must stage in several
+// load+run cycles (none big enough to truncate), then finalize once.
+func TestRunInstall_MultiChunkStages(t *testing.T) {
+	f := &fakeDriver{runStdout: installspec.ResultMarker + "status=3\n"}
+	lines := make([]string, 0, 4000)
+	lines = append(lines, "ZZBIG ;big")
+	for i := 0; i < 4000; i++ {
+		lines = append(lines, fmt.Sprintf(" S X=%d ; padding line %d to grow the transport global", i, i))
+	}
+	pairs := kids.MakeBuildPairs(kids.BuildInput{
+		InstallName: "ZZBIG*1.0*1", Namespace: "ZZBIG",
+		Routines: []kids.RoutineSrc{{Name: "ZZBIG", Lines: lines}},
+	})
+	chunks := installspec.StageChunks(pairs, stageChunkBytes)
+	if len(chunks) < 2 {
+		t.Fatalf("test needs a multi-chunk build, got %d chunks for %d pairs", len(chunks), len(pairs))
+	}
+	res, err := runInstall(context.Background(), fakeClient(f), "ZZBIG*1.0*1", "hdr", pairs)
+	if err != nil {
+		t.Fatalf("runInstall: %v", err)
+	}
+	if !res.Installed || res.Status != 3 {
+		t.Errorf("res = %+v, want installed status 3", res)
+	}
+	// One load+run per chunk, plus the finalize routine.
+	if want := len(chunks) + 1; f.loads != want || f.runs != want {
+		t.Errorf("loads=%d runs=%d, want %d each (chunks+finalize)", f.loads, f.runs, want)
 	}
 }
 

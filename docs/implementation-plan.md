@@ -23,7 +23,7 @@ append any new `§ Lessons learned`, and log directional decisions in `§ Q&A`.
 | P4.1 | — Phase 1: inventory only (`#9.4`/`#9.6`/`#9.7` → `inventory.json`, zero writes, no PHI) | ☐ | — | [§P4](#p4) |
 | P4.2 | — Phase 2: definition extraction (S2/S3) behind the PIKS airlock | ☐ | — | [§P4](#p4) |
 | P4.3 | — Phase 3: S1 re-export → real `.KID` for `m-kids` round-trip | 🔒 | needs gold doc (P6) | [§P4](#p4) |
-| **P5** | KIDS install automation (silent/non-interactive install of a `.KID`) | ◑ built — `v pkg install/verify/uninstall` mounted over the driver; YDB live-proven (T0a.3/T0a.4); IRIS live (T0a.5) pending | `pkgcli/lifecycle.go`, `internal/installspec/*`, `docs/kids-installation-automation.md §7.1` | [§P5](#p5) |
+| **P5** | KIDS install automation (silent/non-interactive install of a `.KID`) | ◑ built — `v pkg install/verify/uninstall` over the driver; **install now streams the transport global in size-bounded chunks → staging global → MERGE + `EN^XPDIJ`** (2026-06-12), fixing a silent partial-install of large packages (one-mega-routine staging truncated). YDB live-proven incl. the full 15-routine MSL base (test-in-place 15/15 suites); IRIS live-validation of the chunked path owed (T0b.2 IRIS leg) | `pkgcli/lifecycle.go`, `internal/installspec/*`, `docs/kids-installation-automation.md §7` | [§P5](#p5) |
 | **P6** | Gold-doc gap — *Kernel 8.0 Developer's Guide: KIDS Developer Tools User Guide* (silent-install APIs + `XPD*` answer vars + re-export entry points) | ☐ | VDL fetch pending | [§P6](#p6) |
 | **P7** | Engine parity for extraction + install (`^XTMP`/`XINDEX`/KIDS identical under YottaDB & IRIS) | 🔒 | depends on `m-ydb`/`m-iris` real-engine spikes | [§P7](#p7) |
 

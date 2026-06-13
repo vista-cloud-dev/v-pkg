@@ -27,53 +27,62 @@ func zzskelPairs() []kids.Pair {
 	})
 }
 
-func TestInstallScript_ProvenSequence(t *testing.T) {
-	got := InstallScript("ZZSKEL*1.0*1", "ZZSKEL via v pkg install", zzskelPairs())
-
-	// The non-interactive direct-populate skeleton (all four steps, in order).
-	wantInOrder := []string{
-		`D HOME^%ZIS`,                                // IO(0) for INIT^XPDID
-		`S XPDST=0,XPDIT=1`,                          // INST prerequisites
-		`S XPDA=$$INST^XPDIL1("ZZSKEL*1.0*1")`,       // real KIDS #9.7 entry
-		`S ^XTMP("XPDI",0)=$$FMADD^XLFDT(DT,7)_U_DT`, // transport expiration
-		`S ^XTMP("XPDI",XPDA,"BLD",1,0)="ZZSKEL*1.0*1^ZZSKEL^0^0"`,
-		`D EN^XPDIJ`, // synchronous install
+// StageChunks splits the transport global into size-bounded routine bodies that
+// populate the ^XTMP("VPKGI",…) staging global — never one routine big enough to
+// exceed the driver's per-routine staging limit (which silently truncates large
+// loads, T0b.2 discoveries P1).
+func TestStageChunks_CoversAllPairsBounded(t *testing.T) {
+	pairs := zzskelPairs()
+	const maxBytes = 80
+	chunks := StageChunks(pairs, maxBytes)
+	if len(chunks) < 2 {
+		t.Fatalf("want multiple chunks at maxBytes=%d, got %d", maxBytes, len(chunks))
 	}
-	last := -1
-	for _, want := range wantInOrder {
-		i := strings.Index(got, want)
-		if i < 0 {
-			t.Errorf("generated script missing %q\n---\n%s", want, got)
-			continue
+	// The first chunk clears any stale staging global before populating it.
+	if !strings.HasPrefix(chunks[0], `K ^XTMP("VPKGI")`) {
+		t.Errorf("first chunk must clear the staging global, got:\n%s", chunks[0])
+	}
+	all := strings.Join(chunks, "\n")
+	// Every pair is staged exactly once, into ^XTMP("VPKGI",…) (not the live
+	// ^XTMP("XPDI",XPDA,…) — that is filled by the finalize MERGE).
+	for _, p := range pairs {
+		ref := "S " + p.Subs.MRef(`^XTMP("VPKGI",`) + "="
+		if n := strings.Count(all, ref); n != 1 {
+			t.Errorf("pair %q staged %d times, want 1", ref, n)
 		}
-		if i < last {
-			t.Errorf("statement %q out of order", want)
+	}
+	// Embedded quotes in routine source are doubled.
+	if !strings.Contains(all, `S ^XTMP("VPKGI","RTN","ZZSKEL",5,0)=" quit ""pong"""`) {
+		t.Errorf("RTN line 5 not M-escaped:\n%s", all)
+	}
+	// Each chunk stays bounded (a lone over-long SET may exceed maxBytes, but a
+	// chunk never accumulates well past it).
+	for i, c := range chunks {
+		if len(c) > maxBytes+256 {
+			t.Errorf("chunk %d = %d bytes, exceeds the bound", i, len(c))
 		}
-		last = i
-	}
-
-	// Routine line 5 carries embedded quotes — they must be doubled.
-	if !strings.Contains(got, `S ^XTMP("XPDI",XPDA,"RTN","ZZSKEL",5,0)=" quit ""pong"""`) {
-		t.Errorf("RTN line 5 not M-escaped:\n%s", got)
-	}
-
-	// Full FM privilege is required for EN^XPDIJ.
-	if !strings.Contains(got, `DUZ(0)="@"`) {
-		t.Errorf("script must grant full FM priv (DUZ(0)=\"@\")")
-	}
-
-	// It must emit a parseable status marker the driver layer reads back.
-	if !strings.Contains(got, ResultMarker+"status=") {
-		t.Errorf("script must emit %sstatus=", ResultMarker)
 	}
 }
 
-// An already-present build must be refused before INST (which would otherwise
-// prompt "OK to continue with Load" with no stdin over the driver Exec).
-func TestInstallScript_GuardsAlreadyInstalled(t *testing.T) {
-	got := InstallScript("ZZSKEL*1.0*1", "h", zzskelPairs())
-	if !strings.Contains(got, `I $D(^XPD(9.7,"B","ZZSKEL*1.0*1"))`) {
-		t.Errorf("script must guard on an existing #9.7 entry:\n%s", got)
+// FinalInstallScript verifies the staged count, then installs in one process:
+// INST → MERGE the staged tree into ^XTMP("XPDI",XPDA) → EN^XPDIJ.
+func TestFinalInstallScript(t *testing.T) {
+	got := FinalInstallScript("ZZSKEL*1.0*1", "ZZSKEL via v pkg install", 7)
+	for _, want := range []string{
+		`I $D(^XPD(9.7,"B","ZZSKEL*1.0*1"))`,    // already-installed guard
+		`DUZ(0)="@"`,                            // full FM priv for EN^XPDIJ
+		ResultMarker + `staged=`,                // staged-node count marker
+		`I VC'=7`,                               // truncation guard: count must match
+		ResultMarker + `error=stage-incomplete`, // …else refuse, do not install partial
+		`S XPDA=$$INST^XPDIL1("ZZSKEL*1.0*1")`,  // real KIDS #9.7 entry
+		`M ^XTMP("XPDI",XPDA)=^XTMP("VPKGI")`,   // staged tree → live transport global
+		`D EN^XPDIJ`,                            // synchronous install (same process)
+		`K ^XTMP("VPKGI")`,                      // clean the staging global
+		ResultMarker + `status=`,                // #9.7 status marker
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("FinalInstallScript missing %q\n---\n%s", want, got)
+		}
 	}
 }
 

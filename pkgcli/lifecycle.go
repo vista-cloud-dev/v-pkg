@@ -154,17 +154,38 @@ type installResult struct {
 	Error     string `json:"error,omitempty"` // e.g. "already-installed"
 }
 
-// runInstall generates and runs the non-interactive install script, returning the
-// outcome read from the #9.7 status marker (or the already-installed guard).
+// stageChunkBytes bounds each staging routine so the driver stages it reliably.
+// A single routine large enough to carry a real package's transport global
+// truncates silently when staged (T0b.2 discoveries P1); 40 KB is well under the
+// observed limit while keeping the chunk count low.
+const stageChunkBytes = 40000
+
+// runInstall installs the build over the driver. The transport global is streamed
+// into a staging global in size-bounded chunks (StageChunks), then a constant-size
+// finalize routine verifies the staged count and runs INST → MERGE → EN^XPDIJ in
+// one process. The outcome is read from the #9.7 status marker (or the
+// already-installed guard). A staged-count mismatch is surfaced as an error.
 func runInstall(ctx context.Context, cl *mdriver.Client, name, header string, pairs []kids.Pair) (installResult, error) {
-	markers, _, err := runMScript(ctx, cl, rtnInstall, installspec.InstallScript(name, header, pairs))
+	chunks := installspec.StageChunks(pairs, stageChunkBytes)
+	for i, body := range chunks {
+		if _, _, err := runMScript(ctx, cl, rtnInstall, body); err != nil {
+			return installResult{Name: name}, fmt.Errorf("stage chunk %d/%d: %w", i+1, len(chunks), err)
+		}
+	}
+	markers, _, err := runMScript(ctx, cl, rtnInstall, installspec.FinalInstallScript(name, header, len(pairs)))
 	if err != nil {
 		return installResult{Name: name}, err
 	}
 	r := installResult{Name: name}
 	if e := markers["error"]; e != "" {
-		r.Error = e
-		return r, nil
+		if e == "already-installed" {
+			r.Error = e
+			return r, nil
+		}
+		// e.g. stage-incomplete: a chunk was truncated — fail loudly, never
+		// install a partial package.
+		return installResult{Name: name}, fmt.Errorf("install refused: %s (staged %s of %d nodes)",
+			e, strings.TrimSpace(markers["staged"]), len(pairs))
 	}
 	r.Status, _ = strconv.Atoi(strings.TrimSpace(markers["status"]))
 	r.Installed = r.Status == 3
