@@ -23,7 +23,7 @@ append any new `§ Lessons learned`, and log directional decisions in `§ Q&A`.
 | P4.1 | — Phase 1: inventory only (`#9.4`/`#9.6`/`#9.7` → `inventory.json`, zero writes, no PHI) | ☐ | — | [§P4](#p4) |
 | P4.2 | — Phase 2: definition extraction (S2/S3) behind the PIKS airlock | ☐ | — | [§P4](#p4) |
 | P4.3 | — Phase 3: S1 re-export → real `.KID` for `m-kids` round-trip | 🔒 | needs gold doc (P6) | [§P4](#p4) |
-| **P5** | KIDS install automation (silent/non-interactive install of a `.KID`) | ☐ design only | `docs/kids-installation-automation.md` | [§P5](#p5) |
+| **P5** | KIDS install automation (silent/non-interactive install of a `.KID`) | ◑ built — `v pkg install/verify/uninstall` over the driver; **install now streams the transport global in size-bounded chunks → staging global → MERGE + `EN^XPDIJ`** (2026-06-12), fixing a silent partial-install of large packages (one-mega-routine staging truncated). YDB live-proven incl. the full 15-routine MSL base (test-in-place 15/15 suites); IRIS live-validation of the chunked path owed (T0b.2 IRIS leg) | `pkgcli/lifecycle.go`, `internal/installspec/*`, `docs/kids-installation-automation.md §7` | [§P5](#p5) |
 | **P6** | Gold-doc gap — *Kernel 8.0 Developer's Guide: KIDS Developer Tools User Guide* (silent-install APIs + `XPD*` answer vars + re-export entry points) | ☐ | VDL fetch pending | [§P6](#p6) |
 | **P7** | Engine parity for extraction + install (`^XTMP`/`XINDEX`/KIDS identical under YottaDB & IRIS) | 🔒 | depends on `m-ydb`/`m-iris` real-engine spikes | [§P7](#p7) |
 
@@ -122,7 +122,7 @@ definition walk / S3 component dump); recommended architecture runs over the
 engine-neutral driver contract (P7). **Phase 1 (inventory-only) is zero-write,
 no-PHI — ship first.** Open items tracked in `§ Q&A` (Q2, Q5).
 
-### P5 — KIDS install automation (design only) {#p5}
+### P5 — KIDS install automation (built; IRIS-live pending) {#p5}
 Per `docs/kids-installation-automation.md`: drive the authoritative 3-phase KIDS
 install (load distribution → install build → post-install) non-interactively.
 Two tiers: **Tier A** = native silent-install APIs + `XPD*` answer variables
@@ -130,6 +130,21 @@ Two tiers: **Tier A** = native silent-install APIs + `XPD*` answer variables
 interactive menus (the safe interim default). Transport globals live in `^XTMP`;
 menus `[XPD MAIN]`/`[XPD INSTALLATION MENU]`; keys `XUPROG`/`XUPROGMODE`. Runs
 over the driver contract (P7). Open items in `§ Q&A` (Q3, Q4).
+
+**Built (2026-06-12):** the chosen automation route is the **direct-`^XTMP`
+populate** path (§7.1) — `internal/installspec` generates the proven M (create the
+`#9.7` entry via `$$INST^XPDIL1` → populate `^XTMP("XPDI",XPDA,…)` from the parsed
+`.KID` pairs → synchronous `EN^XPDIJ`; `<<VPKG>>key=value` result markers), and
+`pkgcli/lifecycle.go` mounts **`v pkg install` / `verify` / `uninstall`** on it.
+The waterline split holds: the KIDS knowledge stays here, while reaching a live
+engine goes through the shared `mdriver.Client` (m-driver-sdk v0.3.0) — each verb
+stages its script as a scratch routine (`ZVPKG*`) via `exec load` and runs `EN^…`
+via `exec run` (one process = one symbol table, so `XPDA` survives the SETs).
+Markers are read off captured device output. **Live-proven on the YDB FOIA engine
+(T0a.3/T0a.4).** Remaining: **T0a.5** — the same lifecycle live on the **IRIS
+FOIA** engine (`foia` container) is the M0a exit gate (three invariants green on
+both engines). `v pkg <verb>` takes the built `.KID` + `--engine ydb|iris`
+`--transport local|docker|remote`.
 
 ### P6 — Gold-doc gap {#p6}
 The *Kernel 8.0 Developer's Guide: KIDS Developer Tools User Guide* is **not** in

@@ -1,9 +1,9 @@
-# m-kids — KIDS round-trip CLI. Build conventions inherited from
+# v-pkg — the `v pkg` KIDS domain. Build conventions inherited from
 # go-cli-template: static (CGO_ENABLED=0), -trimpath, version stamped via
-# -ldflags, cross-compile matrix, lint, test, schema.
+# -ldflags, cross-compile matrix, lint, test, schema, contract.
 
-BIN     ?= m-kids                     # KIDS round-trip CLI
-PKG     := github.com/vista-cloud-dev/m-kids
+BIN     ?= v-pkg                     # the v pkg domain CLI (standalone)
+PKG     := github.com/vista-cloud-dev/v-pkg
 LDPKG   := $(PKG)/clikit
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
@@ -16,7 +16,7 @@ export CGO_ENABLED := 0
 
 PLATFORMS := linux/amd64 linux/arm64 darwin/arm64 windows/amd64
 
-.PHONY: all build run lint test tidy schema dist clean
+.PHONY: all build run lint test tidy schema contract check-contract dist clean
 
 all: lint test build
 
@@ -39,6 +39,14 @@ tidy:
 schema: build
 	./dist/$(BIN) schema
 
+# Regenerate the v-cli domain contract (v-cli-platform.md §4) → dist/v-contract.json.
+contract:
+	UPDATE_GOLDEN=1 go test ./pkgcli/ -run Contract
+
+# Drift gate: fail if dist/v-contract.json is stale vs the live command tree.
+check-contract:
+	go test ./pkgcli/ -run Contract
+
 # Cross-compile the pinned matrix into dist/.
 dist:
 	@mkdir -p dist
@@ -50,4 +58,5 @@ dist:
 	done
 
 clean:
-	rm -rf dist
+	rm -f dist/$(BIN) dist/$(BIN)-* *.test
+	@# keep dist/*.json — committed, drift-gated contract artifacts

@@ -1,0 +1,12 @@
+{
+  "id": "tool:v-pkg",
+  "repo": "https://github.com/vista-cloud-dev/v-pkg",
+  "role": "VistA KIDS packaging — the `v pkg` domain (build/install/verify/uninstall over the m engine seam)",
+  "language": ["go"],
+  "layer": "v",
+  "license": "AGPL-3.0",
+  "exposes": {
+    "contract": "dist/v-contract.json"
+  },
+  "verification_commands": ["go test ./...", "./dist/m arch check ."]
+}

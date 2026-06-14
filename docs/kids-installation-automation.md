@@ -162,9 +162,9 @@ flowchart LR
     SPEC --> ORCH["installer orchestrator"]
 
     subgraph tierA["Tier A — API-driven (preferred)"]
-        A1["$$LOAD^XPDID / silent load API"]
-        A2["set XPD* answer variables in symbol table"]
-        A3["D INSTALL / silent install entry point"]
+        A1["EN1^XPDIL — load distribution from HFS → ^XTMP + INSTALL #9.7"]
+        A2["pre-seed symbol table: XPDDIQ(\"XPZ1/XPO1/XPI1\")=0, Delay=0, null device"]
+        A3["EN^XPDIJ(xpda) — task install of the loaded build by #9.7 IEN (ICR 2243)"]
     end
     subgraph tierB["Tier B — expect-driven (fallback)"]
         B1["spawn terminal session"]
@@ -178,13 +178,29 @@ flowchart LR
     ENG --> RES["structured result<br/>(read from INSTALL #9.7 + #9.4)"]
 ```
 
-- **Tier A — API/silent install (preferred).** KIDS exposes silent entry points
-  used by automated patching: a build is loaded with a load API, the standard
-  answers are pre-seeded as `XPD*` variables in the M symbol table, and the
-  install is driven without prompting. This is how FORUM/Patchman-style
-  automatic patching (`[XPD AUTOMATIC PATCHING MENU]`) operates. Exact entry
-  points must be confirmed against the KIDS Developer Tools guide (gap — §
-  References [4]).
+- **Tier A — API/silent install (preferred). Entry points confirmed from the
+  GOLD corpus (2026-06-12), closing the prior gap:**
+  - **Load:** `EN1^XPDIL` — the routine behind `[XPD LOAD DISTRIBUTION]`; loads
+    the HFS `.KID` into `^XTMP` and creates an INSTALL (#9.7) entry. It is the
+    *interactive option routine* (prompts "Enter a Host File:") — there is **no**
+    documented param-list silent API (`$$LOAD^XPDID` etc. do **not** exist), so it
+    must be driven with the file/device answers pre-seeded.
+  - **Install:** `EN^XPDIJ(xpda)` — the one documented *programmatic* install call
+    (ICR **#2243**, Controlled Subscription): tasks off the install of an
+    **already-loaded** build, where `xpda` = the build's INSTALL (#9.7) IEN. (The
+    interactive option routine is `EN^XPDI`.)
+  - **Suppress the standard questions** from the env-check via the `XPDDIQ` array:
+    `XPDDIQ("XPZ1")=0` (disable options/protocols → NO) is the documented case;
+    `XPDDIQ("XPO1")=0` (rebuild menu trees) / `XPDDIQ("XPI1")=0` (inhibit logons)
+    follow the same answer-code pattern. Delay = `0`; device = null/non-queued via
+    the Kernel IO context (no single documented `XPD*` device var).
+  - **Phase:** `XPDENV` = `1` during the install-phase env-check, `0` during the
+    load-phase one — guard install-only setup (e.g. `XPDDIQ`) on `XPDENV=1`.
+  - **Caveat:** the exact param signatures + non-interactive driving of these
+    routines are **not confirmable from docs alone** (the corpus has no XPD*
+    routine source) — confirm against a real Kernel routine listing (`%RO`/`ZL`)
+    on a live engine before relying on them. So a live FOIA VistA is still
+    required to finalize + validate the driver (M0a's "deepest unknown").
 - **Tier B — expect-driven (fallback).** When silent APIs are unavailable, drive
   the menu in a pseudo-terminal: send `D ^XUP`/`EVE` → KIDS → `XPD INSTALL
   BUILD`, then a prompt→answer state machine sourced from `install-spec.yaml`.
@@ -264,6 +280,99 @@ with long background post-installs (e.g. cross-reference rebuilds that pause
 every N records), the orchestrator must poll the INSTALL `#9.7` status and any
 build-specific completion tag rather than assuming synchronous completion. [5]
 
+### 7.1 Live-proven minimal sequence (ZZSKEL, YottaDB FOIA — 2026-06-12)
+
+The full load → install → verify → uninstall lifecycle was driven end-to-end on
+a live FOIA `worldvista/vehu` engine (`GT.M V7.0-005`), installing the throwaway
+`ZZSKEL` routine-only package built by `v pkg build`. This is the ground truth
+the §11 entry-point research was missing; every claim below was observed live.
+
+**Load** — `EN1^XPDIL` (the `ST→GI` path) reads the host file interactively. Its
+`GI` parser expects exactly the layout `v pkg build` emits: line 1 banner, line 2
+comment, a `**KIDS**:<name>^` line, a blank terminator, then `**INSTALL NAME**` +
+name, then `node)` / `value` pairs to `**END**`. Driving it needs **two** answers
+on stdin — the host-file path and accept-default at *"Want to Continue with Load?
+YES//"*. On success it populates `^XTMP("XPDI",XPDA,…)` and a `#9.7` INSTALL
+entry, and prints *"Use INSTALL NAME: <name> to install this Distribution."*
+
+```m
+S DUZ=1,DUZ(0)="@",DT=$$DT^XLFDT,U="^"
+D EN1^XPDIL          ; reads the next two stdin lines:
+;   /tmp/ZZSKEL.kids  (host file)
+;   YES               (continue-with-load default)
+S XPDA=$O(^XPD(9.7,"B","ZZSKEL*1.0*1",0))   ; recover the loaded build's #9.7 IEN
+```
+
+**Install** — call `EN^XPDIJ` **directly** (synchronous; it is the job TaskMan
+would otherwise queue). It self-runs `INIT^XPDID` (builds the `"ASP"` xref),
+installs the routines via `IN^XPDIJ1`, and sets `#9.7` status. It does **not**
+prompt: the interactive questions live in the *preceding* `XPDIA`/`XPDIP` phase,
+and `$$ANSWER^XPDIQ` returns `""` (= default NO) for a routine-only build with no
+stored answers — exactly what automation wants. Full FM priv (`DUZ(0)="@"`) is
+required.
+
+```m
+S XPDA=$O(^XPD(9.7,"B","ZZSKEL*1.0*1",0)) D EN^XPDIJ
+```
+
+**Verify** — success markers, all confirmed live:
+- `$P(^XPD(9.7,XPDA,0),U,9) = 3` — INSTALL `#9.7` status **"Install Completed"**
+  (piece 9 of the 0-node; **set `U="^"` before slicing** — a missing `U` silently
+  yields an empty/garbage piece and was the one false-alarm this session).
+- `$T(^ZZSKEL)]""` — routine installed and `$$PING^ZZSKEL()` returns `"pong"`
+  (the routine actually executes, not merely files).
+- `#9.6` BUILD entry created (`^XPD(9.6,"B","<name>")`).
+
+**Uninstall (reversibility, T0a.4)** — KIDS ships **no** generic uninstall; back-out
+is the tool's job. For a routine-only package three deletions fully reverse it:
+
+```m
+S X="ZZSKEL" X ^%ZOSF("DEL")                                  ; delete routine (.m + .o)
+S DA=$O(^XPD(9.7,"B","ZZSKEL*1.0*1",0)),DIK="^XPD(9.7," D ^DIK ; delete #9.7 INSTALL
+S DA=$O(^XPD(9.6,"B","ZZSKEL*1.0*1",0)),DIK="^XPD(9.6," D ^DIK ; delete #9.6 BUILD
+```
+
+A snapshot→install→uninstall→diff cycle proved **reversible**: the routine is
+absent (and `ZZSKEL.m`/`.o` gone from disk) and both `#9.6`/`#9.7` B-xrefs return
+to empty, identical to the pre-install snapshot. The only residual divergence is
+the monotonic `#9.6`/`#9.7` IEN counters (`^XPD(9.x,0)` piece 3) — inherent to
+FileMan, not a leak.
+
+**Gotcha — corrupt half-installs.** A prior aborted install can leave a `#9.7`
+entry with the `"ASP"`/`"INI"`/`"INIT"` xrefs (written by `INIT^XPDID` at install
+start) but **no `0`-node** — `EN^XPDIJ`'s first line `Q:'$D(^XPD(9.7,+$G(XPDA),0))`
+silently bails on it, and `EN1^XPDIU` (the KIDS unload) crashes reading the missing
+`0`-node. Automation must purge by IEN (`K ^XPD(9.7,ien),^XPD(9.7,"ASP",ien)` +
+the `"B"` xref + `^XTMP("XPDI",ien)`) before a clean reinstall.
+
+**Non-interactive load is the remaining design point** for `v pkg install` over
+the driver `Exec` (subprocess + JSON, no interactive stdin): either drive the two
+`EN1^XPDIL` prompts through a stdin-capable transport, or populate
+`^XTMP("XPDI",XPDA,…)` + the `#9.7` entry directly from the parsed `.KID` (whose
+node/value pairs are exactly the transport-global contents) and call `EN^XPDIJ`.
+The direct-populate path sidesteps the interactive prompt entirely and is the
+chosen automation route.
+
+**Streamed populate (2026-06-12) — the transport global is too big for one
+routine.** The first cut embedded every `^XTMP("XPDI",XPDA,…)` SET in one
+generated routine (`ZVPKGINS`) and ran it. That works for a one-routine fixture
+(ZZSKEL) but **silently partial-installs a real package**: the MSL base
+(15 routines / ~6100 nodes / ~560 KB) produced a ~560 KB install routine, which
+the driver's routine staging **truncates without error** (T0b.2 discoveries P1),
+so only the first ~3 routines landed while `EN^XPDIJ` still reported `#9.7`
+status 3. The fix (`internal/installspec`, `pkgcli/lifecycle.go`): **stream the
+pairs into a staging global `^XTMP("VPKGI",…)` in size-bounded chunks**
+(`StageChunks`, ≤40 KB each — each stages reliably), then a **constant-size
+finalize routine** (`FinalInstallScript`) counts the staged nodes (refusing with
+`error=stage-incomplete` on any mismatch — a silent truncation now fails loudly),
+creates the `#9.7` entry, `MERGE`s the staged tree into `^XTMP("XPDI",XPDA)`, and
+runs `EN^XPDIJ` — all in one process so XPDA survives. Live-proven on the YDB FOIA
+`vehu`: the full 15-routine MSL base installs (all `$T(^STD*)=1`), the m-stdlib
+suites pass **test-in-place** (15/15 suites, 1403 assertions), and uninstall is
+reversible. (A native driver `SetGlobal` would let the host populate `^XTMP`
+without staging routines at all — cleaner, but it is not on the reference
+`mdriver.Client` yet; the chunked-routine path needs no SDK change.)
+
 ---
 
 ## 8. Verification & idempotency
@@ -316,10 +425,22 @@ Back-out, Rollback guide). Automation should:
 
 ## 11. Open questions
 
-1. **Exact silent-install entry points.** The precise KIDS load/install APIs and
-   the full `XPD*` answer-variable names for fully non-interactive installs need
-   confirmation from the *KIDS Developer Tools User Guide* (§References [4], a
-   gold-corpus gap). Until then, Tier B (expect) is the safe default.
+1. **Exact silent-install entry points. ~~Gap~~ — RESOLVED 2026-06-12 from the
+   GOLD corpus** (Kernel 8.0 DG/SM KIDS UG + TM): load = `EN1^XPDIL`, install =
+   `EN^XPDIJ(xpda)` (ICR 2243) / `EN^XPDI`, answer-suppression via
+   `XPDDIQ("XPZ1"/"XPO1"/"XPI1")`, phase via `XPDENV`, result via INSTALL #9.7
+   `STATUS` (#.02) = "Install Completed" (global `^XPD(9.7,…)`) + PACKAGE #9.4
+   patch history (`^DIC(9.4,ien,22,v,1105,…)`). **No** clean public "silent load
+   from HFS / silent install by name" API exists — `EN1^XPDIL`/`EN^XPDI` are the
+   interactive option routines, driven under a pre-seeded symbol table; `EN^XPDIJ`
+   tasks an already-loaded build. **CLOSED 2026-06-12 (live, YDB FOIA):** the
+   exact sequence is proven end-to-end in [§7.1](#71-live-proven-minimal-sequence-zzskel-yottadb-foia--2026-06-12)
+   — `EN1^XPDIL` load (two stdin answers), `EN^XPDIJ` synchronous install (no
+   prompt; `$$ANSWER^XPDIQ`→`""` default-NO), `#9.7` status piece 9 = 3, routine
+   installed + executes. Reversible uninstall via `^%ZOSF("DEL")` + `DIK` on
+   `#9.7`/`#9.6`. The one remaining design point is **non-interactive load over
+   the driver `Exec`** (direct `^XTMP` populate vs stdin transport), not the entry
+   points. Tier B (expect) stays the cross-engine fallback.
 2. **Queued-install polling contract.** Standardize how the orchestrator polls
    TaskMan + `#9.7` for queued/background completion.
 3. **Engine parity.** Confirm `^XTMP`, `XINDEX`, and KIDS behave identically
