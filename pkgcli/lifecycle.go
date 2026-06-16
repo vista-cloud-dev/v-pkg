@@ -241,10 +241,11 @@ type verifyResult struct {
 	Installed bool            `json:"installed"`
 	Status    int             `json:"status"`
 	Routines  map[string]bool `json:"routines"`
+	Params    map[string]bool `json:"params,omitempty"` // #8989.51 PARAMETER DEFINITIONs present
 }
 
-// ok reports a fully verified install: #9.7 present + completed and every routine
-// loaded.
+// ok reports a fully verified install: #9.7 present + completed, every routine
+// loaded, and every PARAMETER DEFINITION present.
 func (r verifyResult) ok() bool {
 	if !r.Installed || r.Status != 3 {
 		return false
@@ -254,19 +255,27 @@ func (r verifyResult) ok() bool {
 			return false
 		}
 	}
+	for _, present := range r.Params {
+		if !present {
+			return false
+		}
+	}
 	return true
 }
 
-func runVerify(ctx context.Context, cl *mdriver.Client, name string, routines []string) (verifyResult, error) {
-	markers, _, err := runMScript(ctx, cl, rtnVerify, installspec.VerifyScript(name, routines))
+func runVerify(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs []string) (verifyResult, error) {
+	markers, _, err := runMScript(ctx, cl, rtnVerify, installspec.VerifyScript(name, routines, paramDefs))
 	if err != nil {
 		return verifyResult{Name: name}, err
 	}
-	r := verifyResult{Name: name, Routines: map[string]bool{}}
+	r := verifyResult{Name: name, Routines: map[string]bool{}, Params: map[string]bool{}}
 	r.Installed = strings.TrimSpace(markers["installed"]) == "1"
 	r.Status, _ = strconv.Atoi(strings.TrimSpace(markers["status"]))
 	for _, rt := range routines {
 		r.Routines[rt] = strings.TrimSpace(markers["rtn:"+rt]) == "1"
+	}
+	for _, p := range paramDefs {
+		r.Params[p] = strings.TrimSpace(markers["param:"+p]) == "1"
 	}
 	return r, nil
 }
@@ -285,7 +294,7 @@ func (c *verifyCmd) Run(cc *clikit.Context) error {
 	if err != nil {
 		return c.noDriver(err)
 	}
-	res, err := runVerify(context.Background(), cl, name, b.RoutineNames())
+	res, err := runVerify(context.Background(), cl, name, b.RoutineNames(), b.ParamDefNames())
 	if err != nil {
 		return clikit.Fail(clikit.ExitRuntime, "VERIFY_FAILED", err.Error(), "")
 	}
@@ -302,6 +311,13 @@ func (c *verifyCmd) Run(cc *clikit.Context) error {
 				mark = cc.Failure("missing")
 			}
 			fmt.Fprintf(cc.Stdout, "  %s %s\n", rt, mark)
+		}
+		for p, present := range res.Params {
+			mark := cc.Success("ok")
+			if !present {
+				mark = cc.Failure("missing")
+			}
+			fmt.Fprintf(cc.Stdout, "  param %s %s\n", p, mark)
 		}
 	}); err != nil {
 		return err
@@ -320,8 +336,8 @@ type uninstallResult struct {
 	Uninstalled bool   `json:"uninstalled"`
 }
 
-func runUninstall(ctx context.Context, cl *mdriver.Client, name string, routines []string) (uninstallResult, error) {
-	markers, _, err := runMScript(ctx, cl, rtnUninstall, installspec.UninstallScript(name, routines))
+func runUninstall(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs []string) (uninstallResult, error) {
+	markers, _, err := runMScript(ctx, cl, rtnUninstall, installspec.UninstallScript(name, routines, paramDefs))
 	if err != nil {
 		return uninstallResult{Name: name}, err
 	}
@@ -342,7 +358,7 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 	if err != nil {
 		return c.noDriver(err)
 	}
-	res, err := runUninstall(context.Background(), cl, name, b.RoutineNames())
+	res, err := runUninstall(context.Background(), cl, name, b.RoutineNames(), b.ParamDefNames())
 	if err != nil {
 		return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", err.Error(), "")
 	}

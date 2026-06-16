@@ -91,6 +91,12 @@ func FinalInstallScript(name, header string, nPairs int) string {
 	w(`S XPDA=$$INST^XPDIL1(` + nameLit + `)`)
 	w(`S ^XTMP("XPDI",0)=$$FMADD^XLFDT(DT,7)_U_DT`)
 	w(`M ^XTMP("XPDI",XPDA)=` + stageGbl) // staged tree → live transport global
+	// Seed the #9.7 INSTALL record's KRN component-tracking multiple from the build
+	// manifest. A real KIDS load fills this; the direct-populate path does not, and
+	// KRN^XPDIK reads ^XPD(9.7,XPDA,"KRN",file,0) without $G — an undefined node
+	// faults the install (status stuck at 2). XPCOM then stamps each as installed.
+	w(`N XPDBLD S XPDBLD=$O(^XTMP("XPDI",XPDA,"BLD",0))`)
+	w(`M:$D(^XTMP("XPDI",XPDA,"BLD",XPDBLD,"KRN")) ^XPD(9.7,XPDA,"KRN")=^XTMP("XPDI",XPDA,"BLD",XPDBLD,"KRN")`)
 	w(`D EN^XPDIJ`)
 	w(`K ` + stageGbl)
 	w(`W "` + ResultMarker + `status=",$P($G(^XPD(9.7,XPDA,0)),U,9),!`)
@@ -98,9 +104,10 @@ func FinalInstallScript(name, header string, nPairs int) string {
 }
 
 // VerifyScript returns M source that reports whether name is installed: the
-// #9.7 INSTALL presence + status (piece 9; 3 = "Install Completed") and, per
-// routine, whether it is loaded ($T probe). Each fact is a ResultMarker line.
-func VerifyScript(name string, routines []string) string {
+// #9.7 INSTALL presence + status (piece 9; 3 = "Install Completed"), per routine
+// whether it is loaded ($T probe), and per PARAMETER DEFINITION whether it is
+// present in #8989.51 (the "B" index). Each fact is a ResultMarker line.
+func VerifyScript(name string, routines, paramDefs []string) string {
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
 
@@ -111,22 +118,28 @@ func VerifyScript(name string, routines []string) string {
 	for _, r := range routines {
 		w(`W "` + ResultMarker + `rtn:` + r + `=",$S($T(^` + r + `)]"":1,1:0),!`)
 	}
+	for _, p := range paramDefs {
+		w(`W "` + ResultMarker + `param:` + p + `=",$S($D(^XTV(8989.51,"B",` + kids.MString(p) + `)):1,1:0),!`)
+	}
 	return b.String()
 }
 
-// UninstallScript returns M source that reverses a routine-only install
-// (T0a.4): delete each routine (^%ZOSF("DEL") removes the .m + .o) and the #9.7
-// INSTALL and #9.6 BUILD entries via FileMan DIK (which also clears their
-// cross-references). KIDS ships no generic uninstall — back-out is the tool's
-// job. The monotonic #9.x IEN counters are not rolled back (inherent to
-// FileMan, not a leak).
-func UninstallScript(name string, routines []string) string {
+// UninstallScript returns M source that reverses an install (T0a.4): delete each
+// routine (^%ZOSF("DEL") removes the .m + .o), each PARAMETER DEFINITION from
+// #8989.51 (FileMan DIK by IEN — clears its "B" and subfile xrefs), and the #9.7
+// INSTALL and #9.6 BUILD entries via DIK. KIDS ships no generic uninstall —
+// back-out is the tool's job. The monotonic #9.x / #8989.51 IEN counters are not
+// rolled back (inherent to FileMan, not a leak).
+func UninstallScript(name string, routines, paramDefs []string) string {
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
 
 	w(`S U="^",DUZ=1,DUZ(0)="@"`)
 	for _, r := range routines {
 		w(`S X=` + kids.MString(r) + ` X ^%ZOSF("DEL")`)
+	}
+	for _, p := range paramDefs {
+		w(`S DA=$O(^XTV(8989.51,"B",` + kids.MString(p) + `,0)),DIK="^XTV(8989.51," I DA D ^DIK`)
 	}
 	nameLit := kids.MString(name)
 	w(`S DA=$O(^XPD(9.7,"B",` + nameLit + `,0)),DIK="^XPD(9.7," I DA D ^DIK`)

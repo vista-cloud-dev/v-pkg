@@ -205,7 +205,7 @@ func TestRunVerify(t *testing.T) {
 	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
 		installspec.ResultMarker + "status=3\n" +
 		installspec.ResultMarker + "rtn:ZZSKEL=1\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"})
+	res, err := runVerify(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil)
 	if err != nil {
 		t.Fatalf("runVerify: %v", err)
 	}
@@ -214,11 +214,33 @@ func TestRunVerify(t *testing.T) {
 	}
 }
 
+// A verify carrying a PARAMETER DEFINITION reads its presence marker and folds it
+// into ok() — a missing param means the install is not fully verified.
+func TestRunVerify_ParamDef(t *testing.T) {
+	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
+		installspec.ResultMarker + "status=3\n" +
+		installspec.ResultMarker + "rtn:VSLCFG=1\n" +
+		installspec.ResultMarker + "param:VSL GREETING=1\n"}
+	res, err := runVerify(context.Background(), fakeClient(f), "VSLBASE*1.0*1",
+		[]string{"VSLCFG"}, []string{"VSL GREETING"})
+	if err != nil {
+		t.Fatalf("runVerify: %v", err)
+	}
+	if !res.Params["VSL GREETING"] || !res.ok() {
+		t.Errorf("res = %+v, want param present and ok()", res)
+	}
+	// A missing param defeats ok().
+	res.Params["VSL GREETING"] = false
+	if res.ok() {
+		t.Error("ok() must be false when a param def is missing")
+	}
+}
+
 func TestRunVerify_NotInstalled(t *testing.T) {
 	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=0\n" +
 		installspec.ResultMarker + "status=\n" +
 		installspec.ResultMarker + "rtn:ZZSKEL=0\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"})
+	res, err := runVerify(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil)
 	if err != nil {
 		t.Fatalf("runVerify: %v", err)
 	}
@@ -231,7 +253,7 @@ func TestRunVerify_NotInstalled(t *testing.T) {
 
 func TestRunUninstall(t *testing.T) {
 	f := &fakeDriver{runStdout: installspec.ResultMarker + "uninstalled=1\n"}
-	res, err := runUninstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"})
+	res, err := runUninstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil)
 	if err != nil {
 		t.Fatalf("runUninstall: %v", err)
 	}

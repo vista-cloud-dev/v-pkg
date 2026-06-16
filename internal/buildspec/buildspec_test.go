@@ -36,6 +36,65 @@ func TestParse_Valid(t *testing.T) {
 	}
 }
 
+const vslbase = `{
+  "package": "VSLBASE",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "routines": ["VSLCFG"],
+    "parameterDefinitions": [
+      {
+        "name": "VSL GREETING",
+        "displayText": "VSL greeting string (read by VPNG)",
+        "dataType": "free text",
+        "entities": [ { "entity": "SYS", "precedence": 1 } ]
+      }
+    ]
+  },
+  "requiredBuilds": [
+    { "name": "MSL*1.0*1", "action": "DON'T INSTALL, LEAVE GLOBAL" }
+  ]
+}`
+
+func TestParse_ParameterDefinitions(t *testing.T) {
+	s, err := Parse([]byte(vslbase))
+	if err != nil {
+		t.Fatalf("Parse VSL base spec: %v", err)
+	}
+	if len(s.Components.ParameterDefinitions) != 1 {
+		t.Fatalf("parameterDefinitions = %+v", s.Components.ParameterDefinitions)
+	}
+	p := s.Components.ParameterDefinitions[0]
+	if p.Name != "VSL GREETING" {
+		t.Errorf("param name = %q", p.Name)
+	}
+	if p.DataType != "free text" {
+		t.Errorf("param dataType = %q", p.DataType)
+	}
+	if len(p.Entities) != 1 || p.Entities[0].Entity != "SYS" || p.Entities[0].Precedence != 1 {
+		t.Errorf("param entities = %+v", p.Entities)
+	}
+	// A spec carrying only parameter definitions (no routines) is still non-empty.
+	if s.Components.empty() {
+		t.Error("spec with a parameter definition must not be empty")
+	}
+}
+
+func TestParse_ParameterDefinitions_Invalid(t *testing.T) {
+	cases := map[string]string{
+		"no name":      `{"package":"VSL","version":"1.0","components":{"parameterDefinitions":[{"displayText":"x"}]}}`,
+		"bad name":     `{"package":"VSL","version":"1.0","components":{"parameterDefinitions":[{"name":"lower case"}]}}`,
+		"bad datatype": `{"package":"VSL","version":"1.0","components":{"parameterDefinitions":[{"name":"VSL X","dataType":"bogus"}]}}`,
+		"bad entity":   `{"package":"VSL","version":"1.0","components":{"parameterDefinitions":[{"name":"VSL X","entities":[{"entity":"NOPE"}]}]}}`,
+		"neg prec":     `{"package":"VSL","version":"1.0","components":{"parameterDefinitions":[{"name":"VSL X","entities":[{"entity":"SYS","precedence":-1}]}]}}`,
+	}
+	for name, js := range cases {
+		if _, err := Parse([]byte(js)); err == nil {
+			t.Errorf("%s: expected an error, got nil", name)
+		}
+	}
+}
+
 func TestInstallName_NoPatch(t *testing.T) {
 	s, err := Parse([]byte(`{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"]}}`))
 	if err != nil {

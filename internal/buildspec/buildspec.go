@@ -25,6 +25,15 @@ const (
 
 var validActions = map[string]bool{ActionWarn: true, ActionLeaveGlobal: true, ActionRemoveGlobal: true}
 
+// RequiredBuildActionCode maps a Required-Build action to its #9.611 ACTION
+// set-of-codes value (0 = warn, 1 = don't install/remove global, 2 = don't
+// install/leave global).
+var RequiredBuildActionCode = map[string]int{
+	ActionWarn:         0,
+	ActionRemoveGlobal: 1,
+	ActionLeaveGlobal:  2,
+}
+
 // Spec is one KIDS build definition (kids/<pkg>.build.json).
 type Spec struct {
 	Package        string          `json:"package"`         // NAMESPACE (e.g. ZZSKEL)
@@ -39,22 +48,69 @@ type Spec struct {
 // Components is the BUILD component list (#9.6). Each slice is omitempty so a
 // spec lists only what it ships.
 type Components struct {
-	Routines   []string   `json:"routines,omitempty"`
-	Files      []FileComp `json:"files,omitempty"`
-	Options    []string   `json:"options,omitempty"`
-	Keys       []string   `json:"keys,omitempty"`       // security keys
-	Parameters []string   `json:"parameters,omitempty"` // XPAR parameters
-	Protocols  []string   `json:"protocols,omitempty"`
-	Templates  []string   `json:"templates,omitempty"`
-	RPCs       []string   `json:"rpcs,omitempty"`
-	MailGroups []string   `json:"mailGroups,omitempty"`
-	HL7        []string   `json:"hl7,omitempty"`
+	Routines             []string   `json:"routines,omitempty"`
+	Files                []FileComp `json:"files,omitempty"`
+	Options              []string   `json:"options,omitempty"`
+	Keys                 []string   `json:"keys,omitempty"`                 // security keys
+	Parameters           []string   `json:"parameters,omitempty"`           // XPAR parameter names (reference only)
+	ParameterDefinitions []ParamDef `json:"parameterDefinitions,omitempty"` // XPAR #8989.51 PARAMETER DEFINITION components (shipped as data)
+	Protocols            []string   `json:"protocols,omitempty"`
+	Templates            []string   `json:"templates,omitempty"`
+	RPCs                 []string   `json:"rpcs,omitempty"`
+	MailGroups           []string   `json:"mailGroups,omitempty"`
+	HL7                  []string   `json:"hl7,omitempty"`
 }
 
 func (c Components) empty() bool {
 	return len(c.Routines) == 0 && len(c.Files) == 0 && len(c.Options) == 0 &&
-		len(c.Keys) == 0 && len(c.Parameters) == 0 && len(c.Protocols) == 0 &&
-		len(c.Templates) == 0 && len(c.RPCs) == 0 && len(c.MailGroups) == 0 && len(c.HL7) == 0
+		len(c.Keys) == 0 && len(c.Parameters) == 0 && len(c.ParameterDefinitions) == 0 &&
+		len(c.Protocols) == 0 && len(c.Templates) == 0 && len(c.RPCs) == 0 &&
+		len(c.MailGroups) == 0 && len(c.HL7) == 0
+}
+
+// ParamDef is an XPAR PARAMETER DEFINITION (#8989.51) shipped as a KIDS KRN
+// component — the build creates the definition (not a value) at install time.
+// DataType/Entity are human names resolved to their #8989.51 codes / #8989.518
+// IENs by ParamDataTypeCode / ParamEntityIEN.
+type ParamDef struct {
+	Name        string        `json:"name"`                  // #8989.51 .01 NAME (uppercase, e.g. "VSL GREETING")
+	DisplayText string        `json:"displayText,omitempty"` // #8989.51 .02 DISPLAY TEXT
+	DataType    string        `json:"dataType,omitempty"`    // value data type; default "free text"
+	Entities    []ParamEntity `json:"entities,omitempty"`    // ALLOWABLE ENTITIES (#8989.513) — where the param may be set
+}
+
+// ParamEntity is one ALLOWABLE ENTITIES row of a ParamDef: which entity the
+// parameter may be set at, and its precedence.
+type ParamEntity struct {
+	Entity     string `json:"entity"`               // entity abbreviation: SYS, USR, PKG, …
+	Precedence int    `json:"precedence,omitempty"` // #8989.513 .01 PRECEDENCE; default 1
+}
+
+// ParamDataTypeCode maps a human value-data-type name to the #8989.51 field 1.1
+// (VALUE DATA TYPE) set-of-codes value. Free text is the default; the rest are
+// accepted for completeness.
+var ParamDataTypeCode = map[string]string{
+	"free text":       "F",
+	"numeric":         "N",
+	"yes/no":          "Y",
+	"set of codes":    "S",
+	"date/time":       "D",
+	"pointer":         "P",
+	"word processing": "W",
+}
+
+// ParamEntityIEN maps a parameter-entity abbreviation to its #8989.518
+// (PARAMETER ENTITY) IEN. #8989.518 is DINUM'd to the pointed-to file number, so
+// these IENs are national constants — portable across YDB and IRIS VistA.
+var ParamEntityIEN = map[string]string{
+	"DEV": "3.5",  // DEVICE
+	"DIV": "4",    // DIVISION
+	"SYS": "4.2",  // SYSTEM (KERNEL SYSTEM PARAMETERS)
+	"PKG": "9.4",  // PACKAGE
+	"LOC": "44",   // LOCATION
+	"SRV": "49",   // SERVICE
+	"USR": "200",  // USER (NEW PERSON)
+	"CLS": "8930", // CLASS
 }
 
 // FileComp is a FileMan file component (number may be fractional, e.g. 8989.51).
@@ -92,6 +148,7 @@ var (
 	rePatch     = regexp.MustCompile(`^\d+$`)
 	reRoutine   = regexp.MustCompile(`^%?[A-Z][A-Z0-9]*$`)                  // M routine name
 	reReqBuild  = regexp.MustCompile(`^[A-Z%][A-Z0-9]*\*\d+\.\d+(\*\d+)?$`) // NS*VER[*PATCH]
+	reParamName = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // #8989.51 NAME (uppercase, internal spaces)
 )
 
 // Load reads and validates a build spec from a kids/<pkg>.build.json file.
@@ -135,6 +192,9 @@ func (s *Spec) Validate() error {
 	if err := validateRoutines(s.Components.Routines); err != nil {
 		return err
 	}
+	if err := validateParamDefs(s.Components.ParameterDefinitions); err != nil {
+		return err
+	}
 	for _, rb := range s.RequiredBuilds {
 		if !reReqBuild.MatchString(rb.Name) {
 			return fmt.Errorf("buildspec: required build name %q must be NAMESPACE*VERSION[*PATCH]", rb.Name)
@@ -149,6 +209,34 @@ func (s *Spec) Validate() error {
 	for _, icr := range s.ICRs {
 		if icr.Number <= 0 {
 			return fmt.Errorf("buildspec: ICR number must be positive, got %d", icr.Number)
+		}
+	}
+	return nil
+}
+
+// validateParamDefs checks each PARAMETER DEFINITION component: a valid #8989.51
+// NAME (≤30 chars, uppercase), a known value data type, and known allowable
+// entities with non-negative precedence.
+func validateParamDefs(defs []ParamDef) error {
+	for _, p := range defs {
+		if p.Name == "" {
+			return fmt.Errorf("buildspec: a parameterDefinition is missing its name")
+		}
+		if len(p.Name) > 30 || !reParamName.MatchString(p.Name) {
+			return fmt.Errorf("buildspec: parameter name %q must be uppercase ≤30 chars (#8989.51 NAME)", p.Name)
+		}
+		if p.DataType != "" {
+			if _, ok := ParamDataTypeCode[p.DataType]; !ok {
+				return fmt.Errorf("buildspec: parameter %s data type %q is not a known #8989.51 value type", p.Name, p.DataType)
+			}
+		}
+		for _, e := range p.Entities {
+			if _, ok := ParamEntityIEN[e.Entity]; !ok {
+				return fmt.Errorf("buildspec: parameter %s allowable entity %q is not a known parameter entity (SYS, USR, …)", p.Name, e.Entity)
+			}
+			if e.Precedence < 0 {
+				return fmt.Errorf("buildspec: parameter %s entity %s precedence must be ≥ 0", p.Name, e.Entity)
+			}
 		}
 	}
 	return nil

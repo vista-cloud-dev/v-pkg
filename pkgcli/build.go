@@ -24,9 +24,11 @@ type buildCmd struct {
 }
 
 type buildResult struct {
-	InstallName string `json:"installName"`
-	Out         string `json:"out"`
-	Routines    int    `json:"routines"`
+	InstallName    string `json:"installName"`
+	Out            string `json:"out"`
+	Routines       int    `json:"routines"`
+	ParamDefs      int    `json:"paramDefs,omitempty"`
+	RequiredBuilds int    `json:"requiredBuilds,omitempty"`
 }
 
 func (c *buildCmd) Run(cc *clikit.Context) error {
@@ -46,10 +48,18 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 		rtns = append(rtns, kids.RoutineSrc{Name: name, Lines: routineLines(data)})
 	}
 
+	paramDefs, perr := resolveParamDefs(spec.Components.ParameterDefinitions)
+	if perr != nil {
+		return clikit.Fail(clikit.ExitUsage, "BAD_SPEC", perr.Error(), "fix the parameterDefinitions in the build spec")
+	}
+	reqBuilds := resolveRequiredBuilds(spec.RequiredBuilds)
+
 	pairs := kids.MakeBuildPairs(kids.BuildInput{
-		InstallName: spec.InstallName(),
-		Namespace:   spec.Package,
-		Routines:    rtns,
+		InstallName:    spec.InstallName(),
+		Namespace:      spec.Package,
+		Routines:       rtns,
+		ParamDefs:      paramDefs,
+		RequiredBuilds: reqBuilds,
 	})
 
 	out := c.Out
@@ -64,11 +74,54 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 		return clikit.Fail(clikit.ExitRuntime, "WRITE_FAILED", err.Error(), "")
 	}
 
-	return cc.Result(buildResult{InstallName: spec.InstallName(), Out: out, Routines: len(rtns)}, func() {
+	return cc.Result(buildResult{
+		InstallName: spec.InstallName(), Out: out, Routines: len(rtns),
+		ParamDefs: len(paramDefs), RequiredBuilds: len(reqBuilds),
+	}, func() {
 		cc.Title("pkg build")
-		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s)) → %s\n",
-			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), cc.Accent(out))
+		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d required build(s)) → %s\n",
+			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(reqBuilds), cc.Accent(out))
 	})
+}
+
+// resolveParamDefs maps the human PARAMETER DEFINITION spec onto the kids emit
+// shape — value-data-type name → #8989.51 code, entity abbreviation → #8989.518
+// IEN. The spec is already validated, so the lookups are guaranteed present;
+// the error guards a future spec that slips an unknown key past validation.
+func resolveParamDefs(defs []buildspec.ParamDef) ([]kids.ParamDef, error) {
+	out := make([]kids.ParamDef, 0, len(defs))
+	for _, d := range defs {
+		dtName := d.DataType
+		if dtName == "" {
+			dtName = "free text"
+		}
+		dt, ok := buildspec.ParamDataTypeCode[dtName]
+		if !ok {
+			return nil, fmt.Errorf("parameter %s: unknown data type %q", d.Name, d.DataType)
+		}
+		ents := make([]kids.ParamEntity, 0, len(d.Entities))
+		for _, e := range d.Entities {
+			ien, ok := buildspec.ParamEntityIEN[e.Entity]
+			if !ok {
+				return nil, fmt.Errorf("parameter %s: unknown entity %q", d.Name, e.Entity)
+			}
+			ents = append(ents, kids.ParamEntity{EntityIEN: ien, Precedence: e.Precedence})
+		}
+		out = append(out, kids.ParamDef{
+			Name: d.Name, DisplayText: d.DisplayText, DataTypeCode: dt, Entities: ents,
+		})
+	}
+	return out, nil
+}
+
+// resolveRequiredBuilds maps the spec's Required Builds onto the kids emit shape,
+// turning the action phrase into its #9.611 ACTION code.
+func resolveRequiredBuilds(reqs []buildspec.RequiredBuild) []kids.ReqBuild {
+	out := make([]kids.ReqBuild, 0, len(reqs))
+	for _, r := range reqs {
+		out = append(out, kids.ReqBuild{Name: r.Name, Action: buildspec.RequiredBuildActionCode[r.Action]})
+	}
+	return out
 }
 
 // routineLines splits routine source into lines, dropping a single trailing

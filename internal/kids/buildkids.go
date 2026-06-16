@@ -10,6 +10,9 @@ import "strconv"
 // intSub builds an integer-kind subscript element.
 func intSub(n int64) Sub { return Sub{kind: kindInt, intV: n} }
 
+// fltSub builds a decimal (file-number) subscript element, e.g. 8989.51.
+func fltSub(f float64) Sub { return Sub{kind: kindFloat, fltV: f} }
+
 // RoutineSrc is one routine's name and source lines.
 type RoutineSrc struct {
 	Name  string
@@ -20,10 +23,12 @@ type RoutineSrc struct {
 // carried (install date/user/real checksums) — the export is byte-identical for
 // identical inputs, the deterministic-build invariant (§7.2 #2).
 type BuildInput struct {
-	InstallName string       // NAMESPACE*VERSION[*PATCH]
-	Namespace   string       // NAMESPACE
-	Routines    []RoutineSrc // routine components, in build order
-	Platform    string       // VER node (Kernel^FileMan), default "8.0^22.2"
+	InstallName    string       // NAMESPACE*VERSION[*PATCH]
+	Namespace      string       // NAMESPACE
+	Routines       []RoutineSrc // routine components, in build order
+	ParamDefs      []ParamDef   // #8989.51 PARAMETER DEFINITION KRN components
+	RequiredBuilds []ReqBuild   // Required Builds (#9.611) — prerequisites
+	Platform       string       // VER node (Kernel^FileMan), default "8.0^22.2"
 }
 
 // MakeBuildPairs constructs the ^XPD BUILD pairs for a routine-only KIDS package
@@ -38,6 +43,11 @@ func MakeBuildPairs(in BuildInput) []Pair {
 	// to 0 (with the type field also 0) so the artifact is diffable + reproducible.
 	b.Set(Subs{strSub("BLD"), intSub(1), intSub(0)}, in.InstallName+"^"+in.Namespace+"^0^0")
 
+	// BLD #9.6 manifest for the non-routine components (emitted only when present
+	// so a routine-only build stays byte-identical to the live-proven ZZSKEL form).
+	emitParamDefManifest(b, in.ParamDefs)
+	emitRequiredBuildManifest(b, in.RequiredBuilds)
+
 	b.Set(Subs{strSub("RTN")}, strconv.Itoa(len(in.Routines)))
 	for _, r := range in.Routines {
 		// 0^<numlines>^<checksum>^<checksum> — checksums stripped (0) for the
@@ -47,6 +57,11 @@ func MakeBuildPairs(in BuildInput) []Pair {
 			b.Set(Subs{strSub("RTN"), strSub(r.Name), intSub(int64(i + 1)), intSub(0)}, line)
 		}
 	}
+
+	// Install-order + KRN record data + MBREQ count — what KRN^XPDIK consumes to
+	// file the PARAMETER DEFINITIONs (again, only when there are any).
+	emitParamDefData(b, in.ParamDefs)
+	emitMBREQ(b, in.RequiredBuilds)
 
 	plat := in.Platform
 	if plat == "" {

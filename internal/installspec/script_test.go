@@ -69,16 +69,17 @@ func TestStageChunks_CoversAllPairsBounded(t *testing.T) {
 func TestFinalInstallScript(t *testing.T) {
 	got := FinalInstallScript("ZZSKEL*1.0*1", "ZZSKEL via v pkg install", 7)
 	for _, want := range []string{
-		`I $D(^XPD(9.7,"B","ZZSKEL*1.0*1"))`,    // already-installed guard
-		`DUZ(0)="@"`,                            // full FM priv for EN^XPDIJ
-		ResultMarker + `staged=`,                // staged-node count marker
-		`I VC'=7`,                               // truncation guard: count must match
-		ResultMarker + `error=stage-incomplete`, // …else refuse, do not install partial
-		`S XPDA=$$INST^XPDIL1("ZZSKEL*1.0*1")`,  // real KIDS #9.7 entry
-		`M ^XTMP("XPDI",XPDA)=^XTMP("VPKGI")`,   // staged tree → live transport global
-		`D EN^XPDIJ`,                            // synchronous install (same process)
-		`K ^XTMP("VPKGI")`,                      // clean the staging global
-		ResultMarker + `status=`,                // #9.7 status marker
+		`I $D(^XPD(9.7,"B","ZZSKEL*1.0*1"))`,            // already-installed guard
+		`DUZ(0)="@"`,                                    // full FM priv for EN^XPDIJ
+		ResultMarker + `staged=`,                        // staged-node count marker
+		`I VC'=7`,                                       // truncation guard: count must match
+		ResultMarker + `error=stage-incomplete`,         // …else refuse, do not install partial
+		`S XPDA=$$INST^XPDIL1("ZZSKEL*1.0*1")`,          // real KIDS #9.7 entry
+		`M ^XTMP("XPDI",XPDA)=^XTMP("VPKGI")`,           // staged tree → live transport global
+		`^XPD(9.7,XPDA,"KRN")=^XTMP("XPDI",XPDA,"BLD",`, // seed #9.7 KRN tracking (else XPDIK GVUNDEF)
+		`D EN^XPDIJ`,                                    // synchronous install (same process)
+		`K ^XTMP("VPKGI")`,                              // clean the staging global
+		ResultMarker + `status=`,                        // #9.7 status marker
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("FinalInstallScript missing %q\n---\n%s", want, got)
@@ -87,7 +88,7 @@ func TestFinalInstallScript(t *testing.T) {
 }
 
 func TestVerifyScript(t *testing.T) {
-	got := VerifyScript("ZZSKEL*1.0*1", []string{"ZZSKEL"})
+	got := VerifyScript("ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil)
 	for _, want := range []string{
 		`S XPDA=$O(^XPD(9.7,"B","ZZSKEL*1.0*1",0))`,
 		ResultMarker + `installed=`,
@@ -101,8 +102,22 @@ func TestVerifyScript(t *testing.T) {
 	}
 }
 
+// VerifyScript also probes each PARAMETER DEFINITION by NAME in #8989.51's "B"
+// index (XPDIK builds it via IX1^DIK on install).
+func TestVerifyScript_ParamDef(t *testing.T) {
+	got := VerifyScript("VSLBASE*1.0*1", []string{"VSLCFG"}, []string{"VSL GREETING"})
+	for _, want := range []string{
+		`$D(^XTV(8989.51,"B","VSL GREETING"))`,
+		ResultMarker + `param:VSL GREETING=`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("VerifyScript (param) missing %q\n---\n%s", want, got)
+		}
+	}
+}
+
 func TestUninstallScript(t *testing.T) {
-	got := UninstallScript("ZZSKEL*1.0*1", []string{"ZZSKEL"})
+	got := UninstallScript("ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil)
 	for _, want := range []string{
 		`S X="ZZSKEL" X ^%ZOSF("DEL")`,                                        // routine delete
 		`S DA=$O(^XPD(9.7,"B","ZZSKEL*1.0*1",0)),DIK="^XPD(9.7," I DA D ^DIK`, // #9.7
@@ -112,5 +127,15 @@ func TestUninstallScript(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Errorf("UninstallScript missing %q\n---\n%s", want, got)
 		}
+	}
+}
+
+// UninstallScript also backs out each PARAMETER DEFINITION via FileMan DIK on
+// #8989.51 (delete by IEN resolved from the "B" index; DIK clears its xrefs).
+func TestUninstallScript_ParamDef(t *testing.T) {
+	got := UninstallScript("VSLBASE*1.0*1", []string{"VSLCFG"}, []string{"VSL GREETING"})
+	want := `S DA=$O(^XTV(8989.51,"B","VSL GREETING",0)),DIK="^XTV(8989.51," I DA D ^DIK`
+	if !strings.Contains(got, want) {
+		t.Errorf("UninstallScript (param) missing %q\n---\n%s", want, got)
 	}
 }

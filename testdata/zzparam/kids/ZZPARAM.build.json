@@ -1,0 +1,16 @@
+{
+  "package": "ZZPARAM",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "routines": ["ZZPARAM"],
+    "parameterDefinitions": [
+      {
+        "name": "ZZPARAM GREETING",
+        "displayText": "ZZPARAM test greeting (throwaway)",
+        "dataType": "free text",
+        "entities": [ { "entity": "SYS", "precedence": 1 } ]
+      }
+    ]
+  }
+}

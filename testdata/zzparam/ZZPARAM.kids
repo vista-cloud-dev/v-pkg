@@ -1,0 +1,54 @@
+KIDS Distribution saved by v-pkg
+m-kids reassembled output
+**KIDS**:ZZPARAM*1.0*1^
+
+**INSTALL NAME**
+ZZPARAM*1.0*1
+"BLD",1,0)
+ZZPARAM*1.0*1^ZZPARAM^0^0
+"BLD",1,"KRN",0)
+^9.67PA^8989.51^1
+"BLD",1,"KRN",8989.51,0)
+8989.51
+"BLD",1,"KRN",8989.51,"NM",0)
+^9.68A^1^1
+"BLD",1,"KRN",8989.51,"NM",1,0)
+ZZPARAM GREETING^^0
+"BLD",1,"KRN",8989.51,"NM","B","ZZPARAM GREETING",1)
+
+"BLD",1,"KRN","B",8989.51,8989.51)
+
+"RTN")
+1
+"RTN","ZZPARAM")
+0^5^0^0
+"RTN","ZZPARAM",1,0)
+ZZPARAM ;VCD/VSL - throwaway test package (KRN param-def component) ;1.0
+"RTN","ZZPARAM",2,0)
+ ;;1.0;ZZPARAM;;
+"RTN","ZZPARAM",3,0)
+ quit
+"RTN","ZZPARAM",4,0)
+GREET() ;
+"RTN","ZZPARAM",5,0)
+ quit $$GET^XPAR("SYS","ZZPARAM GREETING",1)
+"ORD",1,8989.51)
+8989.51;1;1;;;;;;;
+"ORD",1,8989.51,0)
+PARAMETER DEFINITION
+"KRN",8989.51,1,-1)
+0
+"KRN",8989.51,1,0)
+ZZPARAM GREETING^ZZPARAM test greeting (throwaway)^
+"KRN",8989.51,1,1)
+F^^
+"KRN",8989.51,1,30,0)
+^8989.513I^1^1
+"KRN",8989.51,1,30,1,0)
+1^4.2
+"KRN",8989.51,1,30,"B",1,1)
+
+"VER")
+8.0^22.2
+**END**
+**END**
