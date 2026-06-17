@@ -1,6 +1,6 @@
 ---
 title: "v-pkg FileMan FILE-DD install enabler (VSL M3.T1)"
-status: in-progress — scoped + corpus-grounded; implementation pending
+status: DONE (2026-06-17) — built + live-proven install→verify→uninstall→clean on BOTH engines (vehu YDB + foia-t12 IRIS); record files with B-xref. See docs/memory/fileman-dd-component.md. Remaining: the VSLFS re-test is a SEPARATE v-stdlib session (re-point VSLFSTST at #999000) + flip the M3.T1 docs-repo tracker row there.
 created: 2026-06-16
 for: teaching `v pkg build/install/verify/uninstall` the FileMan FILE-DD KIDS component
 related: docs/memory/krn-param-def-component.md (the KRN sibling), vsl-implementation-tracker.md M3.T1

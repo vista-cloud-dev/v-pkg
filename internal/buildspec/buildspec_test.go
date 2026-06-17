@@ -95,6 +95,61 @@ func TestParse_ParameterDefinitions_Invalid(t *testing.T) {
 	}
 }
 
+const zzvslfs = `{
+  "package": "ZZVSLFS",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "files": [
+      { "number": 999000, "name": "ZZVSLFS", "globalRoot": "^DIZ(999000," }
+    ]
+  }
+}`
+
+func TestParse_Files(t *testing.T) {
+	s, err := Parse([]byte(zzvslfs))
+	if err != nil {
+		t.Fatalf("Parse ZZVSLFS file spec: %v", err)
+	}
+	if len(s.Components.Files) != 1 {
+		t.Fatalf("files = %+v", s.Components.Files)
+	}
+	f := s.Components.Files[0]
+	if f.Number != 999000 || f.Name != "ZZVSLFS" || f.GlobalRoot != "^DIZ(999000," {
+		t.Errorf("file = %+v", f)
+	}
+	// A spec carrying only a file (no routines) is still non-empty.
+	if s.Components.empty() {
+		t.Error("spec with a file component must not be empty")
+	}
+}
+
+func TestParse_Files_DefaultGlobalRoot(t *testing.T) {
+	s, err := Parse([]byte(`{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":999000,"name":"ZZVSLFS"}]}}`))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	// An omitted globalRoot defaults to ^DIZ(<file>, after validation.
+	if got := s.Components.Files[0].GlobalRoot; got != "^DIZ(999000," {
+		t.Errorf("default globalRoot = %q, want ^DIZ(999000,", got)
+	}
+}
+
+func TestParse_Files_Invalid(t *testing.T) {
+	cases := map[string]string{
+		"number too low":  `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":200,"name":"ZZVSLFS"}]}}`,
+		"number too high": `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":1000000,"name":"ZZVSLFS"}]}}`,
+		"no name":         `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":999000}]}}`,
+		"lower-case name": `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":999000,"name":"lower"}]}}`,
+		"bad global root": `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":999000,"name":"ZZVSLFS","globalRoot":"DIZ999000"}]}}`,
+	}
+	for name, js := range cases {
+		if _, err := Parse([]byte(js)); err == nil {
+			t.Errorf("%s: expected an error, got nil", name)
+		}
+	}
+}
+
 func TestInstallName_NoPatch(t *testing.T) {
 	s, err := Parse([]byte(`{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"]}}`))
 	if err != nil {

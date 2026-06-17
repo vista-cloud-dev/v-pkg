@@ -97,6 +97,14 @@ func FinalInstallScript(name, header string, nPairs int) string {
 	// faults the install (status stuck at 2). XPCOM then stamps each as installed.
 	w(`N XPDBLD S XPDBLD=$O(^XTMP("XPDI",XPDA,"BLD",0))`)
 	w(`M:$D(^XTMP("XPDI",XPDA,"BLD",XPDBLD,"KRN")) ^XPD(9.7,XPDA,"KRN")=^XTMP("XPDI",XPDA,"BLD",XPDBLD,"KRN")`)
+	// FileMan FILE components (FIA): the interactive loader (GI^XPDIL) sets each
+	// file's "file is new" flag (…,0,2) and builds the #9.7 FILE checkpoint via
+	// XPCK^XPDIK (XPDIL1). The direct-populate path bypasses that, so do both here:
+	// seed …,0,2)=1 (force new-file DD install) and run XPCK^XPDIK("FIA") — else
+	// FIA^XPDIK reads ^XPD(9.7,XPDA,4,file,0) without $G and the install faults
+	// (status stuck at 2), exactly like the KRN seed.
+	w(`N XPF S XPF=0 I $D(^XTMP("XPDI",XPDA,"FIA")) F  S XPF=$O(^XTMP("XPDI",XPDA,"FIA",XPF)) Q:'XPF  S ^XTMP("XPDI",XPDA,"FIA",XPF,0,2)=1`)
+	w(`D:$D(^XTMP("XPDI",XPDA,"FIA")) XPCK^XPDIK("FIA")`)
 	w(`D EN^XPDIJ`)
 	w(`K ` + stageGbl)
 	w(`W "` + ResultMarker + `status=",$P($G(^XPD(9.7,XPDA,0)),U,9),!`)
@@ -105,9 +113,10 @@ func FinalInstallScript(name, header string, nPairs int) string {
 
 // VerifyScript returns M source that reports whether name is installed: the
 // #9.7 INSTALL presence + status (piece 9; 3 = "Install Completed"), per routine
-// whether it is loaded ($T probe), and per PARAMETER DEFINITION whether it is
-// present in #8989.51 (the "B" index). Each fact is a ResultMarker line.
-func VerifyScript(name string, routines, paramDefs []string) string {
+// whether it is loaded ($T probe), per PARAMETER DEFINITION whether it is present
+// in #8989.51 (the "B" index), and per FileMan FILE whether its data dictionary
+// installed (^DD(file,0) present). Each fact is a ResultMarker line.
+func VerifyScript(name string, routines, paramDefs, files []string) string {
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
 
@@ -121,16 +130,20 @@ func VerifyScript(name string, routines, paramDefs []string) string {
 	for _, p := range paramDefs {
 		w(`W "` + ResultMarker + `param:` + p + `=",$S($D(^XTV(8989.51,"B",` + kids.MString(p) + `)):1,1:0),!`)
 	}
+	for _, f := range files {
+		w(`W "` + ResultMarker + `file:` + f + `=",$S($D(^DD(` + f + `,0)):1,1:0),!`)
+	}
 	return b.String()
 }
 
 // UninstallScript returns M source that reverses an install (T0a.4): delete each
 // routine (^%ZOSF("DEL") removes the .m + .o), each PARAMETER DEFINITION from
-// #8989.51 (FileMan DIK by IEN — clears its "B" and subfile xrefs), and the #9.7
-// INSTALL and #9.6 BUILD entries via DIK. KIDS ships no generic uninstall —
-// back-out is the tool's job. The monotonic #9.x / #8989.51 IEN counters are not
-// rolled back (inherent to FileMan, not a leak).
-func UninstallScript(name string, routines, paramDefs []string) string {
+// #8989.51 (FileMan DIK by IEN — clears its "B" and subfile xrefs), each FileMan
+// FILE (its DD, data global, and dict-of-files pointer — KIDS ships no generic
+// file uninstall), and the #9.7 INSTALL and #9.6 BUILD entries via DIK. The
+// monotonic #9.x / #8989.51 IEN counters are not rolled back (inherent to
+// FileMan, not a leak).
+func UninstallScript(name string, routines, paramDefs, files []string) string {
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
 
@@ -140,6 +153,18 @@ func UninstallScript(name string, routines, paramDefs []string) string {
 	}
 	for _, p := range paramDefs {
 		w(`S DA=$O(^XTV(8989.51,"B",` + kids.MString(p) + `,0)),DIK="^XTV(8989.51," I DA D ^DIK`)
+	}
+	// FileMan FILE back-out: read the data global root + name BEFORE killing the
+	// dictionary, then remove the DD (^DD/^DIC), the data global, and the
+	// dict-of-files "B" pointer. @VG indirection kills the file's data global.
+	for _, f := range files {
+		// VG is the whole "GL" node (a global root like "^DIZ(999000,") — never $P
+		// it on U: it starts with "^", so $P(…,"^",1) would be empty. VN (the file
+		// name) is piece 1 of the ^DIC 0-node.
+		w(`S VN=$P($G(^DIC(` + f + `,0)),U),VG=$G(^DIC(` + f + `,0,"GL"))`)
+		w(`I VG]"" S VG=$E(VG,1,$L(VG)-1)_")" K @VG`)
+		w(`I VN]"" K ^DIC("B",VN,` + f + `)`)
+		w(`K ^DD(` + f + `),^DIC(` + f + `)`)
 	}
 	nameLit := kids.MString(name)
 	w(`S DA=$O(^XPD(9.7,"B",` + nameLit + `,0)),DIK="^XPD(9.7," I DA D ^DIK`)

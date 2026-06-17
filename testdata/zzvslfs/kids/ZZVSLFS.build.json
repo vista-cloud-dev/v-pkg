@@ -1,0 +1,10 @@
+{
+  "package": "ZZVSLFS",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "files": [
+      { "number": 999000, "name": "ZZVSLFS", "globalRoot": "^DIZ(999000," }
+    ]
+  }
+}
