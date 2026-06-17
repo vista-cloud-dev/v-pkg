@@ -205,7 +205,7 @@ func TestRunVerify(t *testing.T) {
 	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
 		installspec.ResultMarker + "status=3\n" +
 		installspec.ResultMarker + "rtn:ZZSKEL=1\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil)
+	res, err := runVerify(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil)
 	if err != nil {
 		t.Fatalf("runVerify: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestRunVerify_ParamDef(t *testing.T) {
 		installspec.ResultMarker + "rtn:VSLCFG=1\n" +
 		installspec.ResultMarker + "param:VSL GREETING=1\n"}
 	res, err := runVerify(context.Background(), fakeClient(f), "VSLBASE*1.0*1",
-		[]string{"VSLCFG"}, []string{"VSL GREETING"})
+		[]string{"VSLCFG"}, []string{"VSL GREETING"}, nil)
 	if err != nil {
 		t.Fatalf("runVerify: %v", err)
 	}
@@ -236,11 +236,30 @@ func TestRunVerify_ParamDef(t *testing.T) {
 	}
 }
 
+// A verify carrying a FileMan FILE reads its DD-present marker and folds it into
+// ok() — a missing file dictionary means the install is not fully verified.
+func TestRunVerify_File(t *testing.T) {
+	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
+		installspec.ResultMarker + "status=3\n" +
+		installspec.ResultMarker + "file:999000=1\n"}
+	res, err := runVerify(context.Background(), fakeClient(f), "ZZVSLFS*1.0*1", nil, nil, []string{"999000"})
+	if err != nil {
+		t.Fatalf("runVerify: %v", err)
+	}
+	if !res.Files["999000"] || !res.ok() {
+		t.Errorf("res = %+v, want file present and ok()", res)
+	}
+	res.Files["999000"] = false
+	if res.ok() {
+		t.Error("ok() must be false when a file dictionary is missing")
+	}
+}
+
 func TestRunVerify_NotInstalled(t *testing.T) {
 	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=0\n" +
 		installspec.ResultMarker + "status=\n" +
 		installspec.ResultMarker + "rtn:ZZSKEL=0\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil)
+	res, err := runVerify(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil)
 	if err != nil {
 		t.Fatalf("runVerify: %v", err)
 	}
@@ -253,7 +272,7 @@ func TestRunVerify_NotInstalled(t *testing.T) {
 
 func TestRunUninstall(t *testing.T) {
 	f := &fakeDriver{runStdout: installspec.ResultMarker + "uninstalled=1\n"}
-	res, err := runUninstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil)
+	res, err := runUninstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil)
 	if err != nil {
 		t.Fatalf("runUninstall: %v", err)
 	}

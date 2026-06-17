@@ -77,6 +77,8 @@ func TestFinalInstallScript(t *testing.T) {
 		`S XPDA=$$INST^XPDIL1("ZZSKEL*1.0*1")`,          // real KIDS #9.7 entry
 		`M ^XTMP("XPDI",XPDA)=^XTMP("VPKGI")`,           // staged tree → live transport global
 		`^XPD(9.7,XPDA,"KRN")=^XTMP("XPDI",XPDA,"BLD",`, // seed #9.7 KRN tracking (else XPDIK GVUNDEF)
+		`^XTMP("XPDI",XPDA,"FIA",`,                      // FileMan FILE: seed new-file flag …,0,2)
+		`XPCK^XPDIK("FIA")`,                             // …and the #9.7 FILE checkpoint (else FIA^XPDIK GVUNDEF)
 		`D EN^XPDIJ`,                                    // synchronous install (same process)
 		`K ^XTMP("VPKGI")`,                              // clean the staging global
 		ResultMarker + `status=`,                        // #9.7 status marker
@@ -88,7 +90,7 @@ func TestFinalInstallScript(t *testing.T) {
 }
 
 func TestVerifyScript(t *testing.T) {
-	got := VerifyScript("ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil)
+	got := VerifyScript("ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil)
 	for _, want := range []string{
 		`S XPDA=$O(^XPD(9.7,"B","ZZSKEL*1.0*1",0))`,
 		ResultMarker + `installed=`,
@@ -105,7 +107,7 @@ func TestVerifyScript(t *testing.T) {
 // VerifyScript also probes each PARAMETER DEFINITION by NAME in #8989.51's "B"
 // index (XPDIK builds it via IX1^DIK on install).
 func TestVerifyScript_ParamDef(t *testing.T) {
-	got := VerifyScript("VSLBASE*1.0*1", []string{"VSLCFG"}, []string{"VSL GREETING"})
+	got := VerifyScript("VSLBASE*1.0*1", []string{"VSLCFG"}, []string{"VSL GREETING"}, nil)
 	for _, want := range []string{
 		`$D(^XTV(8989.51,"B","VSL GREETING"))`,
 		ResultMarker + `param:VSL GREETING=`,
@@ -116,8 +118,22 @@ func TestVerifyScript_ParamDef(t *testing.T) {
 	}
 }
 
+// VerifyScript also probes each installed FileMan FILE by its data dictionary
+// header node (^DD(file,0) present iff the DD installed).
+func TestVerifyScript_File(t *testing.T) {
+	got := VerifyScript("ZZVSLFS*1.0*1", nil, nil, []string{"999000"})
+	for _, want := range []string{
+		`$D(^DD(999000,0))`,
+		ResultMarker + `file:999000=`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("VerifyScript (file) missing %q\n---\n%s", want, got)
+		}
+	}
+}
+
 func TestUninstallScript(t *testing.T) {
-	got := UninstallScript("ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil)
+	got := UninstallScript("ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil)
 	for _, want := range []string{
 		`S X="ZZSKEL" X ^%ZOSF("DEL")`,                                        // routine delete
 		`S DA=$O(^XPD(9.7,"B","ZZSKEL*1.0*1",0)),DIK="^XPD(9.7," I DA D ^DIK`, // #9.7
@@ -133,9 +149,25 @@ func TestUninstallScript(t *testing.T) {
 // UninstallScript also backs out each PARAMETER DEFINITION via FileMan DIK on
 // #8989.51 (delete by IEN resolved from the "B" index; DIK clears its xrefs).
 func TestUninstallScript_ParamDef(t *testing.T) {
-	got := UninstallScript("VSLBASE*1.0*1", []string{"VSLCFG"}, []string{"VSL GREETING"})
+	got := UninstallScript("VSLBASE*1.0*1", []string{"VSLCFG"}, []string{"VSL GREETING"}, nil)
 	want := `S DA=$O(^XTV(8989.51,"B","VSL GREETING",0)),DIK="^XTV(8989.51," I DA D ^DIK`
 	if !strings.Contains(got, want) {
 		t.Errorf("UninstallScript (param) missing %q\n---\n%s", want, got)
+	}
+}
+
+// UninstallScript also backs out each FileMan FILE: it reads the data global root
+// + name from ^DIC before killing the DD (^DD/^DIC), the data global, and the
+// dict-of-files "B" pointer — KIDS ships no generic file uninstall.
+func TestUninstallScript_File(t *testing.T) {
+	got := UninstallScript("ZZVSLFS*1.0*1", nil, nil, []string{"999000"})
+	for _, want := range []string{
+		`^DIC(999000,0,"GL")`,        // read the data global root first
+		`K ^DD(999000),^DIC(999000)`, // remove the data dictionary
+		`,"B",`,                      // remove the dict-of-files "B" pointer
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("UninstallScript (file) missing %q\n---\n%s", want, got)
+		}
 	}
 }

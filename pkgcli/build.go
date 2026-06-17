@@ -28,6 +28,7 @@ type buildResult struct {
 	Out            string `json:"out"`
 	Routines       int    `json:"routines"`
 	ParamDefs      int    `json:"paramDefs,omitempty"`
+	Files          int    `json:"files,omitempty"`
 	RequiredBuilds int    `json:"requiredBuilds,omitempty"`
 }
 
@@ -52,6 +53,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 	if perr != nil {
 		return clikit.Fail(clikit.ExitUsage, "BAD_SPEC", perr.Error(), "fix the parameterDefinitions in the build spec")
 	}
+	files := resolveFiles(spec.Components.Files)
 	reqBuilds := resolveRequiredBuilds(spec.RequiredBuilds)
 
 	pairs := kids.MakeBuildPairs(kids.BuildInput{
@@ -59,6 +61,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 		Namespace:      spec.Package,
 		Routines:       rtns,
 		ParamDefs:      paramDefs,
+		Files:          files,
 		RequiredBuilds: reqBuilds,
 	})
 
@@ -76,11 +79,11 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 
 	return cc.Result(buildResult{
 		InstallName: spec.InstallName(), Out: out, Routines: len(rtns),
-		ParamDefs: len(paramDefs), RequiredBuilds: len(reqBuilds),
+		ParamDefs: len(paramDefs), Files: len(files), RequiredBuilds: len(reqBuilds),
 	}, func() {
 		cc.Title("pkg build")
-		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d required build(s)) → %s\n",
-			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(reqBuilds), cc.Accent(out))
+		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d file(s), %d required build(s)) → %s\n",
+			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(files), len(reqBuilds), cc.Accent(out))
 	})
 }
 
@@ -112,6 +115,21 @@ func resolveParamDefs(defs []buildspec.ParamDef) ([]kids.ParamDef, error) {
 		})
 	}
 	return out, nil
+}
+
+// resolveFiles maps the spec's FILE components onto the kids emit shape. The spec
+// is already validated (number in range, name valid, global root defaulted), so
+// the FileMan file number fits an int64.
+func resolveFiles(files []buildspec.FileComp) []kids.FileDD {
+	out := make([]kids.FileDD, 0, len(files))
+	for _, f := range files {
+		out = append(out, kids.FileDD{
+			Number:     int64(f.Number),
+			Name:       f.Name,
+			GlobalRoot: f.GlobalRoot,
+		})
+	}
+	return out
 }
 
 // resolveRequiredBuilds maps the spec's Required Builds onto the kids emit shape,

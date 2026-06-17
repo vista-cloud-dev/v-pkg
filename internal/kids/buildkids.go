@@ -27,6 +27,7 @@ type BuildInput struct {
 	Namespace      string       // NAMESPACE
 	Routines       []RoutineSrc // routine components, in build order
 	ParamDefs      []ParamDef   // #8989.51 PARAMETER DEFINITION KRN components
+	Files          []FileDD     // brand-new FileMan FILE DD components (FIA)
 	RequiredBuilds []ReqBuild   // Required Builds (#9.611) — prerequisites
 	Platform       string       // VER node (Kernel^FileMan), default "8.0^22.2"
 }
@@ -46,6 +47,7 @@ func MakeBuildPairs(in BuildInput) []Pair {
 	// BLD #9.6 manifest for the non-routine components (emitted only when present
 	// so a routine-only build stays byte-identical to the live-proven ZZSKEL form).
 	emitParamDefManifest(b, in.ParamDefs)
+	emitFileManifest(b, in.Files)
 	emitRequiredBuildManifest(b, in.RequiredBuilds)
 
 	b.Set(Subs{strSub("RTN")}, strconv.Itoa(len(in.Routines)))
@@ -61,6 +63,7 @@ func MakeBuildPairs(in BuildInput) []Pair {
 	// Install-order + KRN record data + MBREQ count — what KRN^XPDIK consumes to
 	// file the PARAMETER DEFINITIONs (again, only when there are any).
 	emitParamDefData(b, in.ParamDefs)
+	emitFileData(b, in.Files, fileVersion(in.InstallName), in.Namespace)
 	emitMBREQ(b, in.RequiredBuilds)
 
 	plat := in.Platform

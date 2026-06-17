@@ -113,11 +113,23 @@ var ParamEntityIEN = map[string]string{
 	"CLS": "8930", // CLASS
 }
 
-// FileComp is a FileMan file component (number may be fractional, e.g. 8989.51).
+// FileComp is a FileMan FILE component shipped as a KIDS data-dictionary export.
+// For VSL M3.T1 the supported shape is a brand-new throwaway file with a single
+// free-text .01 NAME field (the minimal transform-invariant DD); Number is a
+// local/test file number (999000-999999) and GlobalRoot is its data global
+// (defaulting to ^DIZ(<file>,).
 type FileComp struct {
-	Number float64 `json:"number"`
-	Name   string  `json:"name,omitempty"`
+	Number     float64 `json:"number"`
+	Name       string  `json:"name,omitempty"`
+	GlobalRoot string  `json:"globalRoot,omitempty"` // data global, e.g. "^DIZ(999000,"; default derived from Number
 }
+
+// Local/test FileMan file-number range (VA-reserved 999000-999999). A v-pkg
+// DD-install ships only throwaway files in this band — never a national file.
+const (
+	LocalFileMin = 999000
+	LocalFileMax = 999999
+)
 
 // RequiredBuild is a KIDS Required Build (#11) — a prerequisite build + the
 // action KIDS takes when it is absent.
@@ -149,6 +161,8 @@ var (
 	reRoutine   = regexp.MustCompile(`^%?[A-Z][A-Z0-9]*$`)                  // M routine name
 	reReqBuild  = regexp.MustCompile(`^[A-Z%][A-Z0-9]*\*\d+\.\d+(\*\d+)?$`) // NS*VER[*PATCH]
 	reParamName = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // #8989.51 NAME (uppercase, internal spaces)
+	reFileName  = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // FileMan FILE .01 name (uppercase, internal spaces)
+	reGlobalRt  = regexp.MustCompile(`^\^%?[A-Z][A-Z0-9]*\(.*,$`)           // open global root, e.g. ^DIZ(999000,
 )
 
 // Load reads and validates a build spec from a kids/<pkg>.build.json file.
@@ -195,6 +209,9 @@ func (s *Spec) Validate() error {
 	if err := validateParamDefs(s.Components.ParameterDefinitions); err != nil {
 		return err
 	}
+	if err := validateFiles(s.Components.Files); err != nil {
+		return err
+	}
 	for _, rb := range s.RequiredBuilds {
 		if !reReqBuild.MatchString(rb.Name) {
 			return fmt.Errorf("buildspec: required build name %q must be NAMESPACE*VERSION[*PATCH]", rb.Name)
@@ -237,6 +254,33 @@ func validateParamDefs(defs []ParamDef) error {
 			if e.Precedence < 0 {
 				return fmt.Errorf("buildspec: parameter %s entity %s precedence must be ≥ 0", p.Name, e.Entity)
 			}
+		}
+	}
+	return nil
+}
+
+// validateFiles checks each FILE component is a brand-new throwaway file: a
+// number in the local/test range, a valid uppercase FileMan name, and a
+// well-formed data global root (defaulted to ^DIZ(<file>, when omitted). It
+// mutates each FileComp in place to fill the default global root.
+func validateFiles(files []FileComp) error {
+	for i := range files {
+		f := &files[i]
+		n := int64(f.Number)
+		if float64(n) != f.Number || n < LocalFileMin || n > LocalFileMax {
+			return fmt.Errorf("buildspec: file number %v must be an integer in the local range %d-%d", f.Number, LocalFileMin, LocalFileMax)
+		}
+		if f.Name == "" {
+			return fmt.Errorf("buildspec: file #%d is missing its name", n)
+		}
+		if len(f.Name) > 30 || !reFileName.MatchString(f.Name) {
+			return fmt.Errorf("buildspec: file name %q must be uppercase ≤30 chars (FileMan FILE name)", f.Name)
+		}
+		if f.GlobalRoot == "" {
+			f.GlobalRoot = fmt.Sprintf("^DIZ(%d,", n)
+		}
+		if !reGlobalRt.MatchString(f.GlobalRoot) {
+			return fmt.Errorf("buildspec: file %s global root %q must be an open global ref ending in a comma, e.g. ^DIZ(%d,", f.Name, f.GlobalRoot, n)
 		}
 	}
 	return nil
