@@ -200,3 +200,45 @@ func TestLoad_Missing(t *testing.T) {
 		t.Error("missing file must error")
 	}
 }
+
+// A >8-char routine name is rejected under the default (legacy SAC) policy.
+func TestParse_LongName_RejectedByDefault(t *testing.T) {
+	js := `{"package":"MSL","version":"0.1","components":{"routines":["STDASSERT"]}}`
+	if _, err := Parse([]byte(js)); err == nil {
+		t.Fatal("a 9-char routine name must be rejected without allowLongNames")
+	}
+}
+
+// allowLongNames raises the cap from the legacy 8 to the engine limit (31),
+// keeping M-naming character validation. See docs/background ADR
+// "modern routine-name length policy".
+func TestParse_AllowLongNames(t *testing.T) {
+	js := `{"package":"MSL","version":"0.1","allowLongNames":true,
+	  "components":{"routines":["STDASSERT","STDCOMPRESS","STDHTTPMSG"]},
+	  "envCheck":"VSLLONGENVCHECK"}`
+	s, err := Parse([]byte(js))
+	if err != nil {
+		t.Fatalf("allowLongNames should admit ≤31-char M names: %v", err)
+	}
+	if !s.AllowLongNames {
+		t.Error("AllowLongNames field not decoded")
+	}
+	if len(s.Components.Routines) != 3 {
+		t.Errorf("routines = %v", s.Components.Routines)
+	}
+}
+
+// Even with allowLongNames, the engine ceiling (31) and M-naming character
+// rules still bind — the policy modernizes the limit, it does not remove it.
+func TestParse_AllowLongNames_StillGated(t *testing.T) {
+	cases := map[string]string{
+		"over engine ceiling":  `{"package":"MSL","version":"0.1","allowLongNames":true,"components":{"routines":["` + strings.Repeat("A", 32) + `"]}}`,
+		"lower-case still bad": `{"package":"MSL","version":"0.1","allowLongNames":true,"components":{"routines":["stdassert"]}}`,
+		"spaces still bad":     `{"package":"MSL","version":"0.1","allowLongNames":true,"components":{"routines":["STD ASSERT"]}}`,
+	}
+	for name, js := range cases {
+		if _, err := Parse([]byte(js)); err == nil {
+			t.Errorf("%s: expected an error, got nil", name)
+		}
+	}
+}

@@ -43,6 +43,15 @@ type Spec struct {
 	RequiredBuilds []RequiredBuild `json:"requiredBuilds,omitempty"`
 	EnvCheck       string          `json:"envCheck,omitempty"` // environment-check routine name (XPDENV)
 	ICRs           []ICR           `json:"icrs,omitempty"`     // DBIA/ICR agreements the package relies on
+
+	// AllowLongNames opts the build out of the legacy 8-char SAC routine-name
+	// convention, raising the cap to the M engine limit (RoutineNameMaxLong).
+	// The M-naming character rules still bind. This is a deliberate, committed
+	// policy choice — see the org "modern routine-name length policy" ADR — and
+	// is appropriate only for modern YDB/IRIS targets (it forgoes legacy
+	// GT.M/Caché %RO portability and formal SAC/national release without a
+	// later rename).
+	AllowLongNames bool `json:"allowLongNames,omitempty"`
 }
 
 // Components is the BUILD component list (#9.6). Each slice is omitempty so a
@@ -131,6 +140,17 @@ const (
 	LocalFileMax = 999999
 )
 
+// Routine-name length caps. RoutineNameMaxStd is the legacy SAC/DSM-era
+// convention (a 2-4 char namespace + remainder, 8 total). RoutineNameMaxLong is
+// the modern M engine limit honored by YottaDB and IRIS (31 significant
+// characters) — used when a spec sets allowLongNames. KIDS itself (transport
+// global, string-subscript keyed) and XINDEX impose no name-length limit; the 8
+// is a convention, the 31 is the real engine bound.
+const (
+	RoutineNameMaxStd  = 8
+	RoutineNameMaxLong = 31
+)
+
 // RequiredBuild is a KIDS Required Build (#11) — a prerequisite build + the
 // action KIDS takes when it is absent.
 type RequiredBuild struct {
@@ -203,7 +223,11 @@ func (s *Spec) Validate() error {
 	if s.Components.empty() {
 		return fmt.Errorf("buildspec: %s has no components — a build must ship at least one", s.InstallName())
 	}
-	if err := validateRoutines(s.Components.Routines); err != nil {
+	maxName := RoutineNameMaxStd
+	if s.AllowLongNames {
+		maxName = RoutineNameMaxLong
+	}
+	if err := validateRoutines(s.Components.Routines, maxName); err != nil {
 		return err
 	}
 	if err := validateParamDefs(s.Components.ParameterDefinitions); err != nil {
@@ -220,8 +244,8 @@ func (s *Spec) Validate() error {
 			return fmt.Errorf("buildspec: required build %s action %q is not a KIDS install action", rb.Name, rb.Action)
 		}
 	}
-	if s.EnvCheck != "" && !isRoutineName(s.EnvCheck) {
-		return fmt.Errorf("buildspec: envCheck %q is not a valid routine name (≤8 chars)", s.EnvCheck)
+	if s.EnvCheck != "" && !isRoutineName(s.EnvCheck, maxName) {
+		return fmt.Errorf("buildspec: envCheck %q is not a valid routine name (≤%d chars)", s.EnvCheck, maxName)
 	}
 	for _, icr := range s.ICRs {
 		if icr.Number <= 0 {
@@ -286,16 +310,19 @@ func validateFiles(files []FileComp) error {
 	return nil
 }
 
-func validateRoutines(rtns []string) error {
+func validateRoutines(rtns []string, maxLen int) error {
 	for _, r := range rtns {
-		if !isRoutineName(r) {
-			return fmt.Errorf("buildspec: %q is not a valid routine name (≤8 chars, M naming)", r)
+		if !isRoutineName(r, maxLen) {
+			return fmt.Errorf("buildspec: %q is not a valid routine name (≤%d chars, M naming)", r, maxLen)
 		}
 	}
 	return nil
 }
 
-// isRoutineName reports whether s is a valid VistA/M routine name (≤8 chars).
-func isRoutineName(s string) bool {
-	return len(s) >= 1 && len(s) <= 8 && reRoutine.MatchString(s) && !strings.ContainsAny(s, " \t")
+// isRoutineName reports whether s is a valid VistA/M routine name: M-naming
+// characters (optional leading %, then uppercase letters/digits) and length in
+// [1, maxLen]. maxLen is RoutineNameMaxStd by default, or RoutineNameMaxLong
+// when the spec sets allowLongNames.
+func isRoutineName(s string, maxLen int) bool {
+	return len(s) >= 1 && len(s) <= maxLen && reRoutine.MatchString(s) && !strings.ContainsAny(s, " \t")
 }
