@@ -29,8 +29,10 @@ run: build
 lint:
 	golangci-lint run ./...
 
+# -race requires cgo, so enable it for tests only; build/dist stay static
+# (CGO_ENABLED=0) per the reproducible-build convention above.
 test:
-	go test $(GOFLAGS) -race -cover ./...
+	CGO_ENABLED=1 go test $(GOFLAGS) -race -cover ./...
 
 tidy:
 	go mod tidy
