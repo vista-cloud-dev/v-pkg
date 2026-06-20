@@ -19,10 +19,11 @@ metadata:
 
 Tests in `internal/buildspec/buildspec_test.go`: default-reject (9-char w/o flag), long-admit
 (`STDASSERT`/`STDCOMPRESS`/`STDHTTPMSG` + long envCheck w/ flag), still-gated (>31 over ceiling,
-lowercase, spaces). buildspec cov 98.7%. Branch `routine-name-policy`, unmerged.
+lowercase, spaces). buildspec cov 98.7%. **MERGED to `main` 2026-06-20** (`bdd707b`).
 
-Repo gotcha: `make test` uses `-race` but the Makefile hard-sets `export CGO_ENABLED := 0`, so
-the gate needs `make test CGO_ENABLED=1` (command-line override) or `go test -race` directly.
-Pre-existing, not from this change.
+Repo gotcha (now FIXED): `make test` uses `-race` (needs cgo) but the Makefile globally exports
+`CGO_ENABLED := 0` for static builds — collided so the test gate failed unless run as
+`make test CGO_ENABLED=1`. Fixed by setting `CGO_ENABLED=1` on the `test` recipe line only
+(build/dist stay static); `make test` now passes with no override. Merged to `main` (same push).
 
 Shared coordination note: [[routine-name-length-policy]] in the `docs` repo.
