@@ -88,9 +88,20 @@ work) but **no VSL routines**.
 - The tap defaults **OFF** (`^VSLTAP("cfg","mode")` unset → `$$captureOn`=0), so once
   `XWBBRK` is patched the in-path is just the FU-4 fence + the gate read until armed.
 
-## STILL HELD (5B.2c steps 2+ — the live mutation; gated on owner go-ahead)
-2. The **live `--commit` patch** of national `XWBBRK` on foia — hard-to-reverse overwrite
-   of the busiest national routine via the (unproven-live) KIDS-overwrite path; back-out
-   (`wrap-rpc backout --commit`) proven immediately after, broker re-verified.
-3. The **non-interference proof** against the real dispatch: wrap ON vs OFF →
-   byte-identical result + FU-4 property + bounded resource deltas (spec §6.4).
+- **Step 2 done 2026-06-23 — `XWBBRK` PATCHED LIVE on foia (tap OFF; broker intact).**
+  `wrap-rpc install --commit` shipped the patched routine via KIDS (install name
+  `VSLTAP RPC WRAP 1.0`, #9.7 status 3) — **proving the KIDS-overwrite-an-existing-
+  national-routine path works**. Verified: `status` → spliced:true, 213 lines; the
+  inserted `D req^VSLRPCWRAP` is at line 154 (after the denial line) and
+  `. D resp^VSLRPCWRAP` at line 160 (after the `:159` dispatch, dot level); and
+  `captureOn=0 / state=OFF` with the inserted calls running clean (`wrapcalls=ok`) —
+  the patched routine compiled and the wrap calls are safe no-ops with the tap off, so
+  the broker behaves as stock. **CURRENT LIVE STATE: foia XWBBRK is patched, tap OFF.**
+  A raw stock backup is in the session scratchpad (`XWBBRK.stock.m`, 211 lines);
+  deterministic back-out is `wrap-rpc backout --commit`.
+
+## STILL HELD (5B.2c step 3 — arm + the non-interference proof; then back-out)
+3. **Non-interference proof** against the real dispatch: arm the tap, drive
+   `CALLP^XWBBRK` wrap-ON vs the stock result → byte-identical result + FU-4 property +
+   bounded resource deltas (spec §6.4). Then restore stock (`wrap-rpc backout --commit`),
+   re-verify, and (optionally) uninstall the stack.
