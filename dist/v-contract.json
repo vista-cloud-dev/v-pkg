@@ -270,6 +270,140 @@
           "help": "Path to the .KID whose install to reverse (routine-only back-out)."
         }
       ]
+    },
+    {
+      "path": [
+        "wrap-rpc"
+      ],
+      "help": "Install/back out the RPC→S3 traffic-tap wrap in national CALLP^XWBBRK (preview by default; --commit ships via KIDS)."
+    },
+    {
+      "path": [
+        "wrap-rpc",
+        "status"
+      ],
+      "help": "Report whether the XWBBRK traffic-tap wrap is installed (read-only).",
+      "flags": [
+        {
+          "name": "engine",
+          "type": "enum",
+          "enum": [
+            "ydb",
+            "iris"
+          ],
+          "required": true,
+          "help": "Engine to reach: ydb or iris."
+        },
+        {
+          "name": "transport",
+          "type": "enum",
+          "enum": [
+            "local",
+            "docker",
+            "remote"
+          ],
+          "default": "remote",
+          "help": "Driver transport: local | docker | remote."
+        },
+        {
+          "name": "routine",
+          "type": "string",
+          "default": "XWBBRK",
+          "help": "the broker routine to (un)patch"
+        }
+      ]
+    },
+    {
+      "path": [
+        "wrap-rpc",
+        "install"
+      ],
+      "help": "Install the traffic-tap wrap into CALLP^XWBBRK (preview by default; --commit ships it via KIDS).",
+      "flags": [
+        {
+          "name": "engine",
+          "type": "enum",
+          "enum": [
+            "ydb",
+            "iris"
+          ],
+          "required": true,
+          "help": "Engine to reach: ydb or iris."
+        },
+        {
+          "name": "transport",
+          "type": "enum",
+          "enum": [
+            "local",
+            "docker",
+            "remote"
+          ],
+          "default": "remote",
+          "help": "Driver transport: local | docker | remote."
+        },
+        {
+          "name": "routine",
+          "type": "string",
+          "default": "XWBBRK",
+          "help": "the broker routine to (un)patch"
+        },
+        {
+          "name": "out",
+          "type": "string",
+          "help": "write the patched routine (.m) and its KIDS (.kids) preview to this path prefix"
+        },
+        {
+          "name": "commit",
+          "type": "bool",
+          "help": "DESTRUCTIVE: install the patched routine on the live engine via KIDS (overwrites the national routine). Default off = preview only."
+        }
+      ]
+    },
+    {
+      "path": [
+        "wrap-rpc",
+        "backout"
+      ],
+      "help": "Remove the wrap, restoring stock CALLP^XWBBRK (preview by default; --commit ships it via KIDS).",
+      "flags": [
+        {
+          "name": "engine",
+          "type": "enum",
+          "enum": [
+            "ydb",
+            "iris"
+          ],
+          "required": true,
+          "help": "Engine to reach: ydb or iris."
+        },
+        {
+          "name": "transport",
+          "type": "enum",
+          "enum": [
+            "local",
+            "docker",
+            "remote"
+          ],
+          "default": "remote",
+          "help": "Driver transport: local | docker | remote."
+        },
+        {
+          "name": "routine",
+          "type": "string",
+          "default": "XWBBRK",
+          "help": "the broker routine to (un)patch"
+        },
+        {
+          "name": "out",
+          "type": "string",
+          "help": "write the restored stock routine (.m) and its KIDS (.kids) preview to this path prefix"
+        },
+        {
+          "name": "commit",
+          "type": "bool",
+          "help": "DESTRUCTIVE: restore stock on the live engine via KIDS. Default off = preview only."
+        }
+      ]
     }
   ]
 }

@@ -32,6 +32,7 @@ type Commands struct {
 	Install      installCmd      `cmd:"" help:"Install a built .KID on a live engine over the driver (non-interactive KIDS load+install)."`
 	Verify       verifyCmd       `cmd:"" help:"Verify a .KID's install on a live engine (#9.7 status + per-routine presence)."`
 	Uninstall    uninstallCmd    `cmd:"" help:"Uninstall a .KID from a live engine (routine-only back-out: routines + #9.7/#9.6)."`
+	WrapRPC      wrapRPCCmd      `cmd:"" name:"wrap-rpc" help:"Install/back out the RPC→S3 traffic-tap wrap in national CALLP^XWBBRK (preview by default; --commit ships via KIDS)."`
 }
 
 // --- parse -------------------------------------------------------------------

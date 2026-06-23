@@ -36,6 +36,7 @@ const (
 	rtnInstall   = "ZVPKGINS"
 	rtnVerify    = "ZVPKGVFY"
 	rtnUninstall = "ZVPKGUNI"
+	rtnRead      = "ZVPKGRD"
 )
 
 // engineConn selects which engine driver to drive and over which transport — the
@@ -130,6 +131,78 @@ func runMScript(ctx context.Context, cl *mdriver.Client, rtn, body string) (map[
 		return markers, res.Stdout, fmt.Errorf("run EN^%s: %s %s", rtn, res.EngineError.Mnemonic, res.EngineError.Text)
 	}
 	return markers, res.Stdout, nil
+}
+
+// validRoutineName guards the routine name before it is interpolated into a
+// generated M $TEXT script — only a real M routine name (optional leading %, then
+// letters/digits, ≤8 chars) is allowed, so the name cannot inject M code.
+func validRoutineName(s string) bool {
+	if s == "" || len(s) > 8 {
+		return false
+	}
+	for i, r := range s {
+		switch {
+		case r == '%':
+			if i != 0 {
+				return false
+			}
+		case r >= 'A' && r <= 'Z', r >= 'a' && r <= 'z':
+			// a letter is valid anywhere
+		case r >= '0' && r <= '9':
+			if i == 0 {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// readRoutineBody is the M script body that streams a routine's source back as
+// one `<<VPKG>>l<n>=<line>` marker per line (1-indexed, the $TEXT offset). It stops
+// at the first line that is empty AND followed by an empty line (end of routine);
+// VistA routine source carries no embedded blank lines, so a single sentinel is
+// safe and the two-empty check is belt-and-suspenders. Lines carry no newline, so
+// each survives the marker channel verbatim (leading whitespace and all).
+func readRoutineBody(name string) string {
+	return "N I,L,E S E=0 F I=1:1 D  Q:E\n" +
+		". S L=$T(+I^" + name + ")\n" +
+		". I L=\"\",$T(+(I+1)^" + name + ")=\"\" S E=1 Q\n" +
+		". W \"" + installspec.ResultMarker + "l\",I,\"=\",L,!"
+}
+
+// parseRoutineLines reconstructs a routine's source, in order, from the
+// `l<n>`-keyed markers readRoutineBody emitted. It walks contiguous 1-based keys
+// and stops at the first gap (the end), so a value is never lost to map ordering.
+func parseRoutineLines(markers map[string]string) []string {
+	var out []string
+	for i := 1; ; i++ {
+		v, ok := markers["l"+strconv.Itoa(i)]
+		if !ok {
+			return out
+		}
+		out = append(out, v)
+	}
+}
+
+// readRoutineSource reads a routine's full source off the live engine through the
+// driver (the first engine-READ capability in v-pkg — read-only, no mutation). It
+// is the stock-source leg of the wrap-rpc patcher: the caller splices host-side
+// (internal/wrapsplice) and ships the result back through the KIDS path.
+func readRoutineSource(ctx context.Context, cl *mdriver.Client, name string) ([]string, error) {
+	if !validRoutineName(name) {
+		return nil, fmt.Errorf("invalid routine name %q", name)
+	}
+	markers, _, err := runMScript(ctx, cl, rtnRead, readRoutineBody(name))
+	if err != nil {
+		return nil, err
+	}
+	lines := parseRoutineLines(markers)
+	if len(lines) == 0 {
+		return nil, fmt.Errorf("routine %s: no source read (is it present on the engine?)", name)
+	}
+	return lines, nil
 }
 
 // loadBuild parses a .KID and returns the single build's install name and data.

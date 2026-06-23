@@ -54,14 +54,30 @@ coverage **97.7%**. GOTCHA (pre-existing, repo memory): `make test` needs
 `CGO_ENABLED=1` (Makefile hard-sets 0 but `-race` needs cgo) — `make test`/`make all`
 handle it.
 
-## NEXT (5B.2b — owed; the live steps gated on owner go-ahead)
-1. `readRoutineSource(ctx, cl, name) ([]string,error)` — read stock XWBBRK off the
-   engine over the driver (`$TEXT` probe via `runMScript`/`ExecRun`; the first
-   engine-READ capability in v-pkg).
-2. A command (e.g. `v pkg wrap-rpc install|backout|status`) that: read stock →
-   `Splice`/`Unsplice` → ship the patched/stock routine via the existing
-   `kids.MakeBuildPairs`+`installspec` path (reuse, routines-only build).
-3. The **non-interference proof** against the real dispatch (IRIS/foia first): wrap
-   ON vs OFF → byte-identical result + FU-4 property + bounded resource deltas.
-4. **Live install of patched national XWBBRK is hard-to-reverse → confirm with the
-   owner before the first foia overwrite**, with the back-out proven first.
+## 5B.2b parts 1–2 DONE 2026-06-23 (read-capability + command; live install still held)
+- **`readRoutineSource(ctx, cl, name)`** (pkgcli/lifecycle.go) — the **first
+  engine-READ capability in v-pkg**: streams a routine's source back as one
+  `<<VPKG>>l<n>=<line>` marker per line via a generated `$TEXT` loop (`readRoutineBody`),
+  reconstructed in order by `parseRoutineLines`; `validRoutineName` guards the name
+  against M injection before interpolation. Read-only.
+- **`v pkg wrap-rpc status|install|backout`** (pkgcli/wraprpc.go) — read stock →
+  `wrapsplice.Splice`/`Unsplice` → `kids.MakeBuildPairs` (routines-only) →
+  **PREVIEW by default** (writes the patched `.m`+`.kids` to `--out`, engine NOT
+  modified); the live KIDS install (reuse of the proven `runInstall`) runs **only
+  under `--commit`**. `status` is read-only (reports spliced? + anchors-OK).
+- **Live read-only smoke (foia/IRIS):** `wrap-rpc status` read the real **211-line**
+  XWBBRK → `spliced:false, anchorsOk:true` (the content anchors are present + unique
+  on the ACTUAL national routine, not just the fixture — strong FU-21 confirmation);
+  `wrap-rpc install --out …` (no `--commit`) produced a 213-line patched routine
+  (217 KIDS pairs) with `D req^VSLRPCWRAP ;VSLTAPW` at line 154 (after the denial
+  line) and `. D resp^VSLRPCWRAP ;VSLTAPW` at line 160 (after the dispatch, dot
+  level). `committed:false` — engine untouched.
+- Gates: `make all` green; the command-surface contract golden (`dist/v-contract.json`)
+  regenerated (`make contract`); wrapsplice cov 97.7%, pure helpers unit-tested.
+
+## STILL HELD (5B.2c — the live mutation; gated on owner go-ahead)
+1. The **live `--commit` install** of patched national XWBBRK on foia (IRIS first) —
+   hard-to-reverse overwrite of the busiest national routine; back-out (`wrap-rpc
+   backout --commit`) proven first.
+2. The **non-interference proof** against the real dispatch: wrap ON vs OFF →
+   byte-identical result + FU-4 property + bounded resource deltas (spec §6.4).
