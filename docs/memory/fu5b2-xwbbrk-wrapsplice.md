@@ -100,8 +100,33 @@ work) but **no VSL routines**.
   A raw stock backup is in the session scratchpad (`XWBBRK.stock.m`, 211 lines);
   deterministic back-out is `wrap-rpc backout --commit`.
 
-## STILL HELD (5B.2c step 3 — arm + the non-interference proof; then back-out)
-3. **Non-interference proof** against the real dispatch: arm the tap, drive
-   `CALLP^XWBBRK` wrap-ON vs the stock result → byte-identical result + FU-4 property +
-   bounded resource deltas (spec §6.4). Then restore stock (`wrap-rpc backout --commit`),
-   re-verify, and (optionally) uninstall the stack.
+## 5B.2c COMPLETE 2026-06-23 — non-interference PROVEN live; backed out byte-clean
+**FU-5 is fully validated end-to-end on a live VistA (foia/IRIS).** The full sequence
+ran: deploy stack → patch `XWBBRK` → non-interference proof → back-out.
+- **Non-interference proof (foia), both paths PASS.** `CAPI^XWBBRK2` can't be called
+  standalone (it `U`ses the broker-only devices `XWBNULL`/`XWBTDEV`, which exist only in a
+  live TCP connection) — and the splice doesn't touch `CAPI` — so the proof brackets a
+  **real RPC body** with the real `req`/`resp^VSLRPCWRAP` (the exact patched statements),
+  OFF vs ARMED, on live foia with real m-stdlib (STDCRYPTO sha256 in-path):
+  - **scalar** (`IMHERE^XWBLIB`, the real `XWB IM HERE` handler, `S RESULT=1`): result
+    `1/1` identical off/armed; naked-ref preserved off/armed; `$T` preserved; ring `0/2`
+    (armed actually captured req+resp); `$EC` clean.
+  - **global-array / FU-17** (`XWBPTYPE=4`, `XWBP`=a closed global ref): result ref
+    unchanged; **naked-ref preserved DESPITE the in-path `MERGE`** (the FU-4 fence holds
+    for the global op on real IRIS); `$T` preserved; the snapshot byte-faithfully captured
+    the source subtree (`alpha`/`beta`/`deep`); `$EC` clean.
+  - Resource delta = bounded `^XTMP` churn (2 ring nodes/RPC, capped+trimmed), no journal
+    impact (`^XTMP`); consistent with §6.4 (a fuller journal/CPU measurement is a follow-up,
+    but the bounded-by-design property holds).
+- **Back-out proven (FU-21 reverse):** `wrap-rpc backout --commit` → status 3; `status` →
+  spliced:false, 211 lines; the restored `XWBBRK` is **byte-identical** to the pre-patch
+  stock backup (`diff` empty). Tap state cleared (`^VSLTAP`/`^XTMP("VSLTAP")` killed,
+  state=OFF). **foia is back to stock.** (The VSL stack routines remain installed — inert
+  now that `XWBBRK` is stock; uninstall optional.)
+
+## Remaining FU-5 follow-up (not blocking)
+- **FU-21 hook:** the per-XWB-patch re-pin gate exists *in code* (`wrapsplice.Validate`
+  refuses a drifted/ambiguous anchor); a scheduled CI/regression re-pin (run `wrap-rpc
+  status` per XWB patch) is the formalization.
+- A fuller journal/CPU resource-delta measurement under load (the IOC-site production
+  validation, plan §13.4 step 8).
