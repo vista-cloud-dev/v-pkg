@@ -75,9 +75,22 @@ handle it.
 - Gates: `make all` green; the command-surface contract golden (`dist/v-contract.json`)
   regenerated (`make contract`); wrapsplice cov 97.7%, pure helpers unit-tested.
 
-## STILL HELD (5B.2c — the live mutation; gated on owner go-ahead)
-1. The **live `--commit` install** of patched national XWBBRK on foia (IRIS first) —
-   hard-to-reverse overwrite of the busiest national routine; back-out (`wrap-rpc
-   backout --commit`) proven first.
-2. The **non-interference proof** against the real dispatch: wrap ON vs OFF →
+## 5B.2c live sequence — step 1 DONE 2026-06-23 (stack deployed; patch HELD)
+**Prerequisite finding (load-bearing):** the patched `XWBBRK` calls `D req^VSLRPCWRAP`
+on EVERY RPC, so the **VSL tap stack must be installed BEFORE the `XWBBRK` patch** — else
+the call is undefined and the broker's `$ETRAP` fails every RPC. Recon of foia (IRIS):
+**m-stdlib already present** (`STDCRYPTO/STDJSON/STDB64/STDDATE`=1, from earlier M6/M6.5
+work) but **no VSL routines**.
+- **Step 1 done:** `v pkg install VSL.kids` (VSL\*1.0\*2, 15 routines from branch
+  `s3tap-fu5b1-rpcwrap`) on foia → status 3; `VSLRPCWRAP/VSLRPCTAP/VSLTAP/VSLTAPHL/VSLS3`
+  all present; `wrap-rpc status` confirms `XWBBRK` still **stock** (spliced:false, 211
+  lines, anchorsOk:true). Broker untouched (no XWBBRK patch yet).
+- The tap defaults **OFF** (`^VSLTAP("cfg","mode")` unset → `$$captureOn`=0), so once
+  `XWBBRK` is patched the in-path is just the FU-4 fence + the gate read until armed.
+
+## STILL HELD (5B.2c steps 2+ — the live mutation; gated on owner go-ahead)
+2. The **live `--commit` patch** of national `XWBBRK` on foia — hard-to-reverse overwrite
+   of the busiest national routine via the (unproven-live) KIDS-overwrite path; back-out
+   (`wrap-rpc backout --commit`) proven immediately after, broker re-verified.
+3. The **non-interference proof** against the real dispatch: wrap ON vs OFF →
    byte-identical result + FU-4 property + bounded resource deltas (spec §6.4).
