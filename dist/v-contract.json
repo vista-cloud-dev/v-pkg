@@ -109,6 +109,20 @@
     },
     {
       "path": [
+        "classify"
+      ],
+      "help": "Derive a .KID's reversibility class (pure-overwrite vs side-effecting) from its structure — no engine.",
+      "args": [
+        {
+          "name": "kid-file",
+          "type": "string",
+          "required": true,
+          "help": "Path to the .KID file."
+        }
+      ]
+    },
+    {
+      "path": [
         "lint"
       ],
       "help": "Run the PIKS data-class gate over a .KID (exit 3 on a blocked file).",

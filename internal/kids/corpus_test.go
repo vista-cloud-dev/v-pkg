@@ -56,6 +56,7 @@ func TestRoundtripCorpus(t *testing.T) {
 	t.Logf("corpus: %d KIDS distributions under %s", len(files), root)
 
 	var pass, drift, errs int
+	var pure, side int
 	var failures []string
 	for _, f := range files {
 		rel, _ := filepath.Rel(root, f)
@@ -74,9 +75,23 @@ func TestRoundtripCorpus(t *testing.T) {
 		default:
 			pass++
 		}
+		// Classify every parseable file so one sweep also validates the
+		// reversibility classifier at corpus scale (and documents the split).
+		if k, perr := ParseKID(f); perr == nil {
+			if Classify(k).Class == ClassPureOverwrite {
+				pure++
+			} else {
+				side++
+			}
+		}
 	}
 
 	t.Logf("roundtrip sweep: PASS=%d DRIFT=%d ERROR=%d (total %d)", pass, drift, errs, len(files))
+	classified := pure + side
+	if classified > 0 {
+		t.Logf("reversibility:  pure-overwrite=%d (%d%%)  side-effecting=%d (%d%%)",
+			pure, 100*pure/classified, side, 100*side/classified)
+	}
 	if len(failures) > 0 {
 		for _, f := range failures {
 			t.Errorf("%s", f)

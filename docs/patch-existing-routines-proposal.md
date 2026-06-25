@@ -1,12 +1,24 @@
 ---
 title: "v-pkg: patching EXISTING routines (snapshot / restore / drift) — not just greenfield install"
-status: PROPOSAL (2026-06-25) — design for review; not yet implemented
+status: PARTIALLY IMPLEMENTED (2026-06-25) — keystone `classify` verb landed; snapshot/restore/class-aware uninstall are next (engine-bound)
 created: 2026-06-25
 for: extending the v-pkg verb contract + build-spec schema so a build can safely PATCH an existing national routine and be reversed to stock
 related: v-stdlib RPC-broker splice (VSLRPCWRAP / CALLP^XWBBRK), v-stdlib VSLTAPBO + FU-21 (the per-package hack this generalizes), docs/fileman-dd-install-plan.md
 ---
 
 # v-pkg: patching existing routines, not just greenfield install
+
+> **Implementation status (2026-06-25).** The keystone everything else gates on —
+> static reversibility classification — is **built and corpus-validated**:
+> `internal/kids/reversibility.go` (`Classify`/`ClassifyBuild`) + the `v pkg
+> classify` verb derive PureOverwrite vs SideEffecting from the `.KID` alone (no
+> engine), using four node-shape probes (routine name, install-code subnode
+> INI/INIT/PRE/PRET, exported `KRN` entry, FILE-multiple). Cross-checked against
+> all 2,404 WorldVistA distributions via `make corpus`: pure-overwrite **36%**,
+> side-effecting **63%** — matching the independent analyze.py count (35/64). The
+> remaining verbs (`snapshot`/`restore`, class-aware `install`/`uninstall`,
+> `verify --drift`) are **engine-bound** and land next, now unblocked by the
+> classifier.
 
 ## Problem
 

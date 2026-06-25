@@ -230,7 +230,11 @@ Format: **Q<n> (date, STATUS):** question — *recommendation*. **A:** answer.
   ship DD/data, 96% declare required builds). So class-aware `uninstall` and the
   authored-back-out contract are the *common* path, not an edge case — see
   [`kids-corpus-findings.md`](kids-corpus-findings.md).*
-  **A:** _<pending>_
+  **A (partial, 2026-06-25):** keystone landed — `internal/kids/reversibility.go`
+  + `v pkg classify` statically derive the reversibility class (no engine),
+  corpus-validated (36%/63%). `make corpus` round-trips ALL 2,404 local KIDS
+  (PASS=2404, DRIFT=0). Next (engine-bound, now unblocked): `snapshot`/`restore`,
+  class-aware `install`/`uninstall`, `verify --drift`.
 
 ---
 
