@@ -1,6 +1,6 @@
 ---
 title: "v-pkg: patching EXISTING routines (snapshot / restore / drift) — not just greenfield install"
-status: PARTIALLY IMPLEMENTED (2026-06-25) — `classify`, `snapshot`/`restore`, and class-aware `uninstall` landed (live-proven on vehu); class-aware install + verify --drift are next
+status: PARTIALLY IMPLEMENTED (2026-06-25) — `classify`, `snapshot`/`restore`, class-aware `install` + `uninstall` landed (live-proven on vehu); verify --drift + non-routine pre-image are next
 created: 2026-06-25
 for: extending the v-pkg verb contract + build-spec schema so a build can safely PATCH an existing national routine and be reversed to stock
 related: v-stdlib RPC-broker splice (VSLRPCWRAP / CALLP^XWBBRK), v-stdlib VSLTAPBO + FU-21 (the per-package hack this generalizes), docs/fileman-dd-install-plan.md
@@ -189,10 +189,15 @@ drift-gateable (a `patch` component with no captured pre-image is a red gate).
   `install <snapshot.kid>` (restore = install-of-pre-image), so it reuses
   `runInstall`. Implemented in pkgcli/restore.go; previews by default, overwrites
   live routines only under `--commit`.
-- **`install` gains pre-image awareness** — classify each component greenfield vs
-  overwrite; for any `patch` (or any silent overwrite of an existing routine),
-  **auto-`snapshot` first**, or refuse without `--snapshot`/`--allow-overwrite`.
-  No silent clobber of national code.
+- **`install` is pre-image aware** *(DONE 2026-06-25, pkgcli/lifecycle.go)* — it
+  probes the engine (`captureRoutinePreimages`) to split the build's routines into
+  overwrite targets (already present) vs greenfield (new), then `decideInstall`
+  routes: pure greenfield → install (the existing path); an overwrite with
+  `--snapshot <out.kids>` → **auto-capture the pre-image, then install** (enables
+  `uninstall --restore`); with `--allow-overwrite` → install without a pre-image
+  (explicit, unsafe); otherwise → **REFUSE** (exit 4). No silent clobber of
+  national code. Live-proven on vehu: installing the XWBBRK patch with no flags is
+  refused because XWBBRK already exists.
 - **`uninstall` is class-aware** *(DONE 2026-06-25, pkgcli/lifecycle.go)* — it
   `Classify`s the `.KID` and routes via `decideUninstall`: `--restore <pre-image>`
   → re-install the snapshot (class-1 patched-over routine); `--backout <kid>` →

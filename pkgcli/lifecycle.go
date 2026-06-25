@@ -265,26 +265,135 @@ func runInstall(ctx context.Context, cl *mdriver.Client, name, header string, pa
 	return r, nil
 }
 
+// installAction is the class-aware install strategy chosen after probing which
+// of the build's routines already exist on the live engine.
+type installAction int
+
+const (
+	// instProceed: install directly — either pure greenfield (nothing existing
+	// is overwritten) or the operator accepted an unguarded overwrite.
+	instProceed installAction = iota
+	// instSnapshotProceed: capture the pre-image of the routines this install
+	// overwrites, THEN install (so a later uninstall --restore can reverse it).
+	instSnapshotProceed
+	// instRefuse: the install would overwrite existing national routines with no
+	// pre-image captured — refuse rather than silently clobber.
+	instRefuse
+)
+
+func (a installAction) String() string {
+	switch a {
+	case instProceed:
+		return "proceed"
+	case instSnapshotProceed:
+		return "snapshot+proceed"
+	default:
+		return "refuse"
+	}
+}
+
+// decideInstall picks the install strategy. The rule (patch-existing-routines
+// proposal): no SILENT clobber of national code. A pure-greenfield install
+// proceeds (the existing behavior). An install that would OVERWRITE an existing
+// routine must either capture a pre-image first (--snapshot, the safe path —
+// enables uninstall --restore) or be an explicit unguarded overwrite
+// (--allow-overwrite); absent both, it is refused.
+func decideInstall(hasExisting bool, snapshot string, allowOverwrite bool) (installAction, string) {
+	if !hasExisting {
+		return instProceed, "all routines are new (greenfield) — nothing existing is overwritten"
+	}
+	if snapshot != "" {
+		return instSnapshotProceed, "overwrites existing routine(s) — capturing their pre-image first (enables uninstall --restore)"
+	}
+	if allowOverwrite {
+		return instProceed, "overwrites existing routine(s) WITHOUT a pre-image (--allow-overwrite) — uninstall cannot restore them"
+	}
+	return instRefuse, "would overwrite existing national routine(s) with no pre-image — pass --snapshot <out.kids> to capture one (enables uninstall --restore), or --allow-overwrite to clobber without one"
+}
+
 type installCmd struct {
 	engineConn
-	KidFile string `arg:"" help:"Path to the built .KID transport file to install on the live engine."`
+	KidFile        string `arg:"" help:"Path to the built .KID transport file to install on the live engine."`
+	Snapshot       string `help:"Capture the pre-image of any routine this install overwrites to this .KID before installing (enables uninstall --restore)."`
+	AllowOverwrite bool   `help:"Overwrite existing routines WITHOUT capturing a pre-image (unsafe: uninstall cannot then restore them)."`
+}
+
+type installReport struct {
+	Name       string   `json:"name"`
+	Class      string   `json:"class"`
+	Action     string   `json:"action"`
+	Reason     string   `json:"reason"`
+	Overwrites []string `json:"overwrites,omitempty"` // existing routines this install replaces
+	Greenfield []string `json:"greenfield,omitempty"` // routines this install newly adds
+	Snapshot   string   `json:"snapshot,omitempty"`   // pre-image .KID written, if any
+	Installed  bool     `json:"installed"`
+	Status     int      `json:"status"`
+	Error      string   `json:"error,omitempty"`
 }
 
 func (c *installCmd) Run(cc *clikit.Context) error {
-	name, b, err := loadBuild(c.KidFile)
+	k, err := kids.ParseKID(c.KidFile)
 	if err != nil {
 		return clikit.Fail(clikit.ExitRuntime, "READ_FAILED", err.Error(), "")
 	}
+	if len(k.InstallNames) != 1 {
+		return clikit.Fail(clikit.ExitUsage, "MULTI_BUILD",
+			fmt.Sprintf("install expects exactly one build, found %d", len(k.InstallNames)), "install one build at a time")
+	}
+	name := k.InstallNames[0]
+	b := k.Builds[name]
+	rev := kids.Classify(k)
+
 	cl, err := c.client()
 	if err != nil {
 		return c.noDriver(err)
 	}
-	res, err := runInstall(context.Background(), cl, name, name+" via v pkg install", b.Pairs())
+	ctx := context.Background()
+
+	// Probe the engine: which shipped routines already exist (overwrite targets)?
+	existing, greenfield, err := captureRoutinePreimages(ctx, cl, b.RoutineNames())
+	if err != nil {
+		return clikit.Fail(clikit.ExitRuntime, "READ_FAILED", err.Error(),
+			"confirm the driver connection before installing")
+	}
+	action, reason := decideInstall(len(existing) > 0, c.Snapshot, c.AllowOverwrite)
+	res := installReport{
+		Name: name, Class: rev.ClassName, Action: action.String(), Reason: reason,
+		Overwrites: routineNames(existing), Greenfield: greenfield,
+	}
+
+	if action == instRefuse {
+		return clikit.Fail(clikit.ExitRefused, "INSTALL_REFUSED",
+			fmt.Sprintf("refusing to install %s: %s", name, reason),
+			"pass --snapshot <out.kids> to capture a pre-image first, or --allow-overwrite")
+	}
+
+	// Safe path: capture the overwrite targets' pre-image before clobbering.
+	if action == instSnapshotProceed {
+		snapName := snapshotName(name, "")
+		pairs := buildSnapshotPairs(snapName, snapshotNamespace(name), existing)
+		if werr := kids.WriteKID([]string{snapName}, map[string][]kids.Pair{snapName: pairs}, c.Snapshot); werr != nil {
+			return clikit.Fail(clikit.ExitRuntime, "WRITE_FAILED", werr.Error(), "")
+		}
+		res.Snapshot = c.Snapshot
+	}
+
+	ir, err := runInstall(ctx, cl, name, name+" via v pkg install", b.Pairs())
 	if err != nil {
 		return clikit.Fail(clikit.ExitRuntime, "INSTALL_FAILED", err.Error(), "")
 	}
+	res.Installed = ir.Installed
+	res.Status = ir.Status
+	res.Error = ir.Error
+
 	if err := cc.Result(res, func() {
 		cc.Title("pkg install — " + c.Engine)
+		if len(res.Overwrites) > 0 {
+			fmt.Fprintf(cc.Stdout, "  %s overwrites: %s\n", cc.Accent("patch"), strings.Join(res.Overwrites, ", "))
+		}
+		if res.Snapshot != "" {
+			fmt.Fprintf(cc.Stdout, "  pre-image captured → %s\n", cc.Accent(res.Snapshot))
+		}
 		switch {
 		case res.Error != "":
 			fmt.Fprintln(cc.Stdout, cc.Failure(res.Name+": "+res.Error))

@@ -200,6 +200,16 @@
           ],
           "default": "remote",
           "help": "Driver transport: local | docker | remote."
+        },
+        {
+          "name": "snapshot",
+          "type": "string",
+          "help": "Capture the pre-image of any routine this install overwrites to this .KID before installing (enables uninstall --restore)."
+        },
+        {
+          "name": "allow-overwrite",
+          "type": "bool",
+          "help": "Overwrite existing routines WITHOUT capturing a pre-image (unsafe: uninstall cannot then restore them)."
         }
       ],
       "args": [

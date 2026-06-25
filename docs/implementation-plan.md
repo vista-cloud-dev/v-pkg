@@ -237,9 +237,12 @@ Format: **Q<n> (date, STATUS):** question — *recommendation*. **A:** answer.
   restore.go) — pre-image capture + class-aware honesty + preview-gated restore,
   live-proven on vehu (real 213-line XWBBRK). Class-aware `uninstall` also DONE
   (decideUninstall): --restore/--backout reversal, side-effecting REFUSED by
-  default (--force overrides), class-1 greenfield delete fallback. Next:
-  class-aware `install` (auto-snapshot before clobber), `verify --drift`,
-  non-routine pre-image capture, paired snapshot/back-out auto-detect.
+  default (--force overrides), class-1 greenfield delete fallback. Class-aware
+  `install` also DONE (decideInstall): probes the engine for overwrite-vs-
+  greenfield, auto-snapshots before clobber (--snapshot) / explicit
+  --allow-overwrite / else REFUSE — live-proven on vehu (XWBBRK refused). Next:
+  `verify --drift`, non-routine pre-image capture, paired snapshot/back-out
+  auto-detect, verify-clean after a class-2 back-out.
 
 ---
 
