@@ -425,10 +425,15 @@ type verifyResult struct {
 	Routines  map[string]bool `json:"routines"`
 	Params    map[string]bool `json:"params,omitempty"` // #8989.51 PARAMETER DEFINITIONs present
 	Files     map[string]bool `json:"files,omitempty"`  // FileMan FILE data dictionaries present
+	// Drift maps each routine -> "applied" | "drifted" | "absent" when --drift is
+	// requested: does the LIVE routine still match the source this patch shipped?
+	// "drifted" = a later national patch overwrote our code (the FU-21 re-pin gate).
+	Drift map[string]string `json:"drift,omitempty"`
 }
 
 // ok reports a fully verified install: #9.7 present + completed, every routine
-// loaded, and every PARAMETER DEFINITION present.
+// loaded, every PARAMETER DEFINITION present, and — when --drift was checked —
+// every routine still carrying the shipped patch (none drifted/absent).
 func (r verifyResult) ok() bool {
 	if !r.Installed || r.Status != 3 {
 		return false
@@ -448,7 +453,35 @@ func (r verifyResult) ok() bool {
 			return false
 		}
 	}
+	for _, state := range r.Drift {
+		if state != "applied" {
+			return false
+		}
+	}
 	return true
+}
+
+// checkDrift reads each shipped routine off the live engine and compares it to
+// the source the patch ships, returning "applied" (still our code), "drifted" (a
+// later patch overwrote it), or "absent" (not on the engine). This is the FU-21
+// re-pin gate: it answers "is my patch still applied to the live routine?"
+func checkDrift(ctx context.Context, cl *mdriver.Client, b *kids.Build) (map[string]string, error) {
+	drift := map[string]string{}
+	for _, name := range b.RoutineNames() {
+		live, present, err := readRoutinePreimage(ctx, cl, name)
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", name, err)
+		}
+		switch {
+		case !present:
+			drift[name] = "absent"
+		case kids.RoutineDriftMatch(b.RoutineSource(name), live):
+			drift[name] = "applied"
+		default:
+			drift[name] = "drifted"
+		}
+	}
+	return drift, nil
 }
 
 func runVerify(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs, files []string) (verifyResult, error) {
@@ -474,6 +507,7 @@ func runVerify(ctx context.Context, cl *mdriver.Client, name string, routines, p
 type verifyCmd struct {
 	engineConn
 	KidFile string `arg:"" help:"Path to the .KID whose install to verify (its name + routines)."`
+	Drift   bool   `help:"Also check whether each shipped routine still matches the patch on the live engine (detects a later national patch overwriting it)."`
 }
 
 func (c *verifyCmd) Run(cc *clikit.Context) error {
@@ -485,9 +519,16 @@ func (c *verifyCmd) Run(cc *clikit.Context) error {
 	if err != nil {
 		return c.noDriver(err)
 	}
-	res, err := runVerify(context.Background(), cl, name, b.RoutineNames(), b.ParamDefNames(), fileNumStrings(b))
+	ctx := context.Background()
+	res, err := runVerify(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), fileNumStrings(b))
 	if err != nil {
 		return clikit.Fail(clikit.ExitRuntime, "VERIFY_FAILED", err.Error(), "")
+	}
+	if c.Drift {
+		res.Drift, err = checkDrift(ctx, cl, b)
+		if err != nil {
+			return clikit.Fail(clikit.ExitRuntime, "VERIFY_FAILED", err.Error(), "")
+		}
 	}
 	if err := cc.Result(res, func() {
 		cc.Title("pkg verify — " + c.Engine)
@@ -517,12 +558,29 @@ func (c *verifyCmd) Run(cc *clikit.Context) error {
 			}
 			fmt.Fprintf(cc.Stdout, "  file #%s %s\n", f, mark)
 		}
+		for rt, state := range res.Drift {
+			mark := cc.Success("applied")
+			switch state {
+			case "drifted":
+				mark = cc.Failure("DRIFTED (overwritten by a later patch)")
+			case "absent":
+				mark = cc.Failure("absent")
+			}
+			fmt.Fprintf(cc.Stdout, "  drift %s %s\n", rt, mark)
+		}
 	}); err != nil {
 		return err
 	}
 	if !res.ok() {
+		hint := "install it with `v pkg install`"
+		for _, state := range res.Drift {
+			if state == "drifted" {
+				hint = "a later patch overwrote a routine — re-apply this patch (FU-21 re-pin)"
+				break
+			}
+		}
 		return clikit.Fail(clikit.ExitCheck, "NOT_VERIFIED",
-			fmt.Sprintf("%s is not fully installed", res.Name), "install it with `v pkg install`")
+			fmt.Sprintf("%s is not fully installed/applied", res.Name), hint)
 	}
 	return nil
 }

@@ -1,6 +1,9 @@
 package kids
 
-import "strconv"
+import (
+	"sort"
+	"strconv"
+)
 
 // This file builds a KIDS transport global from a declarative spec (VSL T0a.2,
 // coordination plan §7.2) — the inverse of decompose/assemble, which work from
@@ -86,4 +89,50 @@ func (b *Build) RoutineNames() []string {
 		}
 	}
 	return names
+}
+
+// RoutineSource returns the shipped source lines of routine name, in line order —
+// the `"RTN",<name>,<n>,0)` pairs collected by ascending n. Empty if the build
+// ships no source for that routine. Used by `v pkg verify --drift` to compare the
+// shipped patch against the live routine.
+func (b *Build) RoutineSource(name string) []string {
+	type ln struct {
+		n   int64
+		val string
+	}
+	var lines []ln
+	for _, p := range b.Pairs() {
+		s := p.Subs
+		if len(s) == 4 && s[0].IsStr() && s[0].Str() == "RTN" && s[1].IsStr() && s[1].Str() == name &&
+			s[2].IsInt() && s[3].IsZeroInt() {
+			lines = append(lines, ln{n: s[2].Int(), val: p.Value})
+		}
+	}
+	sort.Slice(lines, func(i, j int) bool { return lines[i].n < lines[j].n })
+	out := make([]string, len(lines))
+	for i, l := range lines {
+		out[i] = l.val
+	}
+	return out
+}
+
+// RoutineDriftMatch reports whether a shipped routine and a live routine are the
+// SAME code, ignoring the volatile second line (the `;;`-version/patch-list line
+// KIDS rewrites at install with real checksums/patch history). It canonicalizes
+// line 2 of each (CanonicalizeRoutineLine2) before comparing — so a patch that is
+// still applied matches, and a later national patch that overwrote it does not.
+func RoutineDriftMatch(shipped, live []string) bool {
+	if len(shipped) != len(live) {
+		return false
+	}
+	for i := range shipped {
+		a, b := shipped[i], live[i]
+		if i == 1 { // the 2nd line carries the volatile patch list / checksum
+			a, b = CanonicalizeRoutineLine2(a), CanonicalizeRoutineLine2(b)
+		}
+		if a != b {
+			return false
+		}
+	}
+	return true
 }

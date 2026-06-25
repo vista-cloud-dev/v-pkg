@@ -337,6 +337,11 @@
           ],
           "default": "remote",
           "help": "Driver transport: local | docker | remote."
+        },
+        {
+          "name": "drift",
+          "type": "bool",
+          "help": "Also check whether each shipped routine still matches the patch on the live engine (detects a later national patch overwriting it)."
         }
       ],
       "args": [

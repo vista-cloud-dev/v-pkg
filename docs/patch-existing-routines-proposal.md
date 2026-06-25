@@ -208,10 +208,14 @@ drift-gateable (a `patch` component with no captured pre-image is a red gate).
   brick a patched routine (class 1) and silently orphan data/side-effects (class
   2/3). *Pending:* auto-detect a paired snapshot/back-out (so the flags are
   optional) and `verify-clean` after a class-2 back-out.
-- **`verify`/`drift` extension** — answer "is my patch still applied to the live
-  routine?" so a *later* national patch overwriting our splice is **detected**
-  (generalizes FU-21's re-pin hook). Fits the org's registry-driven, drift-gated
-  philosophy: the patch-applied check is a gate.
+- **`verify --drift`** *(DONE 2026-06-25, pkgcli/lifecycle.go)* — answers "is my
+  patch still applied to the live routine?" It reads each shipped routine off the
+  engine and compares it to the patch's source via `RoutineDriftMatch`
+  (canonicalizing the volatile `;;` line-2 so a real checksum/patch-list rewrite
+  is not a false drift): `applied` (still our code) / `drifted` (a later national
+  patch overwrote it — the FU-21 re-pin gate; exit 3) / `absent`. Live-proven on
+  vehu both ways: the patched .KID vs stock live → `drifted`; the captured
+  pre-image vs stock live → `applied`.
 
 ### Back-out path is class-driven (per the taxonomy above)
 
