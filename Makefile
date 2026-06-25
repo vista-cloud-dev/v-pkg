@@ -34,6 +34,12 @@ lint:
 test:
 	CGO_ENABLED=1 go test $(GOFLAGS) -race -cover ./...
 
+# Full round-trip sweep over a real KIDS corpus (NOT in CI — the corpus is not
+# committed; it lives in the ~/data lake). Override CORPUS to point elsewhere.
+CORPUS ?= ~/data/kids-patches/VistA/Packages
+corpus:
+	VPKG_KIDS_CORPUS=$(CORPUS) go test $(GOFLAGS) ./internal/kids/ -run Corpus -v
+
 tidy:
 	go mod tidy
 
