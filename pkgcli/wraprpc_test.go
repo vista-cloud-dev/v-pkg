@@ -17,13 +17,15 @@ func TestValidRoutineName(t *testing.T) {
 		{"%ZIS", true},
 		{"XWBBRK2", true},
 		{"A", true},
-		{"", false},          // empty
-		{"TOOLONGXX", false}, // 9 chars > 8
-		{"1ABC", false},      // leading digit
-		{"XWB BRK", false},   // space — would break the M literal
-		{`XWBBRK)`, false},   // injection attempt: closes the $TEXT ref
-		{"X%Y", false},       // % only allowed leading
-		{"XWB-BR", false},    // hyphen
+		{"VSLHL7TAP", true}, // 9 chars — allowLongNames package routine
+		{"ABCDEFGHIJKLMNOPQRSTUVWXYZ12345", true}, // 31 chars — the YDB/IRIS significant limit
+		{"", false}, // empty
+		{"ABCDEFGHIJKLMNOPQRSTUVWXYZ123456", false}, // 32 chars > 31
+		{"1ABC", false},    // leading digit
+		{"XWB BRK", false}, // space — would break the M literal
+		{`XWBBRK)`, false}, // injection attempt: closes the $TEXT ref
+		{"X%Y", false},     // % only allowed leading
+		{"XWB-BR", false},  // hyphen
 	}
 	for _, c := range cases {
 		if got := validRoutineName(c.name); got != c.ok {

@@ -135,9 +135,11 @@ func runMScript(ctx context.Context, cl *mdriver.Client, rtn, body string) (map[
 
 // validRoutineName guards the routine name before it is interpolated into a
 // generated M $TEXT script — only a real M routine name (optional leading %, then
-// letters/digits, ≤8 chars) is allowed, so the name cannot inject M code.
+// letters/digits, ≤31 chars — the YDB/IRIS significant-name limit, which
+// allowLongNames packages like v-stdlib's VSLHL7TAP use) is allowed, so the name
+// cannot inject M code.
 func validRoutineName(s string) bool {
-	if s == "" || len(s) > 8 {
+	if s == "" || len(s) > 31 {
 		return false
 	}
 	for i, r := range s {
