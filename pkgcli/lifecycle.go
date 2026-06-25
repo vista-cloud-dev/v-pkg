@@ -311,6 +311,92 @@ func decideInstall(hasExisting bool, snapshot string, allowOverwrite bool) (inst
 	return instRefuse, "would overwrite existing national routine(s) with no pre-image — pass --snapshot <out.kids> to capture one (enables uninstall --restore), or --allow-overwrite to clobber without one"
 }
 
+// liveInstallInput is the engine-write request for liveInstall — a named build's
+// transport pairs plus the routines it lands on and the snapshot policy.
+type liveInstallInput struct {
+	name           string
+	header         string
+	className      string
+	routineNames   []string // the routines this build lands on (overwrite probe targets)
+	pairs          []kids.Pair
+	snapshotPath   string // "" = no pre-image requested
+	allowOverwrite bool
+}
+
+// liveInstall is the ONE class-aware install path (waterline rule: no caller
+// hand-rolls a parallel installer). It probes which target routines already exist,
+// decides the safe strategy (greenfield / snapshot+proceed / refuse) via
+// decideInstall, captures the overwrite targets' pre-image when snapshotting, then
+// ships via runInstall. Shared by `v pkg install` and the wrap-rpc patcher — so
+// the RPC-tap wrap installs through exactly the generic lifecycle, snapshot and
+// all, never a bespoke one-off. The returned *clikit.Error is the refuse / I/O
+// failure; the caller renders the report and maps post-run install state.
+func liveInstall(ctx context.Context, cl *mdriver.Client, in liveInstallInput) (installReport, *clikit.Error) {
+	captured, greenfield, err := captureRoutinePreimages(ctx, cl, in.routineNames)
+	if err != nil {
+		return installReport{Name: in.name}, clikit.Fail(clikit.ExitRuntime, "READ_FAILED", err.Error(),
+			"confirm the driver connection before installing")
+	}
+	action, reason := decideInstall(len(captured) > 0, in.snapshotPath, in.allowOverwrite)
+	res := installReport{
+		Name: in.name, Class: in.className, Action: action.String(), Reason: reason,
+		Overwrites: routineNames(captured), Greenfield: greenfield,
+	}
+	if action == instRefuse {
+		return res, clikit.Fail(clikit.ExitRefused, "INSTALL_REFUSED",
+			fmt.Sprintf("refusing to install %s: %s", in.name, reason),
+			"pass --snapshot <out.kids> (or --auto-snapshot) to capture a pre-image first, or --allow-overwrite")
+	}
+	if action == instSnapshotProceed {
+		snapName := snapshotName(in.name, "")
+		pairs := buildSnapshotPairs(snapName, snapshotNamespace(in.name), captured)
+		if werr := kids.WriteKID([]string{snapName}, map[string][]kids.Pair{snapName: pairs}, in.snapshotPath); werr != nil {
+			return res, clikit.Fail(clikit.ExitRuntime, "WRITE_FAILED", werr.Error(), "")
+		}
+		res.Snapshot = in.snapshotPath
+	}
+	ir, ierr := runInstall(ctx, cl, in.name, in.header, in.pairs)
+	if ierr != nil {
+		return res, clikit.Fail(clikit.ExitRuntime, "INSTALL_FAILED", ierr.Error(), "")
+	}
+	res.Installed = ir.Installed
+	res.Status = ir.Status
+	res.Error = ir.Error
+	return res, nil
+}
+
+// liveRestore re-applies a pre-image / authored back-out .KID via runInstall and,
+// when verify is set, confirms the live routines now match it (verify-clean). The
+// shared reversal core behind `v pkg restore` and the wrap-rpc back-out, so a
+// reversal is install-of-the-inverse through the proven path, never a hand-rolled
+// undo. Returns the snapshot's own install name (for messaging) and the outcome.
+func liveRestore(ctx context.Context, cl *mdriver.Client, restoreKid, label string, verify bool) (name string, done bool, status int, verifyClean string, ferr *clikit.Error) {
+	rname, rb, lerr := loadBuild(restoreKid)
+	if lerr != nil {
+		return "", false, 0, "", clikit.Fail(clikit.ExitRuntime, "READ_FAILED", lerr.Error(), "")
+	}
+	ir, ierr := runInstall(ctx, cl, rname, rname+" via "+label, rb.Pairs())
+	if ierr != nil {
+		return rname, false, 0, "", clikit.Fail(clikit.ExitRuntime, "RESTORE_FAILED", ierr.Error(), "")
+	}
+	done = ir.Installed
+	status = ir.Status
+	if verify && done {
+		drift, derr := checkDrift(ctx, cl, rb)
+		if derr != nil {
+			return rname, done, status, "", clikit.Fail(clikit.ExitRuntime, "RESTORE_FAILED", derr.Error(), "")
+		}
+		verifyClean = "clean"
+		for _, state := range drift {
+			if state != "applied" {
+				verifyClean = "dirty"
+				break
+			}
+		}
+	}
+	return rname, done, status, verifyClean, nil
+}
+
 type installCmd struct {
 	engineConn
 	KidFile        string `arg:"" help:"Path to the built .KID transport file to install on the live engine."`
@@ -351,47 +437,20 @@ func (c *installCmd) Run(cc *clikit.Context) error {
 	}
 	ctx := context.Background()
 
-	// Probe the engine: which shipped routines already exist (overwrite targets)?
-	existing, greenfield, err := captureRoutinePreimages(ctx, cl, b.RoutineNames())
-	if err != nil {
-		return clikit.Fail(clikit.ExitRuntime, "READ_FAILED", err.Error(),
-			"confirm the driver connection before installing")
-	}
 	// --auto-snapshot supplies the conventional sidecar path when no explicit
 	// --snapshot is given, so install/uninstall pair without a path.
 	snapshot := c.Snapshot
 	if snapshot == "" && c.AutoSnapshot {
 		snapshot = defaultPreimagePath(c.KidFile)
 	}
-	action, reason := decideInstall(len(existing) > 0, snapshot, c.AllowOverwrite)
-	res := installReport{
-		Name: name, Class: rev.ClassName, Action: action.String(), Reason: reason,
-		Overwrites: routineNames(existing), Greenfield: greenfield,
+	res, ferr := liveInstall(ctx, cl, liveInstallInput{
+		name: name, header: name + " via v pkg install", className: rev.ClassName,
+		routineNames: b.RoutineNames(), pairs: b.Pairs(),
+		snapshotPath: snapshot, allowOverwrite: c.AllowOverwrite,
+	})
+	if ferr != nil {
+		return ferr
 	}
-
-	if action == instRefuse {
-		return clikit.Fail(clikit.ExitRefused, "INSTALL_REFUSED",
-			fmt.Sprintf("refusing to install %s: %s", name, reason),
-			"pass --snapshot <out.kids> (or --auto-snapshot) to capture a pre-image first, or --allow-overwrite")
-	}
-
-	// Safe path: capture the overwrite targets' pre-image before clobbering.
-	if action == instSnapshotProceed {
-		snapName := snapshotName(name, "")
-		pairs := buildSnapshotPairs(snapName, snapshotNamespace(name), existing)
-		if werr := kids.WriteKID([]string{snapName}, map[string][]kids.Pair{snapName: pairs}, snapshot); werr != nil {
-			return clikit.Fail(clikit.ExitRuntime, "WRITE_FAILED", werr.Error(), "")
-		}
-		res.Snapshot = snapshot
-	}
-
-	ir, err := runInstall(ctx, cl, name, name+" via v pkg install", b.Pairs())
-	if err != nil {
-		return clikit.Fail(clikit.ExitRuntime, "INSTALL_FAILED", err.Error(), "")
-	}
-	res.Installed = ir.Installed
-	res.Status = ir.Status
-	res.Error = ir.Error
 
 	if err := cc.Result(res, func() {
 		cc.Title("pkg install — " + c.Engine)

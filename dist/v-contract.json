@@ -462,7 +462,7 @@
         "wrap-rpc",
         "install"
       ],
-      "help": "Install the traffic-tap wrap into CALLP^XWBBRK (preview by default; --commit ships it via KIDS).",
+      "help": "Install the traffic-tap wrap into CALLP^XWBBRK (preview by default; --commit ships it via the generic lifecycle, snapshotting stock first).",
       "flags": [
         {
           "name": "engine",
@@ -497,6 +497,16 @@
           "help": "write the patched routine (.m) and its KIDS (.kids) preview to this path prefix"
         },
         {
+          "name": "snapshot",
+          "type": "string",
+          "help": "capture the stock pre-image of the broker routine to this .KID before patching (default: the sidecar wrap-rpc backout auto-detects)."
+        },
+        {
+          "name": "allow-overwrite",
+          "type": "bool",
+          "help": "patch the broker WITHOUT capturing a stock pre-image (UNSAFE: wrap-rpc backout cannot then restore it)."
+        },
+        {
           "name": "commit",
           "type": "bool",
           "help": "DESTRUCTIVE: install the patched routine on the live engine via KIDS (overwrites the national routine). Default off = preview only."
@@ -508,7 +518,7 @@
         "wrap-rpc",
         "backout"
       ],
-      "help": "Remove the wrap, restoring stock CALLP^XWBBRK (preview by default; --commit ships it via KIDS).",
+      "help": "Remove the wrap by restoring the captured stock pre-image (preview by default; --commit restores via the generic lifecycle).",
       "flags": [
         {
           "name": "engine",
@@ -538,9 +548,9 @@
           "help": "the broker routine to (un)patch"
         },
         {
-          "name": "out",
+          "name": "restore",
           "type": "string",
-          "help": "write the restored stock routine (.m) and its KIDS (.kids) preview to this path prefix"
+          "help": "the stock pre-image .KID to restore (default: the sidecar wrap-rpc install --commit captured)."
         },
         {
           "name": "commit",

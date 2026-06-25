@@ -249,6 +249,15 @@ Format: **Q<n> (date, STATUS):** question — *recommendation*. **A:** answer.
   reversibility lifecycle is complete.** Only remaining: #9.7/content-address
   provenance recording (open Q1) — a separate registry concern.
 
+  **wrap-rpc routed onto the generic lifecycle (2026-06-25):** the RPC-tap wrap
+  no longer has a bespoke installer. Shared cores `liveInstall` (class-aware
+  snapshot+install) and `liveRestore` (install-of-pre-image reversal) extracted
+  in `lifecycle.go`; `installCmd` + `wrap-rpc install/backout` both call them.
+  `wrap-rpc install --commit` snapshots stock XWBBRK then ships the spliced patch
+  via `runInstall`; `wrap-rpc backout --commit` restores that captured pre-image
+  (the `wrapsplice.Unsplice` second-KID live path is gone). Only the
+  `wrapsplice.Splice` transform stays wrap-specific. `make all` + contract green.
+
 ---
 
 ## References

@@ -124,6 +124,36 @@ ran: deploy stack → patch `XWBBRK` → non-interference proof → back-out.
   state=OFF). **foia is back to stock.** (The VSL stack routines remain installed — inert
   now that `XWBBRK` is stock; uninstall optional.)
 
+## wrap-rpc install/backout migrated onto the GENERIC lifecycle — 2026-06-25
+The owner required the RPC tap to install/back out **strictly via the generic
+v-pkg install/backout machinery, never a bespoke one-off**. Refactor (pkgcli):
+- New shared cores in `lifecycle.go`: **`liveInstall`** (the ONE class-aware
+  install path — probe targets, `decideInstall`, snapshot the pre-image, ship via
+  `runInstall`) and **`liveRestore`** (the ONE reversal — `loadBuild` the
+  pre-image + `runInstall`, optional verify-clean). `installCmd.Run` now calls
+  `liveInstall` (behavior identical; pure extraction).
+- **`wrap-rpc install --commit`** → `liveInstall` with `routineNames=[XWBBRK]`,
+  class-1 pure-overwrite, snapshotting stock to the conventional sidecar
+  `vsltap-rpc-wrap.preimage.kids` (override `--snapshot`; `--allow-overwrite` to
+  skip). The only wrap-specific step left is `wrapsplice.Splice` to produce the
+  patched routine.
+- **`wrap-rpc backout --commit`** → `liveRestore` of that captured stock
+  pre-image (override `--restore`). **`wrapsplice.Unsplice` and the separate
+  `VSLTAP RPC WRAP BACKOUT` KIDS are GONE from the live path** — backout is now
+  install-of-the-byte-exact-stock-pre-image, the generic class-1 reversal. Refuses
+  with `NO_PREIMAGE` if no pre-image is found (vs silently re-deriving). The stock
+  pre-image installs under `VSLTAP RPC WRAP 1.0 PREIMAGE` (snapshotName), so there
+  is no hand-rolled back-out identity.
+- Contract surface: install gained `--snapshot`/`--allow-overwrite`; backout
+  swapped `--out`→`--restore`. `dist/v-contract.json` regenerated; `make all`
+  (lint+race-test) + `check-contract` green. The `wrapsplice` package still owns
+  `Splice`/`IsSpliced`/`Validate` (status's FU-21 anchor check); `Unsplice` stays
+  as the tested host-side inverse but no longer drives the live backout.
+
+This supersedes the "5B.2c back-out" note above: backout is still
+`wrap-rpc backout --commit`, but it now restores the snapshot rather than
+unsplicing. Live re-validation on an engine is the only thing owed.
+
 ## Remaining FU-5 follow-up (not blocking)
 - **FU-21 hook:** the per-XWB-patch re-pin gate exists *in code* (`wrapsplice.Validate`
   refuses a drifted/ambiguous anchor); a scheduled CI/regression re-pin (run `wrap-rpc
