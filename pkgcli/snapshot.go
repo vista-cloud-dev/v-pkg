@@ -98,14 +98,39 @@ func captureRoutinePreimages(ctx context.Context, cl *mdriver.Client, names []st
 // --- snapshot ---------------------------------------------------------------
 
 type snapshotResult struct {
-	Name         string   `json:"name"`         // the patch being snapshotted
-	SnapshotName string   `json:"snapshotName"` // the pre-image build's install name
-	Class        string   `json:"class"`        // reversibility class of the patch
-	Captured     []string `json:"captured"`     // routines whose pre-image was saved
-	Absent       []string `json:"absent"`       // routines the patch ADDS (no pre-image; greenfield)
-	NonRoutine   bool     `json:"nonRoutine"`   // the patch also ships non-routine components
-	CompleteUndo bool     `json:"completeUndo"` // true iff restoring the snapshot fully reverses the patch
-	Out          string   `json:"out"`          // path the snapshot .KID was written to
+	Name         string   `json:"name"`                 // the patch being snapshotted
+	SnapshotName string   `json:"snapshotName"`         // the pre-image build's install name
+	Class        string   `json:"class"`                // reversibility class of the patch
+	Captured     []string `json:"captured"`             // routines whose pre-image was saved
+	Absent       []string `json:"absent"`               // routines the patch ADDS (no pre-image; greenfield)
+	NonRoutine   bool     `json:"nonRoutine"`           // the patch also ships non-routine components
+	Uncaptured   []string `json:"uncaptured,omitempty"` // non-routine components this snapshot does NOT capture
+	CompleteUndo bool     `json:"completeUndo"`         // true iff restoring the snapshot fully reverses the patch
+	Out          string   `json:"out"`                  // path the snapshot .KID was written to
+}
+
+// uncapturedComponents itemizes the NON-routine components a routine-only
+// snapshot cannot capture, so the operator knows exactly what an authored
+// back-out (uninstall --backout) must cover — nothing is silently dropped. These
+// are reversed by the patch's authored inverse, NOT by a generic pre-image (their
+// install code has no generic inverse; capturing a value would over-claim
+// reversibility — see the proposal). params are listed by name; the 8989.51 file
+// (which holds them) is therefore skipped in the bare file-number list.
+func uncapturedComponents(params, fileManFiles, fileDDFiles []string) []string {
+	var out []string
+	for _, p := range params {
+		out = append(out, "param: "+p)
+	}
+	for _, f := range fileDDFiles {
+		out = append(out, "FileMan FILE (DD/data) #"+f)
+	}
+	for _, f := range fileManFiles {
+		if f == "8989.51" { // already listed by param name above
+			continue
+		}
+		out = append(out, "FileMan entries in file #"+f)
+	}
+	return out
 }
 
 type snapshotCmd struct {
@@ -150,6 +175,7 @@ func (c *snapshotCmd) Run(cc *clikit.Context) error {
 	// every component it overwrites is a routine we captured (no greenfield adds,
 	// no non-routine components). Otherwise it is provenance, not a guarantee.
 	nonRoutine := bc.ShipsFileManEntries || bc.ShipsFileDD
+	uncaptured := uncapturedComponents(b.ParamDefNames(), bc.FileManFiles, bc.FileDDFiles)
 	res := snapshotResult{
 		Name:         name,
 		SnapshotName: snapName,
@@ -157,6 +183,7 @@ func (c *snapshotCmd) Run(cc *clikit.Context) error {
 		Captured:     routineNames(captured),
 		Absent:       absent,
 		NonRoutine:   nonRoutine,
+		Uncaptured:   uncaptured,
 		CompleteUndo: bc.Class == kids.ClassPureOverwrite && len(absent) == 0 && !nonRoutine,
 		Out:          c.OutKid,
 	}
@@ -172,10 +199,10 @@ func (c *snapshotCmd) Run(cc *clikit.Context) error {
 			fmt.Fprintln(cc.Stdout, cc.Success("class-1 pure-overwrite: `v pkg restore` fully reverses this patch."))
 		} else {
 			fmt.Fprintln(cc.Stdout, cc.Warning("NOT a complete undo ("+res.Class+"): this snapshot is provenance, not a reversal guarantee."))
-			if nonRoutine {
-				fmt.Fprintln(cc.Stdout, cc.Faint("  the patch ships non-routine components (FileMan entries / DD-data) the snapshot does not capture."))
+			for _, u := range res.Uncaptured {
+				fmt.Fprintf(cc.Stdout, "  %s %s\n", cc.Failure("uncaptured"), u)
 			}
-			fmt.Fprintln(cc.Stdout, cc.Faint("  reversal needs the patch's authored back-out (class 2) or a forward back-out patch (class 3)."))
+			fmt.Fprintln(cc.Stdout, cc.Faint("  these reverse via the patch's authored back-out (uninstall --backout), not a generic pre-image."))
 		}
 	})
 }

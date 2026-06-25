@@ -240,9 +240,14 @@ Format: **Q<n> (date, STATUS):** question — *recommendation*. **A:** answer.
   default (--force overrides), class-1 greenfield delete fallback. Class-aware
   `install` also DONE (decideInstall): probes the engine for overwrite-vs-
   greenfield, auto-snapshots before clobber (--snapshot) / explicit
-  --allow-overwrite / else REFUSE — live-proven on vehu (XWBBRK refused). Next:
-  `verify --drift`, non-routine pre-image capture, paired snapshot/back-out
-  auto-detect, verify-clean after a class-2 back-out.
+  --allow-overwrite / else REFUSE — live-proven on vehu (XWBBRK refused).
+  `verify --drift` DONE (RoutineDriftMatch, FU-21 re-pin gate, live-proven both
+  ways). Pre-image PAIRING DONE (install --auto-snapshot ↔ uninstall auto-detect
+  via `<kid>.preimage.kids`) + uninstall --verify (verify-clean). Non-routine
+  reversal RESOLVED by design (open Q2): authored back-out owns it; snapshot
+  itemizes `uncaptured` components instead of fake-capturing them. **The
+  reversibility lifecycle is complete.** Only remaining: #9.7/content-address
+  provenance recording (open Q1) — a separate registry concern.
 
 ---
 

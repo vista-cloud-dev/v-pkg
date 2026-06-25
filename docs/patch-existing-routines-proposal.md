@@ -1,6 +1,6 @@
 ---
 title: "v-pkg: patching EXISTING routines (snapshot / restore / drift) — not just greenfield install"
-status: PARTIALLY IMPLEMENTED (2026-06-25) — `classify`, `snapshot`/`restore`, class-aware `install` + `uninstall` landed (live-proven on vehu); verify --drift + non-routine pre-image are next
+status: IMPLEMENTED (2026-06-25) — `classify`, `snapshot`/`restore`, class-aware `install`/`uninstall`, `verify --drift`, pre-image pairing + verify-clean all landed (live-proven on vehu). Non-routine reversal resolved by design: authored back-out (open Q2 closed).
 created: 2026-06-25
 for: extending the v-pkg verb contract + build-spec schema so a build can safely PATCH an existing national routine and be reversed to stock
 related: v-stdlib RPC-broker splice (VSLRPCWRAP / CALLP^XWBBRK), v-stdlib VSLTAPBO + FU-21 (the per-package hack this generalizes), docs/fileman-dd-install-plan.md
@@ -183,8 +183,10 @@ drift-gateable (a `patch` component with no captured pre-image is a red gate).
   the current source. This is the manual `XWBBRK.stock.m` step promoted to a verb.
   Implemented in pkgcli/snapshot.go; greenfield (absent) routines are detected and
   reported (no pre-image); the result carries the reversibility class +
-  `completeUndo` honesty flag. *Pending:* non-routine pre-image capture
-  (`#8989.51`/DD/options — open Q2) and `#9.7`/content-address recording (open Q1).
+  `completeUndo` honesty flag, and now ITEMIZES the non-routine components it does
+  NOT capture (`uncaptured`: params by name, FileMan FILE/DD, other KRN entries) so
+  nothing is silently dropped — those reverse via the authored back-out (open Q2,
+  resolved below). *Pending:* `#9.7`/content-address recording (open Q1).
 - **`restore`** *(DONE 2026-06-25)* — re-apply a snapshot. Mechanically it **is**
   `install <snapshot.kid>` (restore = install-of-pre-image), so it reuses
   `runInstall`. Implemented in pkgcli/restore.go; previews by default, overwrites
@@ -237,9 +239,18 @@ class:
 1. **Snapshot storage / provenance.** A `.KID` pre-image on disk, a `#9.7`
    install record, a content hash in a registry — or all three? (The org leans
    "generated, drift-gated artifact," so probably a recorded, hashed pre-image.)
-2. **Multi-routine / non-routine components.** Pre-image capture must also cover
-   `#8989.51` params, DDs, options, etc. — any component a patch overwrites, not
-   just routines.
+2. **Multi-routine / non-routine components.** *(RESOLVED 2026-06-25.)* Generic
+   pre-image capture is the RIGHT model only for routines (pure overwrites). For
+   `#8989.51` params, DDs, options, etc., a patch files them via install code with
+   no generic inverse — so a captured "value" would **over-claim reversibility**
+   (the very thing this proposal forbids). Decision: routines are captured by
+   `snapshot`; non-routine components are reversed by the patch's **authored
+   back-out** (`uninstall --backout`, class 2). `snapshot` does NOT fake-capture
+   them — it **itemizes** them (`uncaptured`) so the operator knows exactly what
+   the back-out must cover and nothing is silently dropped. (A future enhancement
+   could capture the genuinely-restorable sub-case — a FileMan-entry overwrite with
+   no surrounding install code — but that needs per-component-type engine readers
+   v-pkg does not yet have, and must still gate on "no install code" to stay honest.)
 3. **Re-pin trigger.** Is `verify --drift` operator-run, scheduled (TaskMan), or
    wired into a gate? FU-21 wanted a hook on every XWB patch.
 4. **`restore` vs `uninstall` surface.** Keep `restore` as a distinct verb, or

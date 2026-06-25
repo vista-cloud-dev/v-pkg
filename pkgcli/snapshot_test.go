@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/vista-cloud-dev/v-pkg/internal/installspec"
@@ -60,6 +61,31 @@ func TestBuildSnapshotPairs_CarriesRoutine(t *testing.T) {
 	}
 	if !slices.Equal(srcLines, captured[0].Lines) {
 		t.Errorf("source lines = %#v, want %#v", srcLines, captured[0].Lines)
+	}
+}
+
+// uncapturedComponents itemizes the NON-routine components a routine-only
+// snapshot does not capture, so the operator knows exactly what an authored
+// back-out must cover (it must NOT silently drop them).
+func TestUncapturedComponents(t *testing.T) {
+	got := uncapturedComponents(
+		[]string{"ZZ FOO"},        // param defs
+		[]string{"19", "8989.51"}, // FileMan-entry file numbers (8989.51 = the params, dedup'd)
+		[]string{"999000"},        // FileMan FILE (DD/data)
+	)
+	joined := strings.Join(got, " | ")
+	for _, want := range []string{"ZZ FOO", "999000", "19"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("uncapturedComponents %v missing %q", got, want)
+		}
+	}
+	// 8989.51 must appear once as the named param, not duplicated as a bare file #.
+	if strings.Count(joined, "8989.51") != 0 {
+		t.Errorf("param file 8989.51 should be listed by param name, not as a bare file #: %v", got)
+	}
+	// pure routine-only snapshot -> nothing uncaptured.
+	if g := uncapturedComponents(nil, nil, nil); len(g) != 0 {
+		t.Errorf("expected empty manifest for routine-only, got %v", g)
 	}
 }
 
