@@ -77,12 +77,21 @@ So reversibility is **not a capability v-pkg can assume**; it is a property of t
 
 ### Reversibility taxonomy (classify, then gate)
 
-1. **Pure-overwrite — reversible.** Only component overwrites; **no**
+> **Corpus-measured shares** (all 2,404 WorldVistA KIDS distributions — see
+> [kids-corpus-findings.md](kids-corpus-findings.md)): class 1 = **35%**, class
+> 2/3 = **64%**. The pure-overwrite class is the *minority*; generalizing
+> snapshot/restore as the undo model would be wrong for ~2 of every 3 real
+> patches. 51% run install-time code, 23% file FileMan entries, 23% ship DD/data,
+> 96% declare required-build deps. The taxonomy below is not a hypothesis — it is
+> the measured shape of the real corpus.
+
+1. **Pure-overwrite — reversible (≈35%).** Only component overwrites; **no**
    env/pre/post code, no data/DD, no side-effects. Fully reversible by pre-image
    restore. *The XWBBRK splice is this class* — which is why snapshot/restore is
    the right answer *for it*, and a trap if generalized.
-2. **Side-effecting — reversible only with an authored back-out.** Has
-   install-time code and/or data, but the developer ships an explicit inverse.
+2. **Side-effecting — reversible only with an authored back-out (the ≈64%
+   common case).** Has install-time code and/or data, but the developer ships an
+   explicit inverse.
    Reversal = run the patch's own back-out, then restore pre-images, then
    verify-clean. **This is exactly what `VSLTAPBO` already is** (it reverses the
    params / TaskMan / `^XTMP` / `^VSLTAP` footprint the post-install + runtime

@@ -223,7 +223,13 @@ Format: **Q<n> (date, STATUS):** question — *recommendation*. **A:** answer.
   back-out, VSLTAPBO-style · 3 forward-only=refuse, scaffold a forward back-out
   patch), add `snapshot`/`restore`, make `install`/`uninstall` class-aware, add
   patch-drift `verify`, and never over-claim reversibility. Full design:
-  [`patch-existing-routines-proposal.md`](patch-existing-routines-proposal.md).*
+  [`patch-existing-routines-proposal.md`](patch-existing-routines-proposal.md).
+  **Now corpus-grounded** (2026-06-25): a static parse of all **2,404** WorldVistA
+  KIDS distributions shows the pure-overwrite class is the **minority — 35%**;
+  **64%** are side-effecting (51% run install code, 23% file FileMan entries, 23%
+  ship DD/data, 96% declare required builds). So class-aware `uninstall` and the
+  authored-back-out contract are the *common* path, not an edge case — see
+  [`kids-corpus-findings.md`](kids-corpus-findings.md).*
   **A:** _<pending>_
 
 ---
