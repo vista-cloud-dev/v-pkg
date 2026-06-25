@@ -10,9 +10,9 @@ import (
 // restore re-applies a pre-image snapshot .KID (produced by `v pkg snapshot`),
 // putting the captured routines back as they were before a patch. Mechanically
 // it IS install-of-the-pre-image (proposal: "restore = install-of-pre-image, a
-// thin alias"), so it reuses the proven runInstall path. Like wrap-rpc, it
-// PREVIEWS by default — the engine is not written without --commit — because the
-// restore overwrites live (national) routines, the deliberately-gated step.
+// thin alias"), so it reuses the proven runInstall path. It PREVIEWS by default —
+// the engine is not written without --commit — because the restore overwrites live
+// (national) routines, the deliberately-gated step.
 //
 // restore reverses class-1 (pure-overwrite) patches completely. For a
 // side-effecting patch the snapshot only carried routine pre-images, so restore

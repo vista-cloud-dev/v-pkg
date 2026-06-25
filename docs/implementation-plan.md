@@ -249,14 +249,17 @@ Format: **Q<n> (date, STATUS):** question — *recommendation*. **A:** answer.
   reversibility lifecycle is complete.** Only remaining: #9.7/content-address
   provenance recording (open Q1) — a separate registry concern.
 
-  **wrap-rpc routed onto the generic lifecycle (2026-06-25):** the RPC-tap wrap
-  no longer has a bespoke installer. Shared cores `liveInstall` (class-aware
-  snapshot+install) and `liveRestore` (install-of-pre-image reversal) extracted
-  in `lifecycle.go`; `installCmd` + `wrap-rpc install/backout` both call them.
-  `wrap-rpc install --commit` snapshots stock XWBBRK then ships the spliced patch
-  via `runInstall`; `wrap-rpc backout --commit` restores that captured pre-image
-  (the `wrapsplice.Unsplice` second-KID live path is gone). Only the
-  `wrapsplice.Splice` transform stays wrap-specific. `make all` + contract green.
+  **wrap-rpc DELETED (2026-06-25, owner directive — bespoke installers forbidden):**
+  the `v pkg wrap-rpc status|install|backout` command and `internal/wrapsplice`
+  (the content-anchored `CALLP^XWBBRK` splice) have been **removed** from v-pkg. A
+  splice-the-national-routine patcher is a bespoke installer, and those are now
+  permanently off-limits — the RPC traffic tap installs/backs-out **strictly** via
+  the generic `v pkg install` / `v pkg uninstall` KIDS lifecycle against v-stdlib's
+  `kids/vsl.build.json` (which ships the `VSLTAP*`/`VSLRPC*` routines + #8989.51
+  PARAMETER DEFINITIONs). The orphaned helpers `readRoutineSource` and `liveRestore`
+  were removed with it; `liveInstall` (used by `installCmd`) and `snapshot`/`restore`
+  stay. `make all` + contract regenerated green. See [[bespoke-installer-forbidden]]
+  and the shared [[never-use-bespoke-installer]].
 
 ---
 

@@ -7,6 +7,17 @@ metadata:
 
 # internal/wrapsplice — host-side XWBBRK wrap patcher (FU-5 5B.2a)
 
+> **⛔ REMOVED 2026-06-25 (owner directive) — DO NOT REVIVE.** `internal/wrapsplice`
+> and the `v pkg wrap-rpc status|install|backout` command have been **deleted** from
+> v-pkg. `wrap-rpc` was a **bespoke installer** (a content-anchored splice of the
+> national `CALLP^XWBBRK`), and bespoke installers are now permanently forbidden:
+> install / back-out is **strictly and exclusively** the generic `v pkg
+> install` / `v pkg uninstall` KIDS lifecycle over a proper KIDS build (the tap
+> ships in v-stdlib's `kids/vsl.build.json`). See [[bespoke-installer-forbidden]]
+> (this repo) and the shared [[never-use-bespoke-installer]]. The rest of this file
+> is kept **only as a dated historical record** of the deleted mechanism — none of
+> it describes a usable command.
+
 **DONE 2026-06-23.** Branch `s3tap-fu5b2-patcher`. The pure-Go, off-engine patch
 core for the RPC→S3 traffic tap's broker wrap. Part of the cross-repo s3tap
 workstream (the wrap glue `VSLRPCWRAP` lives in v-stdlib; this is the v-pkg

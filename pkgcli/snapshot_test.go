@@ -15,7 +15,7 @@ import (
 func TestSnapshotName(t *testing.T) {
 	cases := []struct{ orig, override, want string }{
 		{"XWBBRK*1.0*1", "", "XWBBRK*1.0*1 PREIMAGE"},
-		{"VSLTAP RPC WRAP 1.0", "", "VSLTAP RPC WRAP 1.0 PREIMAGE"},
+		{"ZZDEMO PATCH 1.0", "", "ZZDEMO PATCH 1.0 PREIMAGE"},
 		{"XWBBRK*1.0*1", "MY SNAP 1.0", "MY SNAP 1.0"}, // explicit override wins
 	}
 	for _, c := range cases {
@@ -28,7 +28,7 @@ func TestSnapshotName(t *testing.T) {
 func TestSnapshotNamespace(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"XWBBRK*1.0*1", "XWBBRK"},
-		{"VSLTAP RPC WRAP 1.0", "VSLTAP"},
+		{"ZZDEMO PATCH 1.0", "ZZDEMO"},
 		{"OR*3.0*484", "OR"},
 		{"*bad", "VPKG"}, // no leading namespace -> fallback
 	}

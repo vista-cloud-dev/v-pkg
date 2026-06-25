@@ -188,25 +188,6 @@ func parseRoutineLines(markers map[string]string) []string {
 	}
 }
 
-// readRoutineSource reads a routine's full source off the live engine through the
-// driver (the first engine-READ capability in v-pkg — read-only, no mutation). It
-// is the stock-source leg of the wrap-rpc patcher: the caller splices host-side
-// (internal/wrapsplice) and ships the result back through the KIDS path.
-func readRoutineSource(ctx context.Context, cl *mdriver.Client, name string) ([]string, error) {
-	if !validRoutineName(name) {
-		return nil, fmt.Errorf("invalid routine name %q", name)
-	}
-	markers, _, err := runMScript(ctx, cl, rtnRead, readRoutineBody(name))
-	if err != nil {
-		return nil, err
-	}
-	lines := parseRoutineLines(markers)
-	if len(lines) == 0 {
-		return nil, fmt.Errorf("routine %s: no source read (is it present on the engine?)", name)
-	}
-	return lines, nil
-}
-
 // loadBuild parses a .KID and returns the single build's install name and data.
 func loadBuild(kidFile string) (string, *kids.Build, error) {
 	k, err := kids.ParseKID(kidFile)
@@ -329,10 +310,9 @@ type liveInstallInput struct {
 // hand-rolls a parallel installer). It probes which target routines already exist,
 // decides the safe strategy (greenfield / snapshot+proceed / refuse) via
 // decideInstall, captures the overwrite targets' pre-image when snapshotting, then
-// ships via runInstall. Shared by `v pkg install` and the wrap-rpc patcher — so
-// the RPC-tap wrap installs through exactly the generic lifecycle, snapshot and
-// all, never a bespoke one-off. The returned *clikit.Error is the refuse / I/O
-// failure; the caller renders the report and maps post-run install state.
+// ships via runInstall. Used by `v pkg install`. The returned *clikit.Error is the
+// refuse / I/O failure; the caller renders the report and maps post-run install
+// state.
 func liveInstall(ctx context.Context, cl *mdriver.Client, in liveInstallInput) (installReport, *clikit.Error) {
 	captured, greenfield, err := captureRoutinePreimages(ctx, cl, in.routineNames)
 	if err != nil {
@@ -365,38 +345,6 @@ func liveInstall(ctx context.Context, cl *mdriver.Client, in liveInstallInput) (
 	res.Status = ir.Status
 	res.Error = ir.Error
 	return res, nil
-}
-
-// liveRestore re-applies a pre-image / authored back-out .KID via runInstall and,
-// when verify is set, confirms the live routines now match it (verify-clean). The
-// shared reversal core behind `v pkg restore` and the wrap-rpc back-out, so a
-// reversal is install-of-the-inverse through the proven path, never a hand-rolled
-// undo. Returns the snapshot's own install name (for messaging) and the outcome.
-func liveRestore(ctx context.Context, cl *mdriver.Client, restoreKid, label string, verify bool) (name string, done bool, status int, verifyClean string, ferr *clikit.Error) {
-	rname, rb, lerr := loadBuild(restoreKid)
-	if lerr != nil {
-		return "", false, 0, "", clikit.Fail(clikit.ExitRuntime, "READ_FAILED", lerr.Error(), "")
-	}
-	ir, ierr := runInstall(ctx, cl, rname, rname+" via "+label, rb.Pairs())
-	if ierr != nil {
-		return rname, false, 0, "", clikit.Fail(clikit.ExitRuntime, "RESTORE_FAILED", ierr.Error(), "")
-	}
-	done = ir.Installed
-	status = ir.Status
-	if verify && done {
-		drift, derr := checkDrift(ctx, cl, rb)
-		if derr != nil {
-			return rname, done, status, "", clikit.Fail(clikit.ExitRuntime, "RESTORE_FAILED", derr.Error(), "")
-		}
-		verifyClean = "clean"
-		for _, state := range drift {
-			if state != "applied" {
-				verifyClean = "dirty"
-				break
-			}
-		}
-	}
-	return rname, done, status, verifyClean, nil
 }
 
 type installCmd struct {

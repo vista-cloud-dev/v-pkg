@@ -35,7 +35,6 @@ type Commands struct {
 	Restore      restoreCmd      `cmd:"" help:"Re-apply a pre-image snapshot .KID to revert routines to stock (preview by default; --commit installs)."`
 	Verify       verifyCmd       `cmd:"" help:"Verify a .KID's install on a live engine (#9.7 status + per-routine presence)."`
 	Uninstall    uninstallCmd    `cmd:"" help:"Uninstall a .KID from a live engine (routine-only back-out: routines + #9.7/#9.6)."`
-	WrapRPC      wrapRPCCmd      `cmd:"" name:"wrap-rpc" help:"Install/back out the RPC→S3 traffic-tap wrap in national CALLP^XWBBRK (preview by default; --commit ships via KIDS)."`
 }
 
 // --- parse -------------------------------------------------------------------
