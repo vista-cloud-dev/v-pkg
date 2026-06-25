@@ -233,8 +233,11 @@ Format: **Q<n> (date, STATUS):** question — *recommendation*. **A:** answer.
   **A (partial, 2026-06-25):** keystone landed — `internal/kids/reversibility.go`
   + `v pkg classify` statically derive the reversibility class (no engine),
   corpus-validated (36%/63%). `make corpus` round-trips ALL 2,404 local KIDS
-  (PASS=2404, DRIFT=0). Next (engine-bound, now unblocked): `snapshot`/`restore`,
-  class-aware `install`/`uninstall`, `verify --drift`.
+  (PASS=2404, DRIFT=0). `snapshot`/`restore` also DONE (pkgcli/snapshot.go,
+  restore.go) — pre-image capture + class-aware honesty + preview-gated restore,
+  live-proven on vehu (real 213-line XWBBRK). Next: class-aware `install`/
+  `uninstall` (auto-restore only for class-1; run authored back-out for
+  side-effecting), `verify --drift`, non-routine pre-image capture.
 
 ---
 

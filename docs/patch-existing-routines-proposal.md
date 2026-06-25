@@ -1,6 +1,6 @@
 ---
 title: "v-pkg: patching EXISTING routines (snapshot / restore / drift) — not just greenfield install"
-status: PARTIALLY IMPLEMENTED (2026-06-25) — keystone `classify` verb landed; snapshot/restore/class-aware uninstall are next (engine-bound)
+status: PARTIALLY IMPLEMENTED (2026-06-25) — `classify` + `snapshot`/`restore` landed (live-proven on vehu); class-aware install/uninstall + verify --drift are next
 created: 2026-06-25
 for: extending the v-pkg verb contract + build-spec schema so a build can safely PATCH an existing national routine and be reversed to stock
 related: v-stdlib RPC-broker splice (VSLRPCWRAP / CALLP^XWBBRK), v-stdlib VSLTAPBO + FU-21 (the per-package hack this generalizes), docs/fileman-dd-install-plan.md
@@ -15,10 +15,19 @@ related: v-stdlib RPC-broker splice (VSLRPCWRAP / CALLP^XWBBRK), v-stdlib VSLTAP
 > engine), using four node-shape probes (routine name, install-code subnode
 > INI/INIT/PRE/PRET, exported `KRN` entry, FILE-multiple). Cross-checked against
 > all 2,404 WorldVistA distributions via `make corpus`: pure-overwrite **36%**,
-> side-effecting **63%** — matching the independent analyze.py count (35/64). The
-> remaining verbs (`snapshot`/`restore`, class-aware `install`/`uninstall`,
-> `verify --drift`) are **engine-bound** and land next, now unblocked by the
-> classifier.
+> side-effecting **63%** — matching the independent analyze.py count (35/64).
+>
+> **`snapshot` + `restore` are now built and live-proven** (pkgcli/snapshot.go,
+> restore.go): `v pkg snapshot <kid> <out.kids>` reads each routine the patch
+> ships off the live engine (driver stack only) into a restorable pre-image
+> `.KID`, classifies the patch, and is HONEST — it sets `completeUndo` only for a
+> class-1 pure-overwrite with no greenfield adds / non-routine components, else it
+> WARNS the snapshot is provenance, not a reversal guarantee. `v pkg restore
+> <snapshot.kids>` re-applies the pre-image (preview by default; `--commit`
+> overwrites live routines via the proven install path). Smoke-tested end-to-end
+> on vehu against the real 213-line XWBBRK (snapshot read+write+classify
+> `completeUndo:true`; restore preview). The remaining verbs (class-aware
+> `install`/`uninstall`, `verify --drift`) land next.
 
 ## Problem
 
@@ -169,13 +178,17 @@ drift-gateable (a `patch` component with no captured pre-image is a red gate).
 
 ### Verbs
 
-- **`snapshot`** *(new)* — before patching, extract the **live pre-image** of every
-  component the build will *overwrite* into a restorable artifact (itself just a
-  `.KID` of the current routines). This is exactly the manual `XWBBRK.stock.m`
-  step, promoted to a verb. Output is content-addressed + recorded in `#9.7`.
-- **`restore`** *(new, cheap)* — re-apply a snapshot. Mechanically this **is**
-  `install <snapshot.kid>` (restore = install-of-pre-image), so it is mostly a
-  thin alias + the bookkeeping to mark the patch reversed.
+- **`snapshot`** *(DONE 2026-06-25)* — before patching, extract the **live
+  pre-image** of every routine the build overwrites into a restorable `.KID` of
+  the current source. This is the manual `XWBBRK.stock.m` step promoted to a verb.
+  Implemented in pkgcli/snapshot.go; greenfield (absent) routines are detected and
+  reported (no pre-image); the result carries the reversibility class +
+  `completeUndo` honesty flag. *Pending:* non-routine pre-image capture
+  (`#8989.51`/DD/options — open Q2) and `#9.7`/content-address recording (open Q1).
+- **`restore`** *(DONE 2026-06-25)* — re-apply a snapshot. Mechanically it **is**
+  `install <snapshot.kid>` (restore = install-of-pre-image), so it reuses
+  `runInstall`. Implemented in pkgcli/restore.go; previews by default, overwrites
+  live routines only under `--commit`.
 - **`install` gains pre-image awareness** — classify each component greenfield vs
   overwrite; for any `patch` (or any silent overwrite of an existing routine),
   **auto-`snapshot` first**, or refuse without `--snapshot`/`--allow-overwrite`.

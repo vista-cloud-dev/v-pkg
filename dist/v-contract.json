@@ -213,6 +213,96 @@
     },
     {
       "path": [
+        "snapshot"
+      ],
+      "help": "Capture the live pre-image of a patch's routines into a restorable .KID (class-1 reversal).",
+      "flags": [
+        {
+          "name": "engine",
+          "type": "enum",
+          "enum": [
+            "ydb",
+            "iris"
+          ],
+          "required": true,
+          "help": "Engine to reach: ydb or iris."
+        },
+        {
+          "name": "transport",
+          "type": "enum",
+          "enum": [
+            "local",
+            "docker",
+            "remote"
+          ],
+          "default": "remote",
+          "help": "Driver transport: local | docker | remote."
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "help": "install name for the snapshot build (default: \"\u003corig\u003e PREIMAGE\")."
+        }
+      ],
+      "args": [
+        {
+          "name": "kid-file",
+          "type": "string",
+          "required": true,
+          "help": "the .KID about to be installed — the live pre-image of its routines is captured."
+        },
+        {
+          "name": "out-kid",
+          "type": "string",
+          "required": true,
+          "help": "output path for the pre-image snapshot .KID (what 'v pkg restore' re-applies)."
+        }
+      ]
+    },
+    {
+      "path": [
+        "restore"
+      ],
+      "help": "Re-apply a pre-image snapshot .KID to revert routines to stock (preview by default; --commit installs).",
+      "flags": [
+        {
+          "name": "engine",
+          "type": "enum",
+          "enum": [
+            "ydb",
+            "iris"
+          ],
+          "required": true,
+          "help": "Engine to reach: ydb or iris."
+        },
+        {
+          "name": "transport",
+          "type": "enum",
+          "enum": [
+            "local",
+            "docker",
+            "remote"
+          ],
+          "default": "remote",
+          "help": "Driver transport: local | docker | remote."
+        },
+        {
+          "name": "commit",
+          "type": "bool",
+          "help": "DESTRUCTIVE: install the snapshot on the live engine (overwrites the live routines). Default off = preview."
+        }
+      ],
+      "args": [
+        {
+          "name": "kid-file",
+          "type": "string",
+          "required": true,
+          "help": "the pre-image snapshot .KID to re-apply (restore to its captured state)."
+        }
+      ]
+    },
+    {
+      "path": [
         "verify"
       ],
       "help": "Verify a .KID's install on a live engine (#9.7 status + per-routine presence).",

@@ -31,6 +31,8 @@ type Commands struct {
 	Lint         lintCmd         `cmd:"" help:"Run the PIKS data-class gate over a .KID (exit 3 on a blocked file)."`
 	Build        buildCmd        `cmd:"" help:"Build a KIDS transport global from a declarative build spec (deterministic, normalized export)."`
 	Install      installCmd      `cmd:"" help:"Install a built .KID on a live engine over the driver (non-interactive KIDS load+install)."`
+	Snapshot     snapshotCmd     `cmd:"" help:"Capture the live pre-image of a patch's routines into a restorable .KID (class-1 reversal)."`
+	Restore      restoreCmd      `cmd:"" help:"Re-apply a pre-image snapshot .KID to revert routines to stock (preview by default; --commit installs)."`
 	Verify       verifyCmd       `cmd:"" help:"Verify a .KID's install on a live engine (#9.7 status + per-routine presence)."`
 	Uninstall    uninstallCmd    `cmd:"" help:"Uninstall a .KID from a live engine (routine-only back-out: routines + #9.7/#9.6)."`
 	WrapRPC      wrapRPCCmd      `cmd:"" name:"wrap-rpc" help:"Install/back out the RPC→S3 traffic-tap wrap in national CALLP^XWBBRK (preview by default; --commit ships via KIDS)."`
