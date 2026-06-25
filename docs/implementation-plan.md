@@ -216,9 +216,14 @@ Format: **Q<n> (date, STATUS):** question — *recommendation*. **A:** answer.
   **patching an existing routine** (not just greenfield install)? The RPC-broker
   splice (`CALLP^XWBBRK`) exposed that `install` overwrites a national routine with
   no pre-image and `uninstall` *deletes* (bricks it) instead of restoring stock.
-  *Recommendation: yes — add `snapshot`/`restore`, make `install`/`uninstall`
-  pre-image-aware, add patch-drift `verify`, and tag build-spec components
-  `greenfield|patch`. Full design: [`patch-existing-routines-proposal.md`](patch-existing-routines-proposal.md).*
+  *Recommendation: yes — but reversibility is a property of the whole patch, not
+  the routine: KIDS patches run pre/post-install code + data with side-effects that
+  have no generic inverse (this is why VA back-out is forward-only). So classify
+  each patch (1 pure-overwrite=restore-able · 2 side-effecting=needs an authored
+  back-out, VSLTAPBO-style · 3 forward-only=refuse, scaffold a forward back-out
+  patch), add `snapshot`/`restore`, make `install`/`uninstall` class-aware, add
+  patch-drift `verify`, and never over-claim reversibility. Full design:
+  [`patch-existing-routines-proposal.md`](patch-existing-routines-proposal.md).*
   **A:** _<pending>_
 
 ---
