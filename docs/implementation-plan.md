@@ -235,9 +235,11 @@ Format: **Q<n> (date, STATUS):** question — *recommendation*. **A:** answer.
   corpus-validated (36%/63%). `make corpus` round-trips ALL 2,404 local KIDS
   (PASS=2404, DRIFT=0). `snapshot`/`restore` also DONE (pkgcli/snapshot.go,
   restore.go) — pre-image capture + class-aware honesty + preview-gated restore,
-  live-proven on vehu (real 213-line XWBBRK). Next: class-aware `install`/
-  `uninstall` (auto-restore only for class-1; run authored back-out for
-  side-effecting), `verify --drift`, non-routine pre-image capture.
+  live-proven on vehu (real 213-line XWBBRK). Class-aware `uninstall` also DONE
+  (decideUninstall): --restore/--backout reversal, side-effecting REFUSED by
+  default (--force overrides), class-1 greenfield delete fallback. Next:
+  class-aware `install` (auto-snapshot before clobber), `verify --drift`,
+  non-routine pre-image capture, paired snapshot/back-out auto-detect.
 
 ---
 

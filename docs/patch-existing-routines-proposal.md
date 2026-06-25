@@ -1,6 +1,6 @@
 ---
 title: "v-pkg: patching EXISTING routines (snapshot / restore / drift) — not just greenfield install"
-status: PARTIALLY IMPLEMENTED (2026-06-25) — `classify` + `snapshot`/`restore` landed (live-proven on vehu); class-aware install/uninstall + verify --drift are next
+status: PARTIALLY IMPLEMENTED (2026-06-25) — `classify`, `snapshot`/`restore`, and class-aware `uninstall` landed (live-proven on vehu); class-aware install + verify --drift are next
 created: 2026-06-25
 for: extending the v-pkg verb contract + build-spec schema so a build can safely PATCH an existing national routine and be reversed to stock
 related: v-stdlib RPC-broker splice (VSLRPCWRAP / CALLP^XWBBRK), v-stdlib VSLTAPBO + FU-21 (the per-package hack this generalizes), docs/fileman-dd-install-plan.md
@@ -193,12 +193,16 @@ drift-gateable (a `patch` component with no captured pre-image is a red gate).
   overwrite; for any `patch` (or any silent overwrite of an existing routine),
   **auto-`snapshot` first**, or refuse without `--snapshot`/`--allow-overwrite`.
   No silent clobber of national code.
-- **`uninstall` becomes class-aware** (see the reversibility taxonomy above) —
-  **delete** greenfield components; **restore** class-1 patched ones from the
-  pre-image; **run the declared back-out + verify-clean** for class 2; **refuse**
-  for class 3 (forward-only) and point at a forward back-out patch. This is the bug
-  fix, not just a feature: today's uninstall would brick the broker (class 1) and,
-  worse, silently orphan data/side-effects (class 2/3).
+- **`uninstall` is class-aware** *(DONE 2026-06-25, pkgcli/lifecycle.go)* — it
+  `Classify`s the `.KID` and routes via `decideUninstall`: `--restore <pre-image>`
+  → re-install the snapshot (class-1 patched-over routine); `--backout <kid>` →
+  install the authored inverse (class-2); a **side-effecting** patch with no
+  reversal artifact is **REFUSED** (exit 4) rather than silently deleted (`--force`
+  overrides, loudly); a class-1 patch with no flags falls back to the greenfield
+  routine-delete. This is the bug fix, not just a feature: the old uninstall would
+  brick a patched routine (class 1) and silently orphan data/side-effects (class
+  2/3). *Pending:* auto-detect a paired snapshot/back-out (so the flags are
+  optional) and `verify-clean` after a class-2 back-out.
 - **`verify`/`drift` extension** — answer "is my patch still applied to the live
   routine?" so a *later* national patch overwriting our splice is **detected**
   (generalizes FU-21's re-pin hook). Fits the org's registry-driven, drift-gated

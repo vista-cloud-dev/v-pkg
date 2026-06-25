@@ -444,37 +444,146 @@ func fileNumStrings(b *kids.Build) []string {
 	return out
 }
 
+// uninstallAction is the class-aware back-out strategy chosen for a .KID.
+type uninstallAction int
+
+const (
+	// actDelete: routine-delete back-out (the original behavior) — correct ONLY
+	// for a greenfield package whose components did not exist before install.
+	actDelete uninstallAction = iota
+	// actRestore: re-install a provided pre-image snapshot (the class-1 reversal
+	// for a patch that OVERWROTE an existing routine — delete would brick it).
+	actRestore
+	// actBackout: install a provided authored back-out (the class-2 reversal —
+	// run the patch's own inverse for its data/side-effects).
+	actBackout
+	// actRefuse: no safe back-out is possible from the inputs — refuse rather
+	// than silently delete-and-orphan (the proposal's core safety fix).
+	actRefuse
+)
+
+func (a uninstallAction) String() string {
+	switch a {
+	case actDelete:
+		return "delete"
+	case actRestore:
+		return "restore"
+	case actBackout:
+		return "backout"
+	default:
+		return "refuse"
+	}
+}
+
+// decideUninstall picks the back-out strategy from the patch's reversibility
+// class and the operator's flags. The rule (patch-existing-routines proposal):
+// NEVER silently delete a side-effecting patch (it orphans the data/side-effects
+// its install code created); a class-1 patch that overwrote an existing routine
+// needs its pre-image restored, not deleted. So a reversal artifact (--restore /
+// --backout) always wins; absent one, a side-effecting patch is refused unless
+// --force, and a class-1 patch falls back to the greenfield delete.
+func decideUninstall(class kids.ReversibilityClass, restoreKid, backoutKid string, force bool) (uninstallAction, string) {
+	if restoreKid != "" && backoutKid != "" {
+		return actRefuse, "specify only one of --restore / --backout"
+	}
+	if restoreKid != "" {
+		return actRestore, "restore the provided pre-image snapshot"
+	}
+	if backoutKid != "" {
+		return actBackout, "install the provided authored back-out"
+	}
+	if class == kids.ClassSideEffecting {
+		if force {
+			return actDelete, "FORCED routine-delete — install-time data/side-effects are NOT reversed and will be orphaned"
+		}
+		return actRefuse, "side-effecting patch (class 2/3): deleting routines orphans the data/side-effects its install code created — provide --backout (authored inverse) or --restore (pre-image), or author a forward back-out patch (--force to delete routines anyway)"
+	}
+	return actDelete, "class-1: routine-delete back-out (if this patch OVERWROTE existing routines, use --restore <pre-image> instead — delete would brick them)"
+}
+
 type uninstallCmd struct {
 	engineConn
-	KidFile string `arg:"" help:"Path to the .KID whose install to reverse (routine-only back-out)."`
+	KidFile string `arg:"" help:"Path to the .KID whose install to reverse."`
+	Restore string `help:"Pre-image snapshot .KID to restore instead of deleting (class-1 reversal for a patched-over routine)."`
+	Backout string `help:"Authored back-out .KID to install instead of deleting (class-2 reversal of a side-effecting patch)."`
+	Force   bool   `help:"Delete routines even for a side-effecting patch (UNSAFE: orphans install-time data/side-effects)."`
+}
+
+type uninstallReport struct {
+	Name   string `json:"name"`
+	Class  string `json:"class"`
+	Action string `json:"action"`
+	Reason string `json:"reason"`
+	Done   bool   `json:"done"`
+	Status int    `json:"status,omitempty"` // #9.7 status for restore/backout installs
 }
 
 func (c *uninstallCmd) Run(cc *clikit.Context) error {
-	name, b, err := loadBuild(c.KidFile)
+	k, err := kids.ParseKID(c.KidFile)
 	if err != nil {
 		return clikit.Fail(clikit.ExitRuntime, "READ_FAILED", err.Error(), "")
 	}
+	if len(k.InstallNames) != 1 {
+		return clikit.Fail(clikit.ExitUsage, "MULTI_BUILD",
+			fmt.Sprintf("uninstall expects exactly one build, found %d", len(k.InstallNames)), "uninstall one build at a time")
+	}
+	name := k.InstallNames[0]
+	b := k.Builds[name]
+	rev := kids.Classify(k)
+	action, reason := decideUninstall(rev.Class, c.Restore, c.Backout, c.Force)
+	res := uninstallReport{Name: name, Class: rev.ClassName, Action: action.String(), Reason: reason}
+
+	if action == actRefuse {
+		return clikit.Fail(clikit.ExitRefused, "UNINSTALL_REFUSED",
+			fmt.Sprintf("refusing to uninstall %s [%s]: %s", name, rev.ClassName, reason),
+			"provide --restore <pre-image> or --backout <authored back-out>, or --force to delete routines anyway")
+	}
+
 	cl, err := c.client()
 	if err != nil {
 		return c.noDriver(err)
 	}
-	res, err := runUninstall(context.Background(), cl, name, b.RoutineNames(), b.ParamDefNames(), fileNumStrings(b))
-	if err != nil {
-		return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", err.Error(), "")
+	ctx := context.Background()
+
+	switch action {
+	case actRestore, actBackout:
+		// reversal = install the provided pre-image / authored back-out.
+		src := c.Restore
+		if action == actBackout {
+			src = c.Backout
+		}
+		rname, rb, lerr := loadBuild(src)
+		if lerr != nil {
+			return clikit.Fail(clikit.ExitRuntime, "READ_FAILED", lerr.Error(), "")
+		}
+		ir, ierr := runInstall(ctx, cl, rname, rname+" via v pkg uninstall --"+action.String(), rb.Pairs())
+		if ierr != nil {
+			return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", ierr.Error(), "")
+		}
+		res.Done = ir.Installed
+		res.Status = ir.Status
+	default: // actDelete
+		ur, uerr := runUninstall(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), fileNumStrings(b))
+		if uerr != nil {
+			return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", uerr.Error(), "")
+		}
+		res.Done = ur.Uninstalled
 	}
+
 	if err := cc.Result(res, func() {
 		cc.Title("pkg uninstall — " + c.Engine)
-		if res.Uninstalled {
-			fmt.Fprintln(cc.Stdout, cc.Success("uninstalled "+res.Name))
+		fmt.Fprintf(cc.Stdout, "%s [%s] %s\n", cc.Accent(name), rev.ClassName, cc.Faint(reason))
+		if res.Done {
+			fmt.Fprintln(cc.Stdout, cc.Success(action.String()+" complete for "+name))
 		} else {
-			fmt.Fprintln(cc.Stdout, cc.Failure("uninstall not confirmed for "+res.Name))
+			fmt.Fprintln(cc.Stdout, cc.Failure(action.String()+" not confirmed for "+name))
 		}
 	}); err != nil {
 		return err
 	}
-	if !res.Uninstalled {
+	if !res.Done {
 		return clikit.Fail(clikit.ExitRuntime, "NOT_UNINSTALLED",
-			"uninstall of "+res.Name+" was not confirmed", "")
+			action.String()+" of "+name+" was not confirmed", "")
 	}
 	return nil
 }

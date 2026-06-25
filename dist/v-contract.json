@@ -364,6 +364,21 @@
           ],
           "default": "remote",
           "help": "Driver transport: local | docker | remote."
+        },
+        {
+          "name": "restore",
+          "type": "string",
+          "help": "Pre-image snapshot .KID to restore instead of deleting (class-1 reversal for a patched-over routine)."
+        },
+        {
+          "name": "backout",
+          "type": "string",
+          "help": "Authored back-out .KID to install instead of deleting (class-2 reversal of a side-effecting patch)."
+        },
+        {
+          "name": "force",
+          "type": "bool",
+          "help": "Delete routines even for a side-effecting patch (UNSAFE: orphans install-time data/side-effects)."
         }
       ],
       "args": [
@@ -371,7 +386,7 @@
           "name": "kid-file",
           "type": "string",
           "required": true,
-          "help": "Path to the .KID whose install to reverse (routine-only back-out)."
+          "help": "Path to the .KID whose install to reverse."
         }
       ]
     },
