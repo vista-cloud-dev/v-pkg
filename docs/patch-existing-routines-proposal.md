@@ -206,8 +206,10 @@ drift-gateable (a `patch` component with no captured pre-image is a red gate).
   overrides, loudly); a class-1 patch with no flags falls back to the greenfield
   routine-delete. This is the bug fix, not just a feature: the old uninstall would
   brick a patched routine (class 1) and silently orphan data/side-effects (class
-  2/3). *Pending:* auto-detect a paired snapshot/back-out (so the flags are
-  optional) and `verify-clean` after a class-2 back-out.
+  2/3). **Auto-detect + verify-clean DONE** — with no reversal flag it auto-finds a
+  paired pre-image at the conventional sidecar `<kid>.preimage.kids` (written by
+  `install --auto-snapshot`); `--verify` confirms the live routines match the
+  re-applied artifact after a restore/back-out (exit 3 if not).
 - **`verify --drift`** *(DONE 2026-06-25, pkgcli/lifecycle.go)* — answers "is my
   patch still applied to the live routine?" It reads each shipped routine off the
   engine and compares it to the patch's source via `RoutineDriftMatch`

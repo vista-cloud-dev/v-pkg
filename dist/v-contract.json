@@ -207,6 +207,11 @@
           "help": "Capture the pre-image of any routine this install overwrites to this .KID before installing (enables uninstall --restore)."
         },
         {
+          "name": "auto-snapshot",
+          "type": "bool",
+          "help": "Like --snapshot, but to the conventional sidecar path (\u003ckid\u003e.preimage.kids) that uninstall auto-detects."
+        },
+        {
           "name": "allow-overwrite",
           "type": "bool",
           "help": "Overwrite existing routines WITHOUT capturing a pre-image (unsafe: uninstall cannot then restore them)."
@@ -394,6 +399,11 @@
           "name": "force",
           "type": "bool",
           "help": "Delete routines even for a side-effecting patch (UNSAFE: orphans install-time data/side-effects)."
+        },
+        {
+          "name": "verify",
+          "type": "bool",
+          "help": "After a restore/back-out, confirm the live routines now match the re-applied artifact (verify-clean)."
         }
       ],
       "args": [

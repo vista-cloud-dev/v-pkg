@@ -315,6 +315,7 @@ type installCmd struct {
 	engineConn
 	KidFile        string `arg:"" help:"Path to the built .KID transport file to install on the live engine."`
 	Snapshot       string `help:"Capture the pre-image of any routine this install overwrites to this .KID before installing (enables uninstall --restore)."`
+	AutoSnapshot   bool   `help:"Like --snapshot, but to the conventional sidecar path (<kid>.preimage.kids) that uninstall auto-detects."`
 	AllowOverwrite bool   `help:"Overwrite existing routines WITHOUT capturing a pre-image (unsafe: uninstall cannot then restore them)."`
 }
 
@@ -356,7 +357,13 @@ func (c *installCmd) Run(cc *clikit.Context) error {
 		return clikit.Fail(clikit.ExitRuntime, "READ_FAILED", err.Error(),
 			"confirm the driver connection before installing")
 	}
-	action, reason := decideInstall(len(existing) > 0, c.Snapshot, c.AllowOverwrite)
+	// --auto-snapshot supplies the conventional sidecar path when no explicit
+	// --snapshot is given, so install/uninstall pair without a path.
+	snapshot := c.Snapshot
+	if snapshot == "" && c.AutoSnapshot {
+		snapshot = defaultPreimagePath(c.KidFile)
+	}
+	action, reason := decideInstall(len(existing) > 0, snapshot, c.AllowOverwrite)
 	res := installReport{
 		Name: name, Class: rev.ClassName, Action: action.String(), Reason: reason,
 		Overwrites: routineNames(existing), Greenfield: greenfield,
@@ -365,17 +372,17 @@ func (c *installCmd) Run(cc *clikit.Context) error {
 	if action == instRefuse {
 		return clikit.Fail(clikit.ExitRefused, "INSTALL_REFUSED",
 			fmt.Sprintf("refusing to install %s: %s", name, reason),
-			"pass --snapshot <out.kids> to capture a pre-image first, or --allow-overwrite")
+			"pass --snapshot <out.kids> (or --auto-snapshot) to capture a pre-image first, or --allow-overwrite")
 	}
 
 	// Safe path: capture the overwrite targets' pre-image before clobbering.
 	if action == instSnapshotProceed {
 		snapName := snapshotName(name, "")
 		pairs := buildSnapshotPairs(snapName, snapshotNamespace(name), existing)
-		if werr := kids.WriteKID([]string{snapName}, map[string][]kids.Pair{snapName: pairs}, c.Snapshot); werr != nil {
+		if werr := kids.WriteKID([]string{snapName}, map[string][]kids.Pair{snapName: pairs}, snapshot); werr != nil {
 			return clikit.Fail(clikit.ExitRuntime, "WRITE_FAILED", werr.Error(), "")
 		}
-		res.Snapshot = c.Snapshot
+		res.Snapshot = snapshot
 	}
 
 	ir, err := runInstall(ctx, cl, name, name+" via v pkg install", b.Pairs())
@@ -674,15 +681,18 @@ type uninstallCmd struct {
 	Restore string `help:"Pre-image snapshot .KID to restore instead of deleting (class-1 reversal for a patched-over routine)."`
 	Backout string `help:"Authored back-out .KID to install instead of deleting (class-2 reversal of a side-effecting patch)."`
 	Force   bool   `help:"Delete routines even for a side-effecting patch (UNSAFE: orphans install-time data/side-effects)."`
+	Verify  bool   `help:"After a restore/back-out, confirm the live routines now match the re-applied artifact (verify-clean)."`
 }
 
 type uninstallReport struct {
-	Name   string `json:"name"`
-	Class  string `json:"class"`
-	Action string `json:"action"`
-	Reason string `json:"reason"`
-	Done   bool   `json:"done"`
-	Status int    `json:"status,omitempty"` // #9.7 status for restore/backout installs
+	Name         string `json:"name"`
+	Class        string `json:"class"`
+	Action       string `json:"action"`
+	Reason       string `json:"reason"`
+	AutoDetected bool   `json:"autoDetected,omitempty"` // pre-image found via the sidecar convention
+	Done         bool   `json:"done"`
+	Status       int    `json:"status,omitempty"`      // #9.7 status for restore/backout installs
+	VerifyClean  string `json:"verifyClean,omitempty"` // "" | "clean" | "dirty" (when --verify)
 }
 
 func (c *uninstallCmd) Run(cc *clikit.Context) error {
@@ -697,8 +707,12 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 	name := k.InstallNames[0]
 	b := k.Builds[name]
 	rev := kids.Classify(k)
-	action, reason := decideUninstall(rev.Class, c.Restore, c.Backout, c.Force)
-	res := uninstallReport{Name: name, Class: rev.ClassName, Action: action.String(), Reason: reason}
+
+	// Auto-detect a paired pre-image at the conventional sidecar path so
+	// `uninstall <patch.kid>` reverses cleanly without re-specifying --restore.
+	restore, autoDetected := resolveAutoRestore(c.Restore, c.Backout, c.KidFile, fileExists(defaultPreimagePath(c.KidFile)))
+	action, reason := decideUninstall(rev.Class, restore, c.Backout, c.Force)
+	res := uninstallReport{Name: name, Class: rev.ClassName, Action: action.String(), Reason: reason, AutoDetected: autoDetected}
 
 	if action == actRefuse {
 		return clikit.Fail(clikit.ExitRefused, "UNINSTALL_REFUSED",
@@ -714,8 +728,8 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 
 	switch action {
 	case actRestore, actBackout:
-		// reversal = install the provided pre-image / authored back-out.
-		src := c.Restore
+		// reversal = install the provided/auto-detected pre-image or back-out.
+		src := restore
 		if action == actBackout {
 			src = c.Backout
 		}
@@ -729,6 +743,20 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 		}
 		res.Done = ir.Installed
 		res.Status = ir.Status
+		// verify-clean: confirm the live routines now match the re-applied artifact.
+		if c.Verify && res.Done {
+			drift, derr := checkDrift(ctx, cl, rb)
+			if derr != nil {
+				return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", derr.Error(), "")
+			}
+			res.VerifyClean = "clean"
+			for _, state := range drift {
+				if state != "applied" {
+					res.VerifyClean = "dirty"
+					break
+				}
+			}
+		}
 	default: // actDelete
 		ur, uerr := runUninstall(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), fileNumStrings(b))
 		if uerr != nil {
@@ -740,10 +768,19 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 	if err := cc.Result(res, func() {
 		cc.Title("pkg uninstall — " + c.Engine)
 		fmt.Fprintf(cc.Stdout, "%s [%s] %s\n", cc.Accent(name), rev.ClassName, cc.Faint(reason))
+		if res.AutoDetected {
+			fmt.Fprintf(cc.Stdout, "  %s pre-image: %s\n", cc.Faint("auto-detected"), defaultPreimagePath(c.KidFile))
+		}
 		if res.Done {
 			fmt.Fprintln(cc.Stdout, cc.Success(action.String()+" complete for "+name))
 		} else {
 			fmt.Fprintln(cc.Stdout, cc.Failure(action.String()+" not confirmed for "+name))
+		}
+		switch res.VerifyClean {
+		case "clean":
+			fmt.Fprintln(cc.Stdout, cc.Success("verify-clean: live routines match the re-applied artifact"))
+		case "dirty":
+			fmt.Fprintln(cc.Stdout, cc.Failure("verify-clean FAILED: live routines do not match the re-applied artifact"))
 		}
 	}); err != nil {
 		return err
@@ -751,6 +788,10 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 	if !res.Done {
 		return clikit.Fail(clikit.ExitRuntime, "NOT_UNINSTALLED",
 			action.String()+" of "+name+" was not confirmed", "")
+	}
+	if res.VerifyClean == "dirty" {
+		return clikit.Fail(clikit.ExitCheck, "VERIFY_CLEAN_FAILED",
+			"reversal of "+name+" did not verify clean", "the live routines do not match the re-applied artifact")
 	}
 	return nil
 }
