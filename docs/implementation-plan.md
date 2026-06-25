@@ -212,6 +212,14 @@ Format: **Q<n> (date, STATUS):** question — *recommendation*. **A:** answer.
   the target system(s)? (How much running code is *not* covered by a retained
   `#9.6` build entry?) Drives how much S2/S3 fallback P4.2 must implement.
   **A:** _<pending>_
+- **Q6 (2026-06-25, OPEN):** Should the verbs grow first-class support for
+  **patching an existing routine** (not just greenfield install)? The RPC-broker
+  splice (`CALLP^XWBBRK`) exposed that `install` overwrites a national routine with
+  no pre-image and `uninstall` *deletes* (bricks it) instead of restoring stock.
+  *Recommendation: yes — add `snapshot`/`restore`, make `install`/`uninstall`
+  pre-image-aware, add patch-drift `verify`, and tag build-spec components
+  `greenfield|patch`. Full design: [`patch-existing-routines-proposal.md`](patch-existing-routines-proposal.md).*
+  **A:** _<pending>_
 
 ---
 
