@@ -36,6 +36,7 @@ type CLI struct {
 	clikit.Globals
 	pkgcli.Commands
 
+	Explore clikit.ExploreCmd `cmd:"" help:"Browse the command surface interactively (palette)."`
 	Schema  clikit.SchemaCmd  `cmd:"" help:"Emit the command/flag/enum tree as JSON (agent discovery)."`
 	Version clikit.VersionCmd `cmd:"" help:"Show version and build info."`
 

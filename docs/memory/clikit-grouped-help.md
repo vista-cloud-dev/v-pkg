@@ -1,6 +1,6 @@
 ---
 name: clikit-grouped-help
-description: v-pkg repinned to clikit v0.2.0 and its Commands now carry group:"" tags, so `v-pkg`/`v pkg` help shows KIDS-lifecycle categories (Inspect/Transform/Build & install/Back-out). Tagged v0.4.0 (2026-06-26).
+description: v-pkg consumes clikit's discovery UX — grouped help (group:"" tags, v0.4.0) and the interactive `v-pkg explore` palette (clikit v0.3.2, mounted at the standalone root, v0.5.0). KIDS-lifecycle categories Inspect/Transform/Build & install/Back-out.
 metadata:
   type: project
 ---
@@ -25,3 +25,11 @@ required it, but v-pkg's groups only appear once v-cli pins v0.4.0.)
 
 Gates: `go build`/`go vet` clean, `go test -race ./...` green, `v-pkg help`
 smoke-tested showing the grouped surface.
+
+**Phase 2 — `v-pkg explore` (2026-06-26, tagged v0.5.0).** Repinned clikit
+v0.2.0 → v0.3.2 and mounted `Explore clikit.ExploreCmd` at the **standalone root**
+in `main.go` (NOT in the shared `pkgcli.Commands`): ExploreCmd always explores
+from the app root, so mounting it inside pkgcli would make `v pkg explore`
+confusingly browse the whole `v` tree. The standalone `v-pkg explore` browses the
+v-pkg tree; the umbrella gets its own `v explore`. v-cli must now pin clikit v0.3.2
++ v-pkg v0.5.0.
