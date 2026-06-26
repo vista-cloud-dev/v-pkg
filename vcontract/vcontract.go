@@ -8,7 +8,7 @@ package vcontract
 import (
 	"github.com/alecthomas/kong"
 
-	"github.com/vista-cloud-dev/v-pkg/clikit"
+	"github.com/vista-cloud-dev/clikit"
 )
 
 // Manifest is one domain's contract (§4): its name, the tool SemVer, a

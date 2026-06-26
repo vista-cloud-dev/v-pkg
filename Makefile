@@ -4,7 +4,8 @@
 
 BIN     ?= v-pkg                     # the v pkg domain CLI (standalone)
 PKG     := github.com/vista-cloud-dev/v-pkg
-LDPKG   := $(PKG)/clikit
+# Version is stamped into the shared clikit module (extracted from v-pkg/clikit).
+LDPKG   := github.com/vista-cloud-dev/clikit
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE    ?= $(shell date -u +%Y-%m-%d)

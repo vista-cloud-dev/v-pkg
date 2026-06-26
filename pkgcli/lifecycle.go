@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/vista-cloud-dev/clikit"
 	mdriver "github.com/vista-cloud-dev/m-driver-sdk"
-	"github.com/vista-cloud-dev/v-pkg/clikit"
 	"github.com/vista-cloud-dev/v-pkg/internal/installspec"
 	"github.com/vista-cloud-dev/v-pkg/internal/kids"
 )

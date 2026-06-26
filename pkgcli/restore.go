@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/vista-cloud-dev/v-pkg/clikit"
+	"github.com/vista-cloud-dev/clikit"
 )
 
 // restore re-applies a pre-image snapshot .KID (produced by `v pkg snapshot`),

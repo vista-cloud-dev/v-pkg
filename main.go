@@ -26,7 +26,7 @@ import (
 
 	"github.com/willabides/kongplete"
 
-	"github.com/vista-cloud-dev/v-pkg/clikit"
+	"github.com/vista-cloud-dev/clikit"
 	"github.com/vista-cloud-dev/v-pkg/pkgcli"
 )
 

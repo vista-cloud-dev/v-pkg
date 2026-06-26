@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/vista-cloud-dev/v-pkg/clikit"
+	"github.com/vista-cloud-dev/clikit"
 	"github.com/vista-cloud-dev/v-pkg/internal/kids"
 )
 

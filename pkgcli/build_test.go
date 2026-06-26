@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/vista-cloud-dev/v-pkg/clikit"
+	"github.com/vista-cloud-dev/clikit"
 )
 
 // runBuild builds the ZZSKEL test package to out, discarding the JSON envelope.

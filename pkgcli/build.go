@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/vista-cloud-dev/v-pkg/clikit"
+	"github.com/vista-cloud-dev/clikit"
 	"github.com/vista-cloud-dev/v-pkg/internal/buildspec"
 	"github.com/vista-cloud-dev/v-pkg/internal/kids"
 )
