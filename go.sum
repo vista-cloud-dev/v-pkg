@@ -52,8 +52,8 @@ github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
 github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
-github.com/vista-cloud-dev/clikit v0.1.0 h1:xHagsn0lV5I8pWMhrFNGO9JvdaPdCIFXcAh7qDMHL4U=
-github.com/vista-cloud-dev/clikit v0.1.0/go.mod h1:cvy8b3SGmOQoCQLu7Padq/kNg6FBWK5derp3bnsOXBo=
+github.com/vista-cloud-dev/clikit v0.2.0 h1:wa26tzSRsljkSSQjgX/X/AYd849nzmn2WUPGSCv3m0g=
+github.com/vista-cloud-dev/clikit v0.2.0/go.mod h1:fRbCZNmWlE5BqmuE0qDY8EfWIuiLZ3wUlpaph1ndMiM=
 github.com/vista-cloud-dev/m-driver-sdk v0.3.0 h1:RudBmVTutjVPur0mF9sFxv7tBpCa2L78DD5GZuB8KGI=
 github.com/vista-cloud-dev/m-driver-sdk v0.3.0/go.mod h1:0Qkz38Qhgyr5nYQeqgthkMHt4zVJMN3j79Kfr+THtpw=
 github.com/willabides/kongplete v0.4.0 h1:eivXxkp5ud5+4+NVN9e4goxC5mSh3n1RHov+gsblM2g=

@@ -22,19 +22,19 @@ import (
 // the standalone binary, or mount it as a named field (`Pkg Commands` with
 // cmd:"" name:"pkg") under the `v` umbrella for `v pkg <verb>`.
 type Commands struct {
-	Parse        parseCmd        `cmd:"" help:"Parse a .KID file and summarize its builds and sections."`
-	Decompose    decomposeCmd    `cmd:"" help:"Split a .KID into a per-component KIDComponents/ tree."`
-	Assemble     assembleCmd     `cmd:"" help:"Reassemble a component tree back into a .KID."`
-	Roundtrip    roundtripCmd    `cmd:"" help:"Verify decompose→assemble reproduces the build (exit 3 on drift)."`
-	Canonicalize canonicalizeCmd `cmd:"" help:"Substitute install-time IENs with \"IEN\" in a tree (LOSSY; review-only)."`
-	Classify     classifyCmd     `cmd:"" help:"Derive a .KID's reversibility class (pure-overwrite vs side-effecting) from its structure — no engine."`
-	Lint         lintCmd         `cmd:"" help:"Run the PIKS data-class gate over a .KID (exit 3 on a blocked file)."`
-	Build        buildCmd        `cmd:"" help:"Build a KIDS transport global from a declarative build spec (deterministic, normalized export)."`
-	Install      installCmd      `cmd:"" help:"Install a built .KID on a live engine over the driver (non-interactive KIDS load+install)."`
-	Snapshot     snapshotCmd     `cmd:"" help:"Capture the live pre-image of a patch's routines into a restorable .KID (class-1 reversal)."`
-	Restore      restoreCmd      `cmd:"" help:"Re-apply a pre-image snapshot .KID to revert routines to stock (preview by default; --commit installs)."`
-	Verify       verifyCmd       `cmd:"" help:"Verify a .KID's install on a live engine (#9.7 status + per-routine presence)."`
-	Uninstall    uninstallCmd    `cmd:"" help:"Uninstall a .KID from a live engine (routine-only back-out: routines + #9.7/#9.6)."`
+	Parse        parseCmd        `cmd:"" group:"Inspect" help:"Parse a .KID file and summarize its builds and sections."`
+	Decompose    decomposeCmd    `cmd:"" group:"Transform" help:"Split a .KID into a per-component KIDComponents/ tree."`
+	Assemble     assembleCmd     `cmd:"" group:"Transform" help:"Reassemble a component tree back into a .KID."`
+	Roundtrip    roundtripCmd    `cmd:"" group:"Transform" help:"Verify decompose→assemble reproduces the build (exit 3 on drift)."`
+	Canonicalize canonicalizeCmd `cmd:"" group:"Transform" help:"Substitute install-time IENs with \"IEN\" in a tree (LOSSY; review-only)."`
+	Classify     classifyCmd     `cmd:"" group:"Inspect" help:"Derive a .KID's reversibility class (pure-overwrite vs side-effecting) from its structure — no engine."`
+	Lint         lintCmd         `cmd:"" group:"Inspect" help:"Run the PIKS data-class gate over a .KID (exit 3 on a blocked file)."`
+	Build        buildCmd        `cmd:"" group:"Build & install" help:"Build a KIDS transport global from a declarative build spec (deterministic, normalized export)."`
+	Install      installCmd      `cmd:"" group:"Build & install" help:"Install a built .KID on a live engine over the driver (non-interactive KIDS load+install)."`
+	Snapshot     snapshotCmd     `cmd:"" group:"Back-out" help:"Capture the live pre-image of a patch's routines into a restorable .KID (class-1 reversal)."`
+	Restore      restoreCmd      `cmd:"" group:"Back-out" help:"Re-apply a pre-image snapshot .KID to revert routines to stock (preview by default; --commit installs)."`
+	Verify       verifyCmd       `cmd:"" group:"Build & install" help:"Verify a .KID's install on a live engine (#9.7 status + per-routine presence)."`
+	Uninstall    uninstallCmd    `cmd:"" group:"Back-out" help:"Uninstall a .KID from a live engine (routine-only back-out: routines + #9.7/#9.6)."`
 }
 
 // --- parse -------------------------------------------------------------------
