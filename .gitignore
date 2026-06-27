@@ -4,6 +4,8 @@
 !/dist/*.json
 /bin/
 *.test
+# Local root-built binary (symlinked onto PATH: ~/scripts/bin/v-pkg -> ./v-pkg)
+/v-pkg
 # coverage report artifacts — specific/anchored so they never match a source
 # file named coverage.go (a broad `coverage.*` silently drops it from commits)
 /coverage.out
