@@ -37,10 +37,10 @@ type CLI struct {
 	pkgcli.Commands
 
 	Menu    clikit.MenuCmd    `cmd:"" help:"Browse the command surface interactively (palette)."`
-	Schema  clikit.SchemaCmd  `cmd:"" help:"Emit the command/flag/enum tree as JSON (agent discovery)."`
+	Schema  clikit.SchemaCmd  `cmd:"" hidden:"" help:"Emit the command/flag/enum tree as JSON (agent discovery)."`
 	Version clikit.VersionCmd `cmd:"" help:"Show version and build info."`
 
-	InstallCompletions kongplete.InstallCompletions `cmd:"" help:"Install shell tab-completions."`
+	InstallCompletions kongplete.InstallCompletions `cmd:"" hidden:"" help:"Install shell tab-completions."`
 }
 
 func main() {
