@@ -60,13 +60,16 @@ type entryGroup struct {
 // types, so the shared "BLD",1,"KRN",0) header and the ORD ordering are computed
 // once across all of them. PARAMETER DEFINITION (#8989.51) and OPTION (#19) ride
 // the same path; new SEND/DELETE types append here.
-func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey) []entryGroup {
+func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey, protos []Protocol) []entryGroup {
 	var groups []entryGroup
 	if len(opts) > 0 {
 		groups = append(groups, entryGroup{optionEntryType, optionRecords(opts)})
 	}
 	if len(keys) > 0 {
 		groups = append(groups, entryGroup{securityKeyEntryType, securityKeyRecords(keys)})
+	}
+	if len(protos) > 0 {
+		groups = append(groups, entryGroup{protocolEntryType, protocolRecords(protos)})
 	}
 	if len(defs) > 0 {
 		groups = append(groups, entryGroup{paramDefEntryType, paramDefRecords(defs)})
@@ -299,3 +302,54 @@ func securityKeyRecords(keys []SecurityKey) []entryRec {
 // KeyNames returns the #19.1 SECURITY KEY component names in build order — what
 // `v pkg verify`/`uninstall` probe and back out.
 func (b *Build) KeyNames() []string { return b.entryNames(securityKeyFile) }
+
+// --- PROTOCOL (#101) — the fourth type on the generic core --------------------
+
+const (
+	protocolFile     = 101
+	protocolFileName = "PROTOCOL"
+	// protocolOrdTail is the national-constant tail of the #101 ORD install line
+	// (pieces after "<file>;<ord>;"): the SEND/DELETE action routines KRN^XPDIK
+	// runs to file/relink/delete a PROTOCOL. One form across the corpus.
+	protocolOrdTail = ";;PRO^XPDTA;PROF1^XPDIA;PROE1^XPDIA;PROF2^XPDIA;;PRODEL^XPDIA"
+)
+
+var protocolEntryType = entryType{number: protocolFile, name: protocolFileName, ordTail: protocolOrdTail}
+
+// Protocol is one #101 PROTOCOL record to ship as a KIDS KRN component
+// (SEND-TO-SITE). Stored in ^ORD(101,; the node skeleton matches OPTION but the
+// TYPE codes and data global are #101's own, and there is no uppercase-text xref.
+// TypeCode is the #101 field 4 (TYPE) set-of-codes value (A action, X extended
+// action, M menu, E event driver, …). The #101.01 ITEM multiple (menu items) and
+// the extended menu-actions are a follow-up — this authors a base protocol.
+type Protocol struct {
+	Name        string // #101 .01 NAME (0;1)
+	ItemText    string // #101 field 1 ITEM TEXT (0;2)
+	TypeCode    string // #101 field 4 TYPE set-of-codes value
+	EntryAction string // #101 field 20 ENTRY ACTION (M code); node 20
+	ExitAction  string // #101 field 15 EXIT ACTION (M code); node 15
+}
+
+// protocolRecords packs each Protocol into the generic entry-record shape: the
+// SEND XPDFL flag and the record image (0-node, optional ENTRY/EXIT action nodes).
+func protocolRecords(protos []Protocol) []entryRec {
+	recs := make([]entryRec, 0, len(protos))
+	for _, p := range protos {
+		img := []imageNode{
+			// 0-node: .01 NAME ^ ITEM TEXT ^ (p3 reserved) ^ TYPE.
+			{Subs{intSub(0)}, p.Name + "^" + p.ItemText + "^^" + p.TypeCode},
+		}
+		if p.ExitAction != "" {
+			img = append(img, imageNode{Subs{intSub(15)}, p.ExitAction})
+		}
+		if p.EntryAction != "" {
+			img = append(img, imageNode{Subs{intSub(20)}, p.EntryAction})
+		}
+		recs = append(recs, entryRec{name: p.Name, xpdfl: "0^1", image: img})
+	}
+	return recs
+}
+
+// ProtocolNames returns the #101 PROTOCOL component names in build order — what
+// `v pkg verify`/`uninstall` probe and back out.
+func (b *Build) ProtocolNames() []string { return b.entryNames(protocolFile) }

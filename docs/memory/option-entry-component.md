@@ -83,8 +83,25 @@ stored in `^DIC(19.1,`). ORD tail (52 corpus builds, one form):
 **name-only** (optional DESCRIPTION word-processing field deferred — avoids the WP
 volatile-date determinism work). Live install→verify→`--force` uninstall→clean on
 vehu (YDB, `^DIC(19.1,797,0)=ZZKEY MANAGER`) + foia-t12 (IRIS). Verify probes
-`^DIC(19.1,"B",<name>)`, uninstall is `DIK` on `^DIC(19.1,`. Remaining B.1 types
-in frequency order: PROTOCOL #101 → RPC #8994 → templates (.4/.402/.401/.403) →
+`^DIC(19.1,"B",<name>)`, uninstall is `DIK` on `^DIC(19.1,`.
+
+## PROTOCOL (#101) — fourth type, live-proven both engines (2026-06-28)
+Same node skeleton as OPTION (0-node `NAME^ITEM TEXT^^TYPE`, ENTRY ACTION node 20,
+EXIT ACTION node 15) but **its own data global `^ORD(101,`, its own TYPE codes, and
+NO "U" xref node** (OPTION's uppercase-menu-text computed field has no #101
+analog). TYPE set-of-codes are #101's own (`A`=action, `X`=extended action, `M`=menu,
+`E`=event driver, `O`=protocol, `Q`=protocol menu, `L`=limited, `D`=dialog, `T`=term,
+`S`=subscriber) — **do NOT reuse #19's TYPE list or its PACKAGE piece (0;14 in #19,
+0;12 in #101)**. ORD tail (57 corpus builds): `;;PRO^XPDTA;PROF1^XPDIA;PROE1^XPDIA;
+PROF2^XPDIA;;PRODEL^XPDIA`. Authored a **base protocol** (NAME + ITEM TEXT + TYPE +
+ENTRY ACTION) — the #101.01 ITEM multiple (menu items) + extended menu-actions
+(USE-AS-LINK/MERGE-ITEMS/ATTACH/DISABLE) are a follow-up. Live-proven
+(`testdata/zzproto`, action protocol, ENTRY ACTION `Q`) on vehu (YDB,
+`^ORD(101,7054,0)=ZZPROTO ACTION^…^^A`, node 20=`Q`) + foia-t12 (IRIS). Verify probes
+`^ORD(101,"B",<name>)`, uninstall is `DIK` on `^ORD(101,`. #101 is integer-numbered
+(re-parses as int) — the `subNum` numeric-match fix covers it.
+
+Remaining B.1 types in frequency order: RPC #8994 → templates (.4/.402/.401/.403) →
 LIST TEMPLATE #409.61 → MAIL GROUP #3.8 → HL7 family.
 
 ## Proof

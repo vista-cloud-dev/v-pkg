@@ -345,7 +345,6 @@ func TestParse_AllowLongNames_StillGated(t *testing.T) {
 // be a hard error that NAMES the type, not a silent omission.
 func TestParse_UnsupportedComponents_Rejected(t *testing.T) {
 	cases := map[string]string{
-		"protocols":  `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"protocols":["ZZSKEL PROTO"]}}`,
 		"templates":  `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"templates":["ZZSKEL TMPL"]}}`,
 		"rpcs":       `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"rpcs":["ZZSKEL RPC"]}}`,
 		"mailGroups": `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"mailGroups":["ZZSKEL MG"]}}`,
@@ -396,6 +395,37 @@ func TestParse_Options_Invalid(t *testing.T) {
 		"bad type":        `{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"ZZOPT A","type":"bogus"}]}}`,
 		"run no routine":  `{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"ZZOPT A","type":"run routine"}]}}`,
 		"bad routine ref": `{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"ZZOPT A","type":"run routine","routine":"EN^123BAD"}]}}`,
+	}
+	for name, js := range cases {
+		if _, err := Parse([]byte(js)); err == nil {
+			t.Errorf("%s: expected an error, got nil", name)
+		}
+	}
+}
+
+func TestParse_Protocols(t *testing.T) {
+	js := `{"package":"ZZPROTO","version":"1.0","patch":"1","components":{
+	  "routines":["ZZPRORT"],
+	  "protocols":[{"name":"ZZPROTO ACTION","itemText":"ZZ Protocol Action Demo","type":"action","entryAction":"Q"}]
+	}}`
+	s, err := Parse([]byte(js))
+	if err != nil {
+		t.Fatalf("Parse protocols spec: %v", err)
+	}
+	if len(s.Components.Protocols) != 1 {
+		t.Fatalf("protocols = %+v", s.Components.Protocols)
+	}
+	p := s.Components.Protocols[0]
+	if p.Name != "ZZPROTO ACTION" || p.Type != "action" || p.EntryAction != "Q" {
+		t.Errorf("protocol = %+v", p)
+	}
+}
+
+func TestParse_Protocols_Invalid(t *testing.T) {
+	cases := map[string]string{
+		"no name":  `{"package":"ZZP","version":"1.0","components":{"protocols":[{"type":"action"}]}}`,
+		"bad name": `{"package":"ZZP","version":"1.0","components":{"protocols":[{"name":"lower case","type":"action"}]}}`,
+		"bad type": `{"package":"ZZP","version":"1.0","components":{"protocols":[{"name":"ZZP A","type":"bogus"}]}}`,
 	}
 	for name, js := range cases {
 		if _, err := Parse([]byte(js)); err == nil {

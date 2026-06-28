@@ -1,0 +1,44 @@
+KIDS Distribution saved by v-pkg
+m-kids reassembled output
+**KIDS**:ZZPROTO*1.0*1^
+
+**INSTALL NAME**
+ZZPROTO*1.0*1
+"BLD",1,0)
+ZZPROTO*1.0*1^ZZPROTO^0^0
+"BLD",1,"KRN",0)
+^9.67PA^101^1
+"BLD",1,"KRN",101,0)
+101
+"BLD",1,"KRN",101,"NM",0)
+^9.68A^1^1
+"BLD",1,"KRN",101,"NM",1,0)
+ZZPROTO ACTION^^0
+"BLD",1,"KRN",101,"NM","B","ZZPROTO ACTION",1)
+
+"BLD",1,"KRN","B",101,101)
+
+"RTN")
+1
+"RTN","ZZPRORT")
+0^3^0^0
+"RTN","ZZPRORT",1,0)
+ZZPRORT ;VCD/VSL - throwaway test package (KRN protocol component) ;1.0
+"RTN","ZZPRORT",2,0)
+ ;;1.0;ZZPROTO;;
+"RTN","ZZPRORT",3,0)
+ quit
+"ORD",1,101)
+101;1;;;PRO^XPDTA;PROF1^XPDIA;PROE1^XPDIA;PROF2^XPDIA;;PRODEL^XPDIA
+"ORD",1,101,0)
+PROTOCOL
+"KRN",101,1,-1)
+0^1
+"KRN",101,1,0)
+ZZPROTO ACTION^ZZPROTO Action Demo^^A
+"KRN",101,1,20)
+Q
+"VER")
+8.0^22.2
+**END**
+**END**

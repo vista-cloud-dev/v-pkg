@@ -1,0 +1,16 @@
+{
+  "package": "ZZPROTO",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "routines": ["ZZPRORT"],
+    "protocols": [
+      {
+        "name": "ZZPROTO ACTION",
+        "itemText": "ZZPROTO Action Demo",
+        "type": "action",
+        "entryAction": "Q"
+      }
+    ]
+  }
+}

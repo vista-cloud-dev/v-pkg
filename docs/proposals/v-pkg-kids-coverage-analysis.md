@@ -394,6 +394,18 @@ not the populate-and-`EN^XPDIJ` shortcut.
     DRIFT=0; golden `testdata/zzkey/ZZKEY.kids`. **Live install→verify→`--force`
     uninstall→clean** on vehu (YDB, `^DIC(19.1,…,0)=ZZKEY MANAGER`) + foia-t12 (IRIS).
     Next: **PROTOCOL #101** (richer record image — items/types). ([[option-entry-component]])
+  - **B.1-d ✅ DONE + LIVE-PROVEN 2026-06-28 — PROTOCOL (#101), both engines.** The
+    fourth type. Mirrors OPTION's node skeleton (0-node `NAME^ITEM TEXT^^TYPE`, ENTRY
+    ACTION node 20, EXIT ACTION node 15) but with its **own data global `^ORD(101,`,
+    own TYPE set-of-codes** (A action / X extended action / M menu / E event driver /
+    …, distinct from #19's), and **no "U" xref node**. ORD action-routine tail
+    (57 corpus builds): `;;PRO^XPDTA;PROF1^XPDIA;PROE1^XPDIA;PROF2^XPDIA;;PRODEL^XPDIA`.
+    Authored a **base protocol** (NAME + ITEM TEXT + TYPE + ENTRY ACTION); the #101.01
+    ITEM multiple + extended menu-actions (USE-AS-LINK / MERGE-ITEMS / ATTACH /
+    DISABLE) are a follow-up. TDD; lint/race/contract green; corpus DRIFT=0; golden
+    `testdata/zzproto/ZZPROTO.kids`. **Live install→verify→`--force` uninstall→clean**
+    on vehu (YDB, `^ORD(101,…,0)=ZZPROTO ACTION^…^^A`, node 20=`Q`) + foia-t12 (IRIS).
+    Next: **RPC #8994**. ([[option-entry-component]])
 - **B.2 Real FILE DD + DATA (F3; the R3 enabler).** Extend `FileComp` to a
   multi-field DD (see §8 for the grounded node-set) and add **DATA** export with
   the four action codes (ADD-IF-NEW / MERGE / OVERWRITE / REPLACE) and FULL/PARTIAL

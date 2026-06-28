@@ -30,6 +30,7 @@ type buildResult struct {
 	ParamDefs      int    `json:"paramDefs,omitempty"`
 	Options        int    `json:"options,omitempty"`
 	Keys           int    `json:"keys,omitempty"`
+	Protocols      int    `json:"protocols,omitempty"`
 	Files          int    `json:"files,omitempty"`
 	RequiredBuilds int    `json:"requiredBuilds,omitempty"`
 }
@@ -58,6 +59,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 	files := resolveFiles(spec.Components.Files)
 	options := resolveOptions(spec.Components.Options)
 	keys := resolveKeys(spec.Components.Keys)
+	protocols := resolveProtocols(spec.Components.Protocols)
 	reqBuilds := resolveRequiredBuilds(spec.RequiredBuilds)
 
 	pairs := kids.MakeBuildPairs(kids.BuildInput{
@@ -67,6 +69,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 		ParamDefs:      paramDefs,
 		Options:        options,
 		Keys:           keys,
+		Protocols:      protocols,
 		Files:          files,
 		RequiredBuilds: reqBuilds,
 		EnvCheck:       spec.EnvCheck,
@@ -88,11 +91,11 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 
 	return cc.Result(buildResult{
 		InstallName: spec.InstallName(), Out: out, Routines: len(rtns),
-		ParamDefs: len(paramDefs), Options: len(options), Keys: len(keys), Files: len(files), RequiredBuilds: len(reqBuilds),
+		ParamDefs: len(paramDefs), Options: len(options), Keys: len(keys), Protocols: len(protocols), Files: len(files), RequiredBuilds: len(reqBuilds),
 	}, func() {
 		cc.Title("pkg build")
-		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d option(s), %d key(s), %d file(s), %d required build(s)) → %s\n",
-			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(options), len(keys), len(files), len(reqBuilds), cc.Accent(out))
+		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d option(s), %d key(s), %d protocol(s), %d file(s), %d required build(s)) → %s\n",
+			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(options), len(keys), len(protocols), len(files), len(reqBuilds), cc.Accent(out))
 	})
 }
 
@@ -199,6 +202,23 @@ func resolveKeys(keys []buildspec.KeyComp) []kids.SecurityKey {
 	out := make([]kids.SecurityKey, 0, len(keys))
 	for _, k := range keys {
 		out = append(out, kids.SecurityKey{Name: k.Name})
+	}
+	return out
+}
+
+// resolveProtocols maps the spec's PROTOCOL components onto the kids emit shape —
+// protocol-type name → #101 field 4 (TYPE) set-of-codes value. The spec is already
+// validated (type known), so the lookup is guaranteed present.
+func resolveProtocols(protos []buildspec.ProtocolComp) []kids.Protocol {
+	out := make([]kids.Protocol, 0, len(protos))
+	for _, p := range protos {
+		out = append(out, kids.Protocol{
+			Name:        p.Name,
+			ItemText:    p.ItemText,
+			TypeCode:    buildspec.ProtocolTypeCode[p.Type],
+			EntryAction: p.EntryAction,
+			ExitAction:  p.ExitAction,
+		})
 	}
 	return out
 }

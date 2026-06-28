@@ -59,17 +59,17 @@ type Spec struct {
 // Components is the BUILD component list (#9.6). Each slice is omitempty so a
 // spec lists only what it ships.
 type Components struct {
-	Routines             []string     `json:"routines,omitempty"`
-	Files                []FileComp   `json:"files,omitempty"`
-	Options              []OptionComp `json:"options,omitempty"`              // #19 OPTION KRN components (B.1)
-	Keys                 []KeyComp    `json:"keys,omitempty"`                 // #19.1 SECURITY KEY KRN components (B.1)
-	Parameters           []string     `json:"parameters,omitempty"`           // XPAR parameter names (reference only)
-	ParameterDefinitions []ParamDef   `json:"parameterDefinitions,omitempty"` // XPAR #8989.51 PARAMETER DEFINITION components (shipped as data)
-	Protocols            []string     `json:"protocols,omitempty"`
-	Templates            []string     `json:"templates,omitempty"`
-	RPCs                 []string     `json:"rpcs,omitempty"`
-	MailGroups           []string     `json:"mailGroups,omitempty"`
-	HL7                  []string     `json:"hl7,omitempty"`
+	Routines             []string       `json:"routines,omitempty"`
+	Files                []FileComp     `json:"files,omitempty"`
+	Options              []OptionComp   `json:"options,omitempty"`              // #19 OPTION KRN components (B.1)
+	Keys                 []KeyComp      `json:"keys,omitempty"`                 // #19.1 SECURITY KEY KRN components (B.1)
+	Parameters           []string       `json:"parameters,omitempty"`           // XPAR parameter names (reference only)
+	ParameterDefinitions []ParamDef     `json:"parameterDefinitions,omitempty"` // XPAR #8989.51 PARAMETER DEFINITION components (shipped as data)
+	Protocols            []ProtocolComp `json:"protocols,omitempty"`            // #101 PROTOCOL KRN components (B.1)
+	Templates            []string       `json:"templates,omitempty"`
+	RPCs                 []string       `json:"rpcs,omitempty"`
+	MailGroups           []string       `json:"mailGroups,omitempty"`
+	HL7                  []string       `json:"hl7,omitempty"`
 }
 
 func (c Components) empty() bool {
@@ -93,7 +93,6 @@ func (c Components) unsupported() []string {
 		name string
 		n    int
 	}{
-		{"protocols", len(c.Protocols)},
 		{"templates", len(c.Templates)},
 		{"rpcs", len(c.RPCs)},
 		{"mailGroups", len(c.MailGroups)},
@@ -135,6 +134,34 @@ type OptionComp struct {
 	Routine     string `json:"routine,omitempty"`     // #19 field 25 ROUTINE entryref (required for "run routine")
 	EntryAction string `json:"entryAction,omitempty"` // #19 field 20 ENTRY ACTION (M code)
 	ExitAction  string `json:"exitAction,omitempty"`  // #19 field 15 EXIT ACTION (M code)
+}
+
+// ProtocolComp is a #101 PROTOCOL shipped as a KIDS KRN component (B.1). Type is a
+// human option-type name resolved to its #101 field 4 (TYPE) set-of-codes value by
+// ProtocolTypeCode. The build files a base protocol (the #101.01 ITEM multiple +
+// extended menu-actions are a follow-up).
+type ProtocolComp struct {
+	Name        string `json:"name"`                  // #101 .01 NAME (uppercase, e.g. "ZZPROTO ACTION")
+	ItemText    string `json:"itemText,omitempty"`    // #101 field 1 ITEM TEXT
+	Type        string `json:"type"`                  // protocol type: action | extended action | menu | event driver | ...
+	EntryAction string `json:"entryAction,omitempty"` // #101 field 20 ENTRY ACTION (M code)
+	ExitAction  string `json:"exitAction,omitempty"`  // #101 field 15 EXIT ACTION (M code)
+}
+
+// ProtocolTypeCode maps a human protocol-type name to its #101 field 4 (TYPE)
+// set-of-codes value. Grounded in the live ^DD(101,4) set string (these codes are
+// #101's OWN — they differ from #19 OPTION's). National constants.
+var ProtocolTypeCode = map[string]string{
+	"action":           "A",
+	"menu":             "M",
+	"protocol":         "O",
+	"protocol menu":    "Q",
+	"limited protocol": "L",
+	"extended action":  "X",
+	"dialog":           "D",
+	"term":             "T",
+	"event driver":     "E",
+	"subscriber":       "S",
 }
 
 // KeyComp is a #19.1 SECURITY KEY shipped as a KIDS KRN component (B.1). A key is
@@ -362,6 +389,9 @@ func (s *Spec) Validate() error {
 	if err := validateKeys(s.Components.Keys); err != nil {
 		return err
 	}
+	if err := validateProtocols(s.Components.Protocols); err != nil {
+		return err
+	}
 	if err := validateFiles(s.Components.Files); err != nil {
 		return err
 	}
@@ -473,6 +503,24 @@ func validateOptions(opts []OptionComp, maxName int) error {
 			if !ok || !isRoutineName(rtn, maxName) || (tag != "" && !reLabel.MatchString(tag)) {
 				return fmt.Errorf("buildspec: option %s routine %q must be a routine entryref (ROUTINE or TAG^ROUTINE)", o.Name, o.Routine)
 			}
+		}
+	}
+	return nil
+}
+
+// validateProtocols checks each PROTOCOL component: a valid #101 NAME (≤30 chars,
+// uppercase) and a known protocol type. The record is filed by KRN^XPDIK; only its
+// build-side shape is validated here.
+func validateProtocols(protos []ProtocolComp) error {
+	for _, p := range protos {
+		if p.Name == "" {
+			return fmt.Errorf("buildspec: a protocol is missing its name")
+		}
+		if len(p.Name) > 30 || !reEntryName.MatchString(p.Name) {
+			return fmt.Errorf("buildspec: protocol name %q must be uppercase ≤30 chars (#101 PROTOCOL NAME)", p.Name)
+		}
+		if _, ok := ProtocolTypeCode[p.Type]; !ok {
+			return fmt.Errorf("buildspec: protocol %s type %q is not a known protocol type (action, extended action, menu, …)", p.Name, p.Type)
 		}
 	}
 	return nil

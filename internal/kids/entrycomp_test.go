@@ -101,6 +101,48 @@ func TestMakeBuildPairs_SecurityKey_KRN(t *testing.T) {
 	}
 }
 
+// TestMakeBuildPairs_Protocol_KRN locks the transport shape for a PROTOCOL (#101)
+// shipped as a KRN component — the fourth type on the generic emitter. Same node
+// skeleton as OPTION (0-node NAME^ITEM TEXT^^TYPE, ENTRY ACTION node 20) but its
+// own data global (^ORD(101,), TYPE codes, ORD action-routine line, and NO "U"
+// xref node. Ground-truthed against the WorldVistA corpus + the live #101 DD.
+func TestMakeBuildPairs_Protocol_KRN(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZPROTO*1.0*1",
+		Namespace:   "ZZPROTO",
+		Routines:    []RoutineSrc{{Name: "ZZPRORT", Lines: []string{"ZZPRORT ;x", " quit"}}},
+		Protocols:   []Protocol{{Name: "ZZPROTO ACTION", ItemText: "ZZ Protocol Action Demo", TypeCode: "A", EntryAction: "Q"}},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	want := map[string]string{
+		`"KRN",101,1,-1)`:             "0^1",
+		`"KRN",101,1,0)`:              "ZZPROTO ACTION^ZZ Protocol Action Demo^^A", // .01^ITEM TEXT^^TYPE
+		`"KRN",101,1,20)`:             "Q",                                         // ENTRY ACTION (field 20)
+		`"ORD",1,101)`:                "101;1;;;PRO^XPDTA;PROF1^XPDIA;PROE1^XPDIA;PROF2^XPDIA;;PRODEL^XPDIA",
+		`"ORD",1,101,0)`:              "PROTOCOL",
+		`"BLD",1,"KRN",0)`:            "^9.67PA^101^1",
+		`"BLD",1,"KRN",101,0)`:        "101",
+		`"BLD",1,"KRN",101,"NM",1,0)`: "ZZPROTO ACTION^^0",
+		`"BLD",1,"KRN",101,"NM","B","ZZPROTO ACTION",1)`: "",
+		`"BLD",1,"KRN","B",101,101)`:                     "",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+	b := newBuild()
+	for _, p := range MakeBuildPairs(in) {
+		b.Set(p.Subs, p.Value)
+	}
+	if ps := b.ProtocolNames(); len(ps) != 1 || ps[0] != "ZZPROTO ACTION" {
+		t.Errorf("ProtocolNames = %v, want [ZZPROTO ACTION]", ps)
+	}
+}
+
 // TestMakeBuildPairs_MixedEntryTypes proves the unified KRN manifest header spans
 // multiple entry types in one build (B.1 next step): an OPTION (#19) AND a
 // PARAMETER DEFINITION (#8989.51) share one "BLD",1,"KRN",0) header
