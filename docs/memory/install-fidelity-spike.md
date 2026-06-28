@@ -61,7 +61,30 @@ driver `Exec`); (b) expect = cross-engine fallback only. **Future cleaner option
 if the SDK gains `SetGlobal`/stdin-`Exec`, call the real `EN1^XPDIL` load (natively
 creates checkpoints + runs load env-check), retiring A.1.1's reconstruction.
 
-Risk: all from source/docs — **confirm live on vehu (YDB) + foia-t12 (IRIS)** before
-relying; IRIS `^XTMP`/checkpoint/`$$ENV` parity unproven. Companion to
-[[kids-coverage-analysis]], [[fileman-dd-component]]; builds on
-kids-installation-automation.md §7.1.
+## A.1.1 mechanism LIVE-CONFIRMED 2026-06-28 (vehu YDB + foia-t12 IRIS, identical)
+Via the driver stack (`m vista exec --engine ydb|iris`; IRIS needs
+`M_IRIS_NAMESPACE=VISTA` + `M_IRIS_CONTAINER=foia-t12` + the built
+`m-iris/dist/m-iris` as `M_IRIS_BIN`; YDB needs `M_YDB_CONTAINER=vehu`):
+- **`$$NEWCP^XPDUTL(name,callback,params)`** exists on both: reads `XPDCP`+`XPDA`;
+  subfile **9.713** (`XPDCP="INI"`) / **9.716** (`"INIT"`); FileMan-files `.01`=name,
+  **field 2=callback routine** (→ node `(c,1)`), field 3=params; idempotent
+  (`$$FIND1^DIC`); returns the checkpoint IEN.
+- **Grammar** (KERNEL 8.0, #9.7 IEN 2, both engines): `…,"INIT",2,0)="XPD
+  POSTINSTALL STARTED^<FMtime>"`, `(2,1)="^XUINEND"`. `"…COMPLETED"` = base (no
+  routine); `"…STARTED"` carries the routine; `PRE^/POST^XPDIJ1` `D @`s it when
+  `(c,1)]""` and `$P((c,0),U,2)=""`.
+- **A.1.1 impl** = after MERGE / before `EN^XPDIJ`, mirror `PKG^XPDIL1`: `S
+  XPDCP="INI"` → `$$NEWCP^XPDUTL("XPD PREINSTALL COMPLETED")`, then iff
+  `^XTMP("XPDI",XPDA,"INI")]""` → `$$NEWCP^XPDUTL("XPD PREINSTALL STARTED",<rtn>)`;
+  same for `INIT`/POST. Calls real KIDS (not a reimpl). Only when the build ships a
+  pre/post routine (no-init builds stay byte-identical).
+
+Gotcha (driver quirk): IRIS `m vista exec` returns empty stdout unless
+`M_IRIS_NAMESPACE=VISTA` is set; ZWR over the driver GVUNDEF'd on some nodes — use
+explicit `$O`/`$G` walks with full (non-naked) refs. The m-iris driver binary must
+be built first (`cd m-iris && make build`).
+
+Risk remaining: IRIS `^XTMP`/`$$ENV` *install-time* parity still proven only at the
+checkpoint-grammar level — the A.1.1 behavioral gate (pre/post routine actually
+fires) is the next live step. Companion to [[kids-coverage-analysis]],
+[[fileman-dd-component]]; builds on kids-installation-automation.md §7.1.

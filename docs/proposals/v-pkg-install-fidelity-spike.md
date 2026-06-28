@@ -187,11 +187,38 @@ load would write — the identical, already-accepted pattern as the KRN/FIA seed
   corrupt-#9.7 purge (§7.1 gotcha); A.1.2 aborts must leave a clean, restartable
   state.
 
+## Live confirmation (2026-06-28) — A.1.1 mechanism verified on BOTH engines
+Confirmed via the driver stack (`m vista exec --engine ydb|iris`, never raw
+`docker exec`) on **vehu (YDB GT.M)** and **foia-t12 (IRIS, namespace VISTA)** —
+identical on both:
+
+- **`$$NEWCP^XPDUTL(name, callback, params)` exists** with the same source. It reads
+  `XPDCP` + `XPDA` from scope, picks subfile **9.713** (pre, `XPDCP="INI"`) /
+  **9.716** (post, `XPDCP="INIT"`), FileMan-files (`UPDATE^DIE`) `.01`=name,
+  **field 2 = callback routine**, field 3 = params, is **idempotent** (returns the
+  existing IEN via `$$FIND1^DIC`), and returns the checkpoint IEN.
+- **Checkpoint grammar** (real example, both engines — KERNEL 8.0, #9.7 IEN 2):
+  `^XPD(9.7,2,"INIT",2,0)="XPD POSTINSTALL STARTED^<FMtime>"`, `(2,1)="^XUINEND"`
+  (the post-install routine). The base `"…COMPLETED"` checkpoint (#1) carries no
+  routine; the `"…STARTED"` checkpoint (created only when the build has a pre/post
+  routine) carries it at node `(c,1)`, which `PRE^/POST^XPDIJ1` reads and `D @`s
+  (skipping it when `(c,1)=""` or the completion time `$P((c,0),U,2)` is set).
+- A build with no pre/post routine has only the `COMPLETED` checkpoint (verified on
+  XU\*8.0\*1, #9.7 IEN 3).
+
+**So A.1.1 is exactly:** after the MERGE (XPDA in scope, `DUZ(0)="@"`), and before
+`EN^XPDIJ`, mirror `PKG^XPDIL1`'s checkpoint block — `S XPDCP="INI"` then
+`$$NEWCP^XPDUTL("XPD PREINSTALL COMPLETED")` and, iff `^XTMP("XPDI",XPDA,"INI")]""`,
+`$$NEWCP^XPDUTL("XPD PREINSTALL STARTED",<that routine>)`; likewise `XPDCP="INIT"`
++ `…POSTINSTALL…` from `^XTMP("XPDI",XPDA,"INIT")`. These transport nodes are
+already present after v-pkg's MERGE for any build that ships pre/post routines.
+Calls the **real** `$$NEWCP^XPDUTL` (not a reimplementation) → inside the waterline.
+
 ## Recommended next step
 Implement **A.1.1 (pre/post-install routines)** first as a TDD increment with a
 live install→verify→uninstall gate on both engines — it is the highest-value,
 best-understood gap and validates the route end-to-end before A.1.2/A.1.3 build on
-it.
+it. *(Mechanism now live-confirmed above; proceeding.)*
 
 ## Sources
 - Real `XPD*` routine source: WorldVistA/VistA-M `Packages/Kernel/Routines/`
