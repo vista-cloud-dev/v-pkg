@@ -25,11 +25,17 @@ options/keys/protocols/rpcs/templates/mailGroups/hl7 (`buildspec.go:60–71`
 accepted, `build.go` ignores — no error) → red-gate-worthy. F2 install bypasses
 KIDS load semantics. F3 the FILE feature ships single-`.01` DD-only, but **100% of
 the 579 file-shipping dists also ship DATA** (DD-only = 0). F4 Required-Builds
-declared, never enforced (51.5% depend on one). F5 **the committed
+declared, never enforced (79% depend on one). F5 **the committed
 `kids-corpus-findings.md` numbers are WRONG** — `analyze.py` mis-probes the
 `"BLD",ien,"KRN",file,"NM"` / `"REQB",1,0)` layout: OPTION is **39% not 13%**, REQB
-**51.5% not 96%**, multi-build **3.66% not 0%**, and FORM/PRINT-TEMPLATE/SECURITY-KEY
-were omitted. F6 no PKG #9.4 patch-history footprint. F8 see reframing.
+**79% not 96%**, multi-build **3.66% not 0%**, non-routine entries **50% not 23%**,
+routine-only **28% not 35%**, and FORM/PRINT-TEMPLATE/SECURITY-KEY were omitted.
+**T0.2 DONE**: `analyze.py` fixed (probes + labels + 9.8 excluded from the
+side-effect set) and re-run (`analysis-report.txt`); `kids-corpus-findings.md`
+re-issued. NOTE the agent's interim REQB "51.5%/1238" was its own probe error —
+direct verification of the `"REQB",1,0)` node = **1,890 (79%)**. `reversibility.go`
+still uses the older top-level-`KRN` probe (→36% routine-only); aligning it is a
+separate follow-up (it gates uninstall behavior). F6 no PKG #9.4 patch-history footprint. F8 see reframing.
 
 **Corrected authoring priority (by corpus %):** ROUTINE 95% » OPTION 39% » PRINT
 TEMPLATE 20% ≈ SECURITY KEY 20% » PROTOCOL 18% » INPUT TEMPLATE 10% » RPC 9% »

@@ -52,7 +52,7 @@ is the fourth.
 ## Verdict
 
 **v-pkg authors ~4 of the ~24 KIDS component types and can faithfully build and
-install roughly the routine-only 35% of real distributions.** The build path
+install roughly the routine-only ~28% of real distributions.** The build path
 emits Routines, one entry type (#8989.51 PARAMETER DEFINITION), a toy single-`.01`
 FileMan file, and Required-Build *declarations*. Everything else KIDS can
 transport — OPTION, SECURITY KEY, PROTOCOL, RPC, the template/form family,
@@ -66,7 +66,7 @@ exist as `.KID` files, and v-pkg's `decompose`/`assemble` already round-trips al
 **install path bypasses real KIDS load semantics** (F2) — it populates `^XTMP`
 and calls `EN^XPDIJ` directly, so it never runs the build's Environment Check
 (13% of the corpus), Pre/Post-Install routines (5% / 12%), install questions, or
-Required-Build enforcement (51.5%). So the work splits cleanly into two tracks:
+Required-Build enforcement (79%). So the work splits cleanly into two tracks:
 
 - **Install fidelity** — to install the ~2,400 *existing* distributions, run the
   real KIDS phases against a faithfully-loaded transport global. This is the
@@ -95,7 +95,7 @@ detection off a top-level `"KRN",<file>,<ien>,0)` node and `"REQB"` as a bare
 substring. The real transport stores components under
 `"BLD",<ien>,"KRN",<file>,"NM",…)` and dependencies under `"BLD",<ien>,"REQB",1,0)`.
 The mismatch made the committed findings undercount OPTION (13%→**39%**), report
-Required-Builds at 96% (real **51.5%**) and multi-build at 0% (real **3.66%**),
+Required-Builds at 96% (real **79%**) and multi-build at 0% (real **3.66%**),
 and omit PRINT TEMPLATE / FORM / SECURITY KEY from the entry ranking entirely.
 The corrected probes (and the authoritative file#→name map from the Build
 Analyzer UG) are used throughout; see F5.
@@ -216,13 +216,13 @@ is **the** blocker — see F8.
 **every one ships DATA too** (DD-only = 0). So the current shape models a pattern
 no real distribution uses, and multi-field (R3) is impossible.
 
-**F4 — Required-builds: declared, never enforced.** 51.5% of distributions depend
+**F4 — Required-builds: declared, never enforced.** 79% of distributions depend
 on a prior build; v-pkg emits the #9.611 declaration but its bypassing install
 runs no prerequisite check, so it will install out of order without complaint.
 
 **F5 — The committed evidence base is wrong, and decisions rest on it.**
 `kids-corpus-findings.md` (from the mis-probed `analyze.py`) undercounts OPTION
-(13% vs **39%**), reports REQB 96% (vs **51.5%**) and multi-build 0% (vs
+(13% vs **39%**), reports REQB 96% (vs **79%**) and multi-build 0% (vs
 **3.66%**), and omits PRINT TEMPLATE / FORM / SECURITY KEY from the ranking. The
 corrected order promotes SECURITY KEY and the template family. **Recommendation:**
 fix `analyze.py`'s node probes and re-issue the findings; the priority order in
@@ -279,15 +279,22 @@ Analyzer UG). This is the priority order.
 
 (plus a small tail: lexicon #9002226 84/3.5%, ENTITY #1.5, LOCK DICT #8993, …)
 
+**Non-routine FileMan entries:** 1,206 distributions (**50%**) ship ≥1 entry
+component (an OPTION/KEY/PROTOCOL/RPC/… — i.e. a permanent FileMan write), far
+above the 23% first reported.
 **Install-time code:** Environment Check 317 (13%) · Post-Install 293 (12%) ·
 Pre-Install 109 (5%).
 **FILE shipment:** 579 (24%) ship a FileMan FILE — **DD+data 334 (14%), data-only
 245 (10%), DD-only 0**. 673 distinct file numbers; a long flat tail of
 package-specific files.
-**Dependencies:** real Required-Build dep 1238 (**51.5%**); multi-build 88
+**Dependencies:** real Required-Build dep 1,890 (**79%**); multi-build 88
 (**3.66%**, up to 8 builds). Custom install questions are rare (~11); the
 "questions" you see everywhere are the 3 standard boilerplate prompts.
-**Reversibility:** routine-only 847 (35%), side-effecting 1557 (64%) — unchanged.
+**Reversibility:** with accurate entry detection, routine-only **674 (28%)**,
+side-effecting **1,730 (72%)** — *lower* than the 35%/64% first reported, since
+half the corpus ships an entry. (The committed `reversibility.go` classifier
+still uses the older top-level-`KRN` probe → ~36% routine-only; aligning it is a
+follow-up, not changed here.)
 
 ---
 
@@ -298,14 +305,16 @@ Sequenced by leverage. **Track A (install fidelity)** is the dominant lever for
 what builds new packages like VSL. Do **T0 first** — it is cheap and an integrity
 fix.
 
-### T0 — Integrity (do first; days)
-- **T0.1 Stop dropping declared components silently (F1).** Make `build` fail hard
-  when a component slice has no emitter, naming the unsupported type. One gate,
-  highest ROI — it converts a confidence-destroying silent bug into an honest
-  "not yet supported."
-- **T0.2 Correct the evidence (F5).** Fix `analyze.py`'s node probes
-  (`"BLD",ien,"KRN",file,"NM"` and `"REQB",1,0)`); re-issue
-  `kids-corpus-findings.md` with the corrected table above.
+### T0 — Integrity (do first; days) — ✅ DONE 2026-06-28
+- **T0.1 Stop dropping declared components silently (F1). ✅** `buildspec.Validate`
+  now rejects a populated `options/keys/protocols/templates/rpcs/mailGroups/hl7`
+  slice with an error naming the type(s) — a confidence-destroying silent bug is
+  now an honest "not yet supported" (TDD, buildspec cov 98.8%).
+- **T0.2 Correct the evidence (F5). ✅** `analyze.py`'s probes fixed
+  (`"BLD",ien,"KRN",file,"NM"`, `"REQB",1,0)`, `re.M` multi-build, 9.8 excluded
+  from the side-effect set) + file#→name labels corrected; re-run to
+  `analysis-report.txt`; `kids-corpus-findings.md` re-issued with the corrected
+  tables above.
 
 ### Track A — Install fidelity (install the existing ~2,400)
 The goal: take any reconstructed transport global and run it through *real* KIDS,
@@ -401,8 +410,8 @@ faithfully** (authoring ∩ install-fidelity):
 
 | After | Authors | Installs faithfully | ~Corpus reach |
 |---|---|---|---|
-| **today** | routines, #8989.51, toy-file | routine filing only | ~35% (routine-only, and only the routine effects) |
-| **T0** | same (but honest about gaps) | same | ~35%, no longer silently lying |
+| **today** | routines, #8989.51, toy-file | routine filing only | ~28% (routine-only, and only the routine effects) |
+| **T0** | same (but honest about gaps) | same | ~28%, no longer silently lying |
 | **+Track A** | same | **any existing `.KID`, real phases** | ~**95%+ install** of existing dists (authoring still limited) |
 | **+B.1** | +all entry types | +entry components | entry-bearing dists now *authorable* (OPTION 39%, KEY 20%, …) |
 | **+B.2** | +multi-field DD +data | +file DD/data | +file-bearing dists (24%); **R3 unblocked** |
