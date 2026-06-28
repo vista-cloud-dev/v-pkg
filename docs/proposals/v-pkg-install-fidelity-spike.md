@@ -238,13 +238,58 @@ A.1.1 is exactly what makes them fire, identically on YDB and IRIS. (Driver note
 the YDB `exec load` needs `M_YDB_ROUTINES` set to the container's source dir, e.g.
 `/home/vehu/r`; IRIS needs `M_IRIS_NAMESPACE=VISTA`.)
 
+## A.1.2 — DONE + live-proven on BOTH engines (2026-06-28)
+Implemented in `internal/installspec/script.go` (`FinalInstallScript` gained a
+`runEnvCheck bool`) + plumbed through `pkgcli` (`runInstall`/`liveInstall`/
+`installCmd` with a new `--skip-env-check` flag; restore/back-out callers pass
+`false`). After the MERGE / before the KRN-FIA-checkpoint-`EN^XPDIJ` filing block,
+the script reconstructs the minimal install-phase scope `EN^XPDI` sets (XPDI.m:11)
+— `XPDNM`, `XPDPKG`, and the **seeded `XPDT`** (without which `$$ENV`'s own tail
+`'$O(XPDT(0))` self-rejects a clean build) — then calls the **real**
+`$$ENV^XPDIL1(1)`, which runs the build's env-check routine (`^XTMP("XPDI",XPDA,
+"PRE")`) and `REQB^XPDIL1` Required-Build (#9.611) enforcement. On a non-zero
+reject it **purges the aborted `#9.7` entry** (`K ^XPD(9.7,"B",XPDNM,XPDA),
+^XPD(9.7,XPDA)`, so a corrected retry is clean) and refuses to file with
+`error=env-check-rejected^<rc>^<XPDREQAB>`. Invokes KIDS, never reimplements it
+(route (c), inside the waterline + bespoke-installer ban). TDD:
+`TestFinalInstallScript_EnvCheck` (run vs skip + ordering before `EN^XPDIJ`);
+lint/race/contract green.
+
+**Live-proven through the real `v pkg install` path over the driver stack** with a
+required-build fixture (`testdata/zza2-reqb/`): `ZZA2.kids` declares an unmet
+Required Build `ZZNOPE*1.0*1` (action "DON'T INSTALL, LEAVE GLOBAL" = #9.611 code
+2); `ZZA2-ok.kids` is the same routine with no requirement.
+
+| Engine | bogus required build (`ZZA2.kids`) | control (`ZZA2-ok.kids`) | A.1.1 regression (`ZZA1`, env-check ON) |
+|---|---|---|---|
+| vehu (YDB)     | **REFUSED** `env-check-rejected^2^2`, `#9.7` auto-purged (9.7B=0) | status 3 | `^ZZA1OUT PRE/POST=11` (status 3) |
+| foia-t12 (IRIS)| **REFUSED** `env-check-rejected^2^2`, `#9.7` auto-purged (9.7B=0) | status 3 | `^ZZA1OUT PRE/POST=11` (status 3) |
+
+`--skip-env-check` installs the bogus build anyway (status 3) — the bypass works,
+and the A.1.1 regression confirms env-check-on did not break pre/post firing.
+
+> **Scope note.** A.1.2 is proven via **Required-Build enforcement** (no routine
+> execution needed; `emitRequiredBuildManifest` already ships the #9.611 nodes).
+> The env-check **routine** path runs too (same `$$ENV` call) but isn't exercised
+> here: a build's own env-check routine isn't filed at env-check time, and emitting
+> the `"PRE"` transport node from `buildspec.envCheck` is a follow-up (sibling of
+> A.1.1's still-hand-injected `INI`/`INIT`).
+
+> **Follow-up finding (not fixed here).** `internal/kids/reversibility.go`'s
+> `installRoleNames` map labels the transport keys **`INI`/`PRE` swapped** vs ground
+> truth: live `ENV^XPDIL1` reads `^XTMP("XPDI",XPDA,"PRE")` as the **env-check**
+> routine and `"INI"` is the **pre-install** routine (A.1.1, live-proven), but the
+> map says `INI`=environment-check / `PRE`=pre-install. It is **display-only**
+> (classification keys on subnode *presence*, not the role name), so it's cosmetic —
+> but worth correcting so the `classify` output isn't misleading.
+
 ## Recommended next steps
-- **A.1.2** — env-check + required-builds via `$$ENV^XPDIL1(1)` before filing
-  (honor `XPDQUIT`/`XPDABORT`/`XPDREQAB`).
-- **A.1.3** — seed `#9.7` `QUES` answers from an install-spec.
-- **B.3 (authoring)** — emit pre/post-install routines from a build spec so the
-  A.1.1 fixture is reproducible end-to-end (the `INI`/`INIT` nodes are hand-injected
-  today).
+- **A.1.3** — seed `#9.7` `QUES` answers from an install-spec (the `installspec`
+  package + `Answers.XPDDIQ()` already model this; wire it into the install script).
+- **B.3 (authoring)** — emit pre/post-install routines **and** the env-check `"PRE"`
+  node from a build spec so the A.1.1/A.1.2 fixtures are reproducible end-to-end
+  (the `INI`/`INIT`/`PRE` nodes are hand-injected / requirement-only today).
+- **Fix** the `reversibility.go` `INI`/`PRE` role-label swap (cosmetic, above).
 
 ## Sources
 - Real `XPD*` routine source: WorldVistA/VistA-M `Packages/Kernel/Routines/`

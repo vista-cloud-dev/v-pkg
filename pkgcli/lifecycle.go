@@ -221,14 +221,14 @@ const stageChunkBytes = 40000
 // finalize routine verifies the staged count and runs INST → MERGE → EN^XPDIJ in
 // one process. The outcome is read from the #9.7 status marker (or the
 // already-installed guard). A staged-count mismatch is surfaced as an error.
-func runInstall(ctx context.Context, cl *mdriver.Client, name, header string, pairs []kids.Pair) (installResult, error) {
+func runInstall(ctx context.Context, cl *mdriver.Client, name, header string, pairs []kids.Pair, runEnvCheck bool) (installResult, error) {
 	chunks := installspec.StageChunks(pairs, stageChunkBytes)
 	for i, body := range chunks {
 		if _, _, err := runMScript(ctx, cl, rtnInstall, body); err != nil {
 			return installResult{Name: name}, fmt.Errorf("stage chunk %d/%d: %w", i+1, len(chunks), err)
 		}
 	}
-	markers, _, err := runMScript(ctx, cl, rtnInstall, installspec.FinalInstallScript(name, header, len(pairs)))
+	markers, _, err := runMScript(ctx, cl, rtnInstall, installspec.FinalInstallScript(name, header, len(pairs), runEnvCheck))
 	if err != nil {
 		return installResult{Name: name}, err
 	}
@@ -237,6 +237,14 @@ func runInstall(ctx context.Context, cl *mdriver.Client, name, header string, pa
 		if e == "already-installed" {
 			r.Error = e
 			return r, nil
+		}
+		// env-check-rejected^<rc>^<reqab>: the build's environment-check routine
+		// or Required-Build (#9.611) enforcement rejected the install (A.1.2).
+		// Refuse loudly — the aborted #9.7 entry was already purged engine-side.
+		if strings.HasPrefix(e, "env-check-rejected") {
+			return installResult{Name: name}, fmt.Errorf(
+				"install refused: environment check / required-build enforcement rejected %s (%s) — "+
+					"fix the environment, or pass --skip-env-check to bypass", name, e)
 		}
 		// e.g. stage-incomplete: a chunk was truncated — fail loudly, never
 		// install a partial package.
@@ -304,6 +312,7 @@ type liveInstallInput struct {
 	pairs          []kids.Pair
 	snapshotPath   string // "" = no pre-image requested
 	allowOverwrite bool
+	runEnvCheck    bool // run the build's env-check + Required-Build enforcement before filing (A.1.2)
 }
 
 // liveInstall is the ONE class-aware install path (waterline rule: no caller
@@ -337,7 +346,7 @@ func liveInstall(ctx context.Context, cl *mdriver.Client, in liveInstallInput) (
 		}
 		res.Snapshot = in.snapshotPath
 	}
-	ir, ierr := runInstall(ctx, cl, in.name, in.header, in.pairs)
+	ir, ierr := runInstall(ctx, cl, in.name, in.header, in.pairs, in.runEnvCheck)
 	if ierr != nil {
 		return res, clikit.Fail(clikit.ExitRuntime, "INSTALL_FAILED", ierr.Error(), "")
 	}
@@ -353,6 +362,7 @@ type installCmd struct {
 	Snapshot       string `help:"Capture the pre-image of any routine this install overwrites to this .KID before installing (enables uninstall --restore)."`
 	AutoSnapshot   bool   `help:"Like --snapshot, but to the conventional sidecar path (<kid>.preimage.kids) that uninstall auto-detects."`
 	AllowOverwrite bool   `help:"Overwrite existing routines WITHOUT capturing a pre-image (unsafe: uninstall cannot then restore them)."`
+	SkipEnvCheck   bool   `help:"Skip the build's environment-check routine + Required-Build (#9.611) enforcement before filing (default: run them, KIDS-faithful)."`
 }
 
 type installReport struct {
@@ -397,6 +407,7 @@ func (c *installCmd) Run(cc *clikit.Context) error {
 		name: name, header: name + " via v pkg install", className: rev.ClassName,
 		routineNames: b.RoutineNames(), pairs: b.Pairs(),
 		snapshotPath: snapshot, allowOverwrite: c.AllowOverwrite,
+		runEnvCheck: !c.SkipEnvCheck,
 	})
 	if ferr != nil {
 		return ferr
@@ -746,7 +757,7 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 		if lerr != nil {
 			return clikit.Fail(clikit.ExitRuntime, "READ_FAILED", lerr.Error(), "")
 		}
-		ir, ierr := runInstall(ctx, cl, rname, rname+" via v pkg uninstall --"+action.String(), rb.Pairs())
+		ir, ierr := runInstall(ctx, cl, rname, rname+" via v pkg uninstall --"+action.String(), rb.Pairs(), false)
 		if ierr != nil {
 			return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", ierr.Error(), "")
 		}

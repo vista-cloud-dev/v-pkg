@@ -67,7 +67,7 @@ func TestStageChunks_CoversAllPairsBounded(t *testing.T) {
 // FinalInstallScript verifies the staged count, then installs in one process:
 // INST → MERGE the staged tree into ^XTMP("XPDI",XPDA) → EN^XPDIJ.
 func TestFinalInstallScript(t *testing.T) {
-	got := FinalInstallScript("ZZSKEL*1.0*1", "ZZSKEL via v pkg install", 7)
+	got := FinalInstallScript("ZZSKEL*1.0*1", "ZZSKEL via v pkg install", 7, true)
 	for _, want := range []string{
 		`I $D(^XPD(9.7,"B","ZZSKEL*1.0*1"))`,            // already-installed guard
 		`DUZ(0)="@"`,                                    // full FM priv for EN^XPDIJ
@@ -95,7 +95,7 @@ func TestFinalInstallScript(t *testing.T) {
 // for the COMPLETED checkpoint, then the STARTED one (carrying the routine) only
 // when the transport carries a pre/post routine name.
 func TestFinalInstallScript_PrePostCheckpoints(t *testing.T) {
-	got := FinalInstallScript("ZZSKEL*1.0*1", "ZZSKEL via v pkg install", 7)
+	got := FinalInstallScript("ZZSKEL*1.0*1", "ZZSKEL via v pkg install", 7, true)
 	for _, want := range []string{
 		`S XPDCP="INI"`, // pre-install checkpoint multiple (subfile 9.713)
 		`$$NEWCP^XPDUTL("XPD PREINSTALL COMPLETED")`, // base checkpoint
@@ -113,6 +113,34 @@ func TestFinalInstallScript_PrePostCheckpoints(t *testing.T) {
 	// The checkpoints must be created BEFORE the install runs them.
 	if iCP, iJ := strings.Index(got, `XPD PREINSTALL STARTED`), strings.Index(got, `D EN^XPDIJ`); iCP < 0 || iJ < 0 || iCP > iJ {
 		t.Errorf("checkpoint creation (%d) must precede EN^XPDIJ (%d)", iCP, iJ)
+	}
+}
+
+// A.1.2: with runEnvCheck=true the script must reconstruct the install-phase
+// scope (XPDNM/XPDPKG + the seeded XPDT, without which ENV's tail self-rejects a
+// clean build) and call the REAL $$ENV^XPDIL1(1) before filing, refusing to file
+// on a non-zero reject. With runEnvCheck=false it must emit none of that (the
+// restore/back-out callers must not re-run env-check).
+func TestFinalInstallScript_EnvCheck(t *testing.T) {
+	on := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, true)
+	for _, want := range []string{
+		`S XPDT(XPDIT)=XPDA_U_XPDNM`,                 // seed XPDT (else ENV self-rejects)
+		`XPDPKG=+$P($G(^XPD(9.7,XPDA,0)),U,2)`,       // package pointer for the version check
+		`S XPDENV=1,XPDENVRC=$$ENV^XPDIL1(1)`,        // the REAL env-check + REQB call
+		ResultMarker + `error=env-check-rejected^`,   // refuse-to-file marker on reject
+		`K ^XPD(9.7,"B",XPDNM,XPDA),^XPD(9.7,XPDA),`, // purge the aborted #9.7 entry on reject
+	} {
+		if !strings.Contains(on, want) {
+			t.Errorf("runEnvCheck=true: FinalInstallScript missing %q\n---\n%s", want, on)
+		}
+	}
+	// Env-check must run BEFORE filing.
+	if iE, iJ := strings.Index(on, `$$ENV^XPDIL1(1)`), strings.Index(on, `D EN^XPDIJ`); iE < 0 || iJ < 0 || iE > iJ {
+		t.Errorf("env-check (%d) must precede EN^XPDIJ (%d)", iE, iJ)
+	}
+	off := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, false)
+	if strings.Contains(off, `$$ENV^XPDIL1`) {
+		t.Errorf("runEnvCheck=false must NOT call $$ENV^XPDIL1\n---\n%s", off)
 	}
 }
 

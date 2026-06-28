@@ -215,6 +215,11 @@
           "name": "allow-overwrite",
           "type": "bool",
           "help": "Overwrite existing routines WITHOUT capturing a pre-image (unsafe: uninstall cannot then restore them)."
+        },
+        {
+          "name": "skip-env-check",
+          "type": "bool",
+          "help": "Skip the build's environment-check routine + Required-Build (#9.611) enforcement before filing (default: run them, KIDS-faithful)."
         }
       ],
       "args": [

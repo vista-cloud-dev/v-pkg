@@ -101,8 +101,37 @@ load/compile does; "driver loaded no routine" = this is unset. IRIS needs
 `M_IRIS_NAMESPACE=VISTA` + the built `m-iris/dist/m-iris` (`M_IRIS_BIN`). foia-t12
 container was stopped — `docker start foia-t12` (lifecycle, allowed; not exec).
 
-Next: A.1.2 (env-check+required-builds via `$$ENV^XPDIL1(1)`), A.1.3 (seed #9.7
-QUES), and B.3 authoring (emit pre/post routines so the fixture is reproducible
-end-to-end — INI/INIT are hand-injected today). Companion to
-the coverage-analysis proposal (`docs/proposals/v-pkg-kids-coverage-analysis.md`),
-[[fileman-dd-component]]; builds on `docs/design/kids-installation-automation.md` §7.1.
+## A.1.2 DONE + live-proven 2026-06-28 (vehu YDB + foia-t12 IRIS)
+`FinalInstallScript` gained `runEnvCheck bool`; plumbed through `runInstall`/
+`liveInstall`/`installCmd` (`--skip-env-check` flag; restore/back-out callers pass
+`false`). After the MERGE / before filing, the script reconstructs the install-phase
+scope `EN^XPDI` sets (XPDI.m:11) — `XPDNM`, `XPDPKG`, and **`XPDT` (MUST seed: `$$ENV`'s
+own tail `'$O(XPDT(0))` self-rejects a clean build otherwise)** — then calls the REAL
+`$$ENV^XPDIL1(1)` (env-check routine in `^XTMP("XPDI",XPDA,"PRE")` + `REQB^XPDIL1`
+#9.611 enforcement). Non-zero return → **purge the aborted #9.7 entry** (`K
+^XPD(9.7,"B",XPDNM,XPDA),^XPD(9.7,XPDA)` → clean retry) + refuse with
+`error=env-check-rejected^<rc>^<XPDREQAB>`. TDD `TestFinalInstallScript_EnvCheck`;
+lint/race/contract green (new flag needs `make contract`).
+
+Live-proven via the real `v pkg install` over the driver stack, fixture
+`testdata/zza2-reqb/` (bogus Required Build `ZZNOPE*1.0*1` action code 2 vs a control
+with none): **both engines** — bogus → REFUSED `env-check-rejected^2^2` + `#9.7`
+auto-purged (9.7B=0); control → status 3; `--skip-env-check` bypasses (status 3).
+**A.1.1 regression green** (zza1 `^ZZA1OUT PRE/POST=11` with env-check ON, both engines).
+
+**GOTCHAS:** (1) seed `XPDT` or a clean build self-rejects (the non-obvious one). (2)
+clean a stuck #9.7 with **direct global kill** `K ^XPD(9.7,DA),^XPD(9.7,"B",name,DA)` —
+`^DIK` over `m vista exec` needs `DUZ(0)="@"` set or it silently no-ops. (3) the env-check
+**routine** path runs in the same `$$ENV` call but isn't fixture-proven (a build's own
+env routine isn't filed at env-check time; emitting the `"PRE"` node from
+`buildspec.envCheck` is a B.3 follow-up). (4) **FOLLOW-UP BUG (cosmetic, not fixed):**
+`internal/kids/reversibility.go` `installRoleNames` has `INI`/`PRE` **swapped** vs ground
+truth — live `ENV^XPDIL1` reads `"PRE"`=env-check and `"INI"`=pre-install (A.1.1-proven),
+but the map says `INI`=environment-check / `PRE`=pre-install. Display-only (classification
+keys on subnode presence, not name).
+
+Next: A.1.3 (seed #9.7 QUES from the `installspec` `Answers.XPDDIQ()`), B.3 authoring
+(emit pre/post + env-check `"PRE"` nodes so fixtures are reproducible end-to-end), and
+the `reversibility.go` INI/PRE label fix. Companion to the coverage-analysis proposal
+(`docs/proposals/v-pkg-kids-coverage-analysis.md`), [[fileman-dd-component]]; builds on
+`docs/design/kids-installation-automation.md` §7.1.

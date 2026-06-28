@@ -71,7 +71,7 @@ func StageChunks(pairs []kids.Pair, maxBytes int) []string {
 // count: the routine counts the staging global and refuses to install if it does
 // not match (so a silently-truncated stage fails loudly instead of installing a
 // partial package). header is the #9.7 install header (cosmetic).
-func FinalInstallScript(name, header string, nPairs int) string {
+func FinalInstallScript(name, header string, nPairs int, runEnvCheck bool) string {
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
 	nameLit := kids.MString(name)
@@ -91,6 +91,23 @@ func FinalInstallScript(name, header string, nPairs int) string {
 	w(`S XPDA=$$INST^XPDIL1(` + nameLit + `)`)
 	w(`S ^XTMP("XPDI",0)=$$FMADD^XLFDT(DT,7)_U_DT`)
 	w(`M ^XTMP("XPDI",XPDA)=` + stageGbl) // staged tree → live transport global
+	// A.1.2 env-check + required-builds (install-fidelity-spike). The
+	// direct-populate path jumps to EN^XPDIJ (filing) and SKIPS the load/install
+	// phase that runs the build's environment-check routine and enforces Required
+	// Builds (#9.611). Reconstruct the minimal install-phase scope EN^XPDI sets
+	// (XPDI.m:11) and call the REAL $$ENV^XPDIL1(1): it runs the env-check routine
+	// named in ^XTMP("XPDI",XPDA,"PRE") and REQB^XPDIL1 over the BLD…REQB nodes,
+	// returning 0=ok, non-zero=reject. XPDT MUST be seeded — ENV's own tail
+	// self-rejects a clean build when '$O(XPDT(0)). On reject: purge the aborted
+	// #9.7 entry (so a corrected retry is clean) and refuse to file. This INVOKES
+	// KIDS, never reimplements it (route (c), inside the waterline + the
+	// bespoke-installer ban). Skipped for the restore/back-out callers.
+	if runEnvCheck {
+		w(`S XPDNM=$P($G(^XPD(9.7,XPDA,0)),U),XPDPKG=+$P($G(^XPD(9.7,XPDA,0)),U,2)`)
+		w(`S XPDT(XPDIT)=XPDA_U_XPDNM,XPDT("NM",XPDA)=XPDIT,XPDT("DA",XPDNM)=XPDIT`)
+		w(`N XPDENV,XPDENVRC S XPDENV=1,XPDENVRC=$$ENV^XPDIL1(1)`)
+		w(`I XPDENVRC K ^XPD(9.7,"B",XPDNM,XPDA),^XPD(9.7,XPDA),` + stageGbl + ` W "` + ResultMarker + `error=env-check-rejected^"_XPDENVRC_"^"_$G(XPDREQAB),! Q`)
+	}
 	// Seed the #9.7 INSTALL record's KRN component-tracking multiple from the build
 	// manifest. A real KIDS load fills this; the direct-populate path does not, and
 	// KRN^XPDIK reads ^XPD(9.7,XPDA,"KRN",file,0) without $G — an undefined node
