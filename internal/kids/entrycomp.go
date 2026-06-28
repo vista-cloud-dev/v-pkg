@@ -1,6 +1,7 @@
 package kids
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -46,50 +47,87 @@ type entryRec struct {
 	image []imageNode
 }
 
-// emitEntryManifest writes the BLD #9.6 KRN component list (#9.67) naming the
-// shipped entries of one type — the documentation half (the install reads the
-// data + ORD sections, not this). Identical in shape to the #8989.51 manifest,
-// parameterized by file number. NOTE: the shared "BLD",1,"KRN",0)" header carries
-// this type's file number + count of 1 type; a build that ships two distinct KRN
-// entry types (e.g. options AND parameter definitions) is rejected upstream
-// (buildspec) until the header is computed across all types — a follow-up.
-func emitEntryManifest(b *Build, et entryType, recs []entryRec) {
+// entryGroup is one entry type plus the records of that type a build ships. A
+// build's groups are ordered file-number ascending (buildEntryGroups), which
+// fixes both the shared manifest header and each type's install order.
+type entryGroup struct {
+	et   entryType
+	recs []entryRec
+}
+
+// buildEntryGroups collects every KRN entry type a build ships into one ordered
+// list (file-number ascending) — the single place that knows the build's KRN
+// types, so the shared "BLD",1,"KRN",0) header and the ORD ordering are computed
+// once across all of them. PARAMETER DEFINITION (#8989.51) and OPTION (#19) ride
+// the same path; new SEND/DELETE types append here.
+func buildEntryGroups(defs []ParamDef, opts []Option) []entryGroup {
+	var groups []entryGroup
+	if len(opts) > 0 {
+		groups = append(groups, entryGroup{optionEntryType, optionRecords(opts)})
+	}
+	if len(defs) > 0 {
+		groups = append(groups, entryGroup{paramDefEntryType, paramDefRecords(defs)})
+	}
+	sort.SliceStable(groups, func(i, j int) bool { return groups[i].et.number < groups[j].et.number })
+	return groups
+}
+
+// emitEntryManifest writes the BLD #9.6 KRN component list (#9.67) for every entry
+// type the build ships — the documentation half (the install reads the data + ORD
+// sections, not this). One shared header spans all types; each type then gets its
+// own 0-node, NM name multiple, and "B" index. The header's last-IEN piece is the
+// MAX file number and the count is the number of types — a deterministic stand-in
+// for KIDS' insertion-order "last IEN" (cosmetic: KRN^XPDIK iterates the
+// subscripts, not the header).
+func emitEntryManifest(b *Build, groups []entryGroup) {
+	if len(groups) == 0 {
+		return
+	}
 	bld := Subs{strSub("BLD"), intSub(1)}
 	krn := func(tail ...Sub) Subs { return append(append(Subs{}, bld...), append(Subs{strSub("KRN")}, tail...)...) }
-	// KRN multiple header: ^9.67PA^<last file#>^<count of file types>.
-	b.Set(krn(intSub(0)), "^9.67PA^"+formatKIDSFloat(et.number)+"^1")
-	b.Set(krn(fltSub(et.number), intSub(0)), formatKIDSFloat(et.number))
-	b.Set(krn(fltSub(et.number), strSub("NM"), intSub(0)),
-		"^9.68A^"+strconv.Itoa(len(recs))+"^"+strconv.Itoa(len(recs)))
-	for i, r := range recs {
-		seq := int64(i + 1)
-		// NM node piece 3 = 0 (SEND); delete-at-site would be 1 (a follow-up).
-		b.Set(krn(fltSub(et.number), strSub("NM"), intSub(seq), intSub(0)), r.name+"^^0")
-		b.Set(krn(fltSub(et.number), strSub("NM"), strSub("B"), strSub(r.name), intSub(seq)), "")
+	var maxFile float64
+	for _, g := range groups {
+		if g.et.number > maxFile {
+			maxFile = g.et.number
+		}
 	}
-	b.Set(krn(strSub("B"), fltSub(et.number), fltSub(et.number)), "")
+	// KRN multiple header: ^9.67PA^<last file#>^<count of file types>.
+	b.Set(krn(intSub(0)), "^9.67PA^"+formatKIDSFloat(maxFile)+"^"+strconv.Itoa(len(groups)))
+	for _, g := range groups {
+		b.Set(krn(fltSub(g.et.number), intSub(0)), formatKIDSFloat(g.et.number))
+		b.Set(krn(fltSub(g.et.number), strSub("NM"), intSub(0)),
+			"^9.68A^"+strconv.Itoa(len(g.recs))+"^"+strconv.Itoa(len(g.recs)))
+		for i, r := range g.recs {
+			seq := int64(i + 1)
+			// NM node piece 3 = 0 (SEND); delete-at-site would be 1 (a follow-up).
+			b.Set(krn(fltSub(g.et.number), strSub("NM"), intSub(seq), intSub(0)), r.name+"^^0")
+			b.Set(krn(fltSub(g.et.number), strSub("NM"), strSub("B"), strSub(r.name), intSub(seq)), "")
+		}
+		b.Set(krn(strSub("B"), fltSub(g.et.number), fltSub(g.et.number)), "")
+	}
 }
 
 // emitEntryData writes the install-driving ORD section and the top-level KRN
-// record image for each entry of one type — the half KRN^XPDIK actually files,
-// at install order `ord`. The ORD value is <file>;<ord>;<type's action-routine
-// tail>; the record image is the -1 XPDFL flag followed by the record's nodes.
-func emitEntryData(b *Build, et entryType, recs []entryRec, ord int) {
-	if len(recs) == 0 {
-		return
-	}
-	b.Set(Subs{strSub("ORD"), intSub(int64(ord)), fltSub(et.number)},
-		formatKIDSFloat(et.number)+";"+strconv.Itoa(ord)+";"+et.ordTail)
-	b.Set(Subs{strSub("ORD"), intSub(int64(ord)), fltSub(et.number), intSub(0)}, et.name)
-	for i, r := range recs {
-		seq := int64(i + 1)
-		rec := func(tail ...Sub) Subs {
-			return append(Subs{strSub("KRN"), fltSub(et.number), intSub(seq)}, tail...)
-		}
-		// -1 = XPDFL action; killed from the live record after the merge.
-		b.Set(rec(intSub(-1)), r.xpdfl)
-		for _, n := range r.image {
-			b.Set(rec(n.tail...), n.val)
+// record image for every entry type — the half KRN^XPDIK actually files. Each
+// type's install order is its 1-based position in the group list; the ORD value
+// is <file>;<ord>;<type's action-routine tail>, and each record image is the -1
+// XPDFL flag followed by the record's nodes.
+func emitEntryData(b *Build, groups []entryGroup) {
+	for gi, g := range groups {
+		ord := gi + 1
+		b.Set(Subs{strSub("ORD"), intSub(int64(ord)), fltSub(g.et.number)},
+			formatKIDSFloat(g.et.number)+";"+strconv.Itoa(ord)+";"+g.et.ordTail)
+		b.Set(Subs{strSub("ORD"), intSub(int64(ord)), fltSub(g.et.number), intSub(0)}, g.et.name)
+		for i, r := range g.recs {
+			seq := int64(i + 1)
+			rec := func(tail ...Sub) Subs {
+				return append(Subs{strSub("KRN"), fltSub(g.et.number), intSub(seq)}, tail...)
+			}
+			// -1 = XPDFL action; killed from the live record after the merge.
+			b.Set(rec(intSub(-1)), r.xpdfl)
+			for _, n := range r.image {
+				b.Set(rec(n.tail...), n.val)
+			}
 		}
 	}
 }
@@ -172,20 +210,50 @@ func optionRecords(opts []Option) []entryRec {
 	return recs
 }
 
-// emitOptionManifest / emitOptionData write the #19 OPTION transport — the BLD
-// manifest and the ORD + record-image halves. Emit nothing when there are no
-// options, so a build without them stays byte-identical.
-func emitOptionManifest(b *Build, opts []Option) {
-	if len(opts) == 0 {
-		return
-	}
-	emitEntryManifest(b, optionEntryType, optionRecords(opts))
-}
-
-func emitOptionData(b *Build, opts []Option) {
-	emitEntryData(b, optionEntryType, optionRecords(opts), 1)
-}
-
 // OptionNames returns the #19 OPTION component names in build order — what `v pkg
 // verify`/`uninstall` probe and back out.
 func (b *Build) OptionNames() []string { return b.entryNames(optionFile) }
+
+// --- PARAMETER DEFINITION (#8989.51) — migrated onto the generic core ---------
+
+var paramDefEntryType = entryType{number: paramDefFile, name: paramDefFileName, ordTail: "1;;;;;;;"}
+
+// paramDefRecords packs each #8989.51 PARAMETER DEFINITION into the generic
+// entry-record shape: the SEND XPDFL flag ("0" — a single piece, unlike OPTION's
+// "0^1") and the record image (0-node NAME^DISPLAY^.03-empty, 1-node VALUE DATA
+// TYPE, and the ALLOWABLE ENTITIES #30 multiple). Mirrors the live-proven prior
+// emitter byte-for-byte; the build creates the definition only, never a value.
+func paramDefRecords(defs []ParamDef) []entryRec {
+	recs := make([]entryRec, 0, len(defs))
+	for _, d := range defs {
+		dt := d.DataTypeCode
+		if dt == "" {
+			dt = "F"
+		}
+		img := []imageNode{
+			// 0 node: .01 NAME ^ .02 DISPLAY TEXT ^ .03 MULTIPLE VALUED (empty = single).
+			{Subs{intSub(0)}, d.Name + "^" + d.DisplayText + "^"},
+			// 1 node: 1.1 VALUE DATA TYPE ^ 1.2 VALUE DOMAIN ^ 1.3 VALUE HELP.
+			{Subs{intSub(1)}, dt + "^^"},
+		}
+		if len(d.Entities) > 0 {
+			img = append(img, imageNode{Subs{intSub(30), intSub(0)},
+				"^" + entitySubfile + "I^" + strconv.Itoa(len(d.Entities)) + "^" + strconv.Itoa(len(d.Entities))})
+			for j, e := range d.Entities {
+				esub := int64(j + 1)
+				prec := e.Precedence
+				if prec == 0 {
+					prec = 1
+				}
+				img = append(img, imageNode{Subs{intSub(30), intSub(esub), intSub(0)}, strconv.Itoa(prec) + "^" + e.EntityIEN})
+				img = append(img, imageNode{Subs{intSub(30), strSub("B"), intSub(int64(prec)), intSub(esub)}, ""})
+			}
+		}
+		recs = append(recs, entryRec{name: d.Name, xpdfl: "0", image: img})
+	}
+	return recs
+}
+
+// ParamDefNames returns the #8989.51 PARAMETER DEFINITION component names in build
+// order — what `v pkg verify`/`uninstall` use to probe and back out each definition.
+func (b *Build) ParamDefNames() []string { return b.entryNames(paramDefFile) }

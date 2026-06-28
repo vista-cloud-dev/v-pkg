@@ -367,11 +367,22 @@ not the populate-and-`EN^XPDIJ` shortcut.
     float) — integer file numbers (#19/#101/#8994) re-parse from a `.KID` as int, so
     an `IsFloat`-only probe passed unit tests but silently dropped every option on
     the live verify/uninstall path (`subNum()`; regression
-    `TestBuild_OptionNames_AfterReparse`). **Open:** the shared `"BLD",1,"KRN",0)`
-    header isn't yet computed across multiple entry types, so a build mixing options
-    + parameterDefinitions is rejected (`buildspec`) — generalizing that header
-    (and migrating param-def onto the generic core) is the next B.1 step, ahead of
-    SECURITY KEY #19.1. ([[option-entry-component]])
+    `TestBuild_OptionNames_AfterReparse`). ([[option-entry-component]])
+  - **B.1-b ✅ DONE + LIVE-PROVEN 2026-06-28 — unified multi-type KRN manifest +
+    param-def migrated onto the generic core, both engines.** One build can now ship
+    several KRN entry types: `buildEntryGroups` collects all of them (file-number
+    ascending) and a single `"BLD",1,"KRN",0)` header spans them
+    (`^9.67PA^<max file#>^<type count>` — a deterministic stand-in for KIDS'
+    insertion-order "last IEN", which a corpus build showed as `779.2` over 20 types;
+    cosmetic to the install since KRN^XPDIK iterates the subscripts). PARAMETER
+    DEFINITION (#8989.51) migrated onto the same `entryType`/`entryRec` core —
+    **byte-identical** (unchanged `zzparam` golden, `TestMakeBuildPairs_ParamDef_KRN`,
+    corpus DRIFT=0). The buildspec "can't-mix-options-and-paramDefs" guard is removed.
+    **Live install→verify→uninstall→clean of a mixed OPTION + PARAMETER DEFINITION
+    build** (`testdata/zzmix`, header `^9.67PA^8989.51^2`, option ORD 1 / param-def
+    ORD 2, both types filed + verified + backed out) on vehu (YDB) + foia-t12 (IRIS).
+    Next: **SECURITY KEY #19.1** (a one-`entryType` addition to `buildEntryGroups`).
+    ([[option-entry-component]])
 - **B.2 Real FILE DD + DATA (F3; the R3 enabler).** Extend `FileComp` to a
   multi-field DD (see §8 for the grounded node-set) and add **DATA** export with
   the four action codes (ADD-IF-NEW / MERGE / OVERWRITE / REPLACE) and FULL/PARTIAL

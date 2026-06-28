@@ -53,8 +53,10 @@ func MakeBuildPairs(in BuildInput) []Pair {
 
 	// BLD #9.6 manifest for the non-routine components (emitted only when present
 	// so a routine-only build stays byte-identical to the live-proven ZZSKEL form).
-	emitParamDefManifest(b, in.ParamDefs)
-	emitOptionManifest(b, in.Options)
+	// All KRN entry types (PARAMETER DEFINITION, OPTION, …) share one manifest +
+	// ORD numbering, computed once over the ordered group list.
+	groups := buildEntryGroups(in.ParamDefs, in.Options)
+	emitEntryManifest(b, groups)
 	emitFileManifest(b, in.Files)
 	emitRequiredBuildManifest(b, in.RequiredBuilds)
 	emitInstallHooks(b, in.EnvCheck, in.PreInstall, in.PostInstall)
@@ -70,9 +72,8 @@ func MakeBuildPairs(in BuildInput) []Pair {
 	}
 
 	// Install-order + KRN record data + MBREQ count — what KRN^XPDIK consumes to
-	// file the PARAMETER DEFINITIONs (again, only when there are any).
-	emitParamDefData(b, in.ParamDefs)
-	emitOptionData(b, in.Options)
+	// file the entry components (again, only when there are any).
+	emitEntryData(b, groups)
 	emitFileData(b, in.Files, fileVersion(in.InstallName), in.Namespace)
 	emitMBREQ(b, in.RequiredBuilds)
 

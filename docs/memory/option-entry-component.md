@@ -9,17 +9,36 @@ metadata:
 
 Coverage-analysis **Track B.1**: generalized the proven #8989.51 KRN mechanism
 ([[krn-param-def-component]]) into a **generic SEND/DELETE entry-component
-emitter** and landed the first type on it — **OPTION (#19)**, the largest
-non-routine share of the corpus (39%). `internal/kids/entrycomp.go` is the new
-generic core; param-def stays on its own `krncomp.go` functions (migrating it is a
-noted follow-up — left untouched to protect the live-proven path + golden).
+emitter** and landed **OPTION (#19)** (39% of the corpus) on it, then **migrated
+PARAMETER DEFINITION onto the same core and unified the manifest header across
+entry types** — so one build can ship several KRN types. `internal/kids/entrycomp.go`
+is the single generic core; `krncomp.go` keeps only the ParamDef/ReqBuild structs +
+REQB/MBREQ/install-hook emitters.
 
 ## The generic core (`entrycomp.go`)
-`entryType{number,name,ordTail}` + `entryRec{name,xpdfl,image []imageNode}` →
-`emitEntryManifest` (BLD #9.6 `"KRN"` list) + `emitEntryData` (ORD line + top-level
-`"KRN",<file>,<seq>` record image) + `(*Build).entryNames(file)`. Same three-part
-transport as param-def, parameterized by file number. Each SEND/DELETE type is one
-`entryType` with a national-constant `ordTail` (the per-type XPDIK action routines).
+`entryType{number,name,ordTail}` + `entryRec{name,xpdfl,image []imageNode}`, grouped
+as `entryGroup{et,recs}`. `buildEntryGroups(defs,opts)` collects every KRN type a
+build ships, **ordered file-number ascending** — the single place that knows the
+build's KRN types. `emitEntryManifest(groups)` writes ONE shared `"BLD",1,"KRN",0)`
+header + per-type body; `emitEntryData(groups)` writes per-type ORD (ord = 1-based
+group position) + record image; `(*Build).entryNames(file)`. Both OPTION and
+PARAMETER DEFINITION ride this; new SEND/DELETE types just append in `buildEntryGroups`.
+
+## Multi-type KRN manifest header (B.1-b, live-proven both engines)
+`"BLD",1,"KRN",0)` = `^9.67PA^<last file#>^<type count>`. Real KIDS' "last IEN"
+piece is **insertion-order** (a corpus build showed `^9.67PA^779.2^20` where 779.2
+is NOT the max of its 20 types) — non-reproducible, so v-pkg uses a **deterministic
+`max(file#)` + type-count** rule. This is **cosmetic to the install** (KRN^XPDIK
+iterates the subscripts, not the header), confirmed by installing a build with BOTH
+an OPTION (#19) and a PARAMETER DEFINITION (#8989.51): header `^9.67PA^8989.51^2`,
+option at ORD 1, param-def at ORD 2, both file + verify + back out clean on vehu +
+foia-t12. Per-type install order is each type's 1-based group position; the absolute
+ord value is irrelevant (independent FileMan files), only the relative order matters,
+and XPDIK loops ords ascending. The single-type goldens stay byte-identical
+(`^9.67PA^19^1`, `^9.67PA^8989.51^1`) because max+count of one type is that type.
+Param-def migration is byte-identical — proven by the unchanged `zzparam` golden,
+`TestMakeBuildPairs_ParamDef_KRN`, and corpus DRIFT=0. The old buildspec
+"can't-mix-options-and-paramDefs" guard is **removed**. Fixture `testdata/zzmix`.
 
 ## OPTION specifics (ground-truthed: live ^DD(19) + WorldVistA corpus)
 - **ORD action-routine line** (national constant, one form across 216 corpus
@@ -47,12 +66,11 @@ integer-numbered entry type (#19, #101 PROTOCOL, #8994 RPC, …)**; #19.1/#3.8 a
 floats and would have hidden it. Regression test:
 `TestBuild_OptionNames_AfterReparse` (re-parses each emitted subscript).
 
-## Mixing guard (F1 honesty)
-The shared `"BLD",1,"KRN",0)` header is not yet computed across multiple entry
-types, so `buildspec.Validate` **rejects a build that ships both options AND
-parameterDefinitions** rather than emit a wrong header. Generalizing that header
-(so one build can carry several KRN types) is the follow-up that also unblocks
-migrating param-def onto the generic core.
+## (resolved) Mixing options + param-defs
+The earlier "reject a build mixing options + parameterDefinitions" guard is GONE —
+the unified multi-type header (above) makes mixed KRN builds first-class and
+live-proven. Next types append in `buildEntryGroups` in frequency order
+(SECURITY KEY #19.1 → PROTOCOL #101 → RPC #8994 → templates → …).
 
 ## Proof
 **Live install→verify→uninstall→clean on BOTH engines** via the driver stack

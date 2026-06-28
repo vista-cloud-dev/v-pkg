@@ -59,6 +59,60 @@ func TestMakeBuildPairs_Option_KRN(t *testing.T) {
 	}
 }
 
+// TestMakeBuildPairs_MixedEntryTypes proves the unified KRN manifest header spans
+// multiple entry types in one build (B.1 next step): an OPTION (#19) AND a
+// PARAMETER DEFINITION (#8989.51) share one "BLD",1,"KRN",0) header
+// (^9.67PA^<max file#>^<type count>), each gets its own type body + a distinct
+// ORD install order (file-number ascending), and both record images are emitted.
+func TestMakeBuildPairs_MixedEntryTypes(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZMIX*1.0*1",
+		Namespace:   "ZZMIX",
+		Routines:    []RoutineSrc{{Name: "ZZMIXRT", Lines: []string{"ZZMIXRT ;x", " quit"}}},
+		Options:     []Option{{Name: "ZZMIX RUN", MenuText: "ZZ Mix Run", TypeCode: "R", Routine: "EN^ZZMIXRT"}},
+		ParamDefs: []ParamDef{{
+			Name: "ZZMIX GREETING", DisplayText: "g", DataTypeCode: "F",
+			Entities: []ParamEntity{{EntityIEN: "4.2", Precedence: 1}},
+		}},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	want := map[string]string{
+		// One shared header: last-IEN = max file# (8989.51), count = 2 types.
+		`"BLD",1,"KRN",0)`:                   "^9.67PA^8989.51^2",
+		`"BLD",1,"KRN",19,0)`:                "19",
+		`"BLD",1,"KRN",8989.51,0)`:           "8989.51",
+		`"BLD",1,"KRN","B",19,19)`:           "",
+		`"BLD",1,"KRN","B",8989.51,8989.51)`: "",
+		// Distinct install orders, file-number ascending: option(19) then param(8989.51).
+		`"ORD",1,19)`:        "19;1;;;OPT^XPDTA;OPTF1^XPDIA;OPTE1^XPDIA;OPTF2^XPDIA;;OPTDEL^XPDIA",
+		`"ORD",2,8989.51)`:   "8989.51;2;1;;;;;;;",
+		`"ORD",1,19,0)`:      "OPTION",
+		`"ORD",2,8989.51,0)`: "PARAMETER DEFINITION",
+		// Both record images present, each seq-numbered within its own type.
+		`"KRN",19,1,0)`:      "ZZMIX RUN^ZZ Mix Run^^R",
+		`"KRN",8989.51,1,0)`: "ZZMIX GREETING^g^",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+	// Both name-readers work on the mixed build.
+	b := newBuild()
+	for _, p := range MakeBuildPairs(in) {
+		b.Set(p.Subs, p.Value)
+	}
+	if o := b.OptionNames(); len(o) != 1 || o[0] != "ZZMIX RUN" {
+		t.Errorf("OptionNames = %v", o)
+	}
+	if pd := b.ParamDefNames(); len(pd) != 1 || pd[0] != "ZZMIX GREETING" {
+		t.Errorf("ParamDefNames = %v", pd)
+	}
+}
+
 func TestBuild_OptionNames(t *testing.T) {
 	b := newBuild()
 	for _, p := range MakeBuildPairs(optionInput()) {

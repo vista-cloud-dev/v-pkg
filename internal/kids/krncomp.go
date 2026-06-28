@@ -2,7 +2,6 @@ package kids
 
 import (
 	"strconv"
-	"strings"
 )
 
 // This file emits the KIDS transport pairs for two non-routine component kinds:
@@ -45,74 +44,6 @@ type ParamEntity struct {
 type ReqBuild struct {
 	Name   string
 	Action int
-}
-
-// emitParamDefManifest writes the BLD #9.6 KRN component list (#9.67) naming the
-// shipped #8989.51 entries — the documentation half of the build (the install
-// reads the data + ORD sections, not this).
-func emitParamDefManifest(b *Build, defs []ParamDef) {
-	if len(defs) == 0 {
-		return
-	}
-	bld := Subs{strSub("BLD"), intSub(1)}
-	krn := func(tail ...Sub) Subs { return append(append(Subs{}, bld...), append(Subs{strSub("KRN")}, tail...)...) }
-	// KRN multiple header: ^9.67PA^<last file#>^<count of file types>.
-	b.Set(krn(intSub(0)), "^9.67PA^"+formatKIDSFloat(paramDefFile)+"^1")
-	b.Set(krn(fltSub(paramDefFile), intSub(0)), formatKIDSFloat(paramDefFile))
-	b.Set(krn(fltSub(paramDefFile), strSub("NM"), intSub(0)),
-		"^9.68A^"+strconv.Itoa(len(defs))+"^"+strconv.Itoa(len(defs)))
-	for i, d := range defs {
-		seq := int64(i + 1)
-		b.Set(krn(fltSub(paramDefFile), strSub("NM"), intSub(seq), intSub(0)), d.Name+"^^0")
-		b.Set(krn(fltSub(paramDefFile), strSub("NM"), strSub("B"), strSub(d.Name), intSub(seq)), "")
-	}
-	b.Set(krn(strSub("B"), fltSub(paramDefFile), fltSub(paramDefFile)), "")
-}
-
-// emitParamDefData writes the install-driving ORD section and the top-level KRN
-// record image for each PARAMETER DEFINITION — the half KRN^XPDIK actually files.
-func emitParamDefData(b *Build, defs []ParamDef) {
-	if len(defs) == 0 {
-		return
-	}
-	const ord = 1 // single KRN file type → install order 1
-	// ORD: <file#>;<ord>;<xref>;…;<action routines>. xref=1 makes XPDIK re-index
-	// each entry (IX1^DIK), which builds the "B" cross-reference for a new entry.
-	b.Set(Subs{strSub("ORD"), intSub(ord), fltSub(paramDefFile)},
-		strings.Join([]string{formatKIDSFloat(paramDefFile), strconv.Itoa(ord), "1", "", "", "", "", "", "", ""}, ";"))
-	b.Set(Subs{strSub("ORD"), intSub(ord), fltSub(paramDefFile), intSub(0)}, paramDefFileName)
-
-	for i, d := range defs {
-		seq := int64(i + 1)
-		rec := func(tail ...Sub) Subs {
-			return append(Subs{strSub("KRN"), fltSub(paramDefFile), intSub(seq)}, tail...)
-		}
-		dt := d.DataTypeCode
-		if dt == "" {
-			dt = "F"
-		}
-		// -1 = XPDFL action (0 = send/add-or-update); killed from the live record
-		// after the merge.
-		b.Set(rec(intSub(-1)), "0")
-		// 0 node: .01 NAME ^ .02 DISPLAY TEXT ^ .03 MULTIPLE VALUED (empty = single).
-		b.Set(rec(intSub(0)), d.Name+"^"+d.DisplayText+"^")
-		// 1 node: 1.1 VALUE DATA TYPE ^ 1.2 VALUE DOMAIN ^ 1.3 VALUE HELP.
-		b.Set(rec(intSub(1)), dt+"^^")
-		// 30 multiple: ALLOWABLE ENTITIES (#8989.513).
-		if len(d.Entities) > 0 {
-			b.Set(rec(intSub(30), intSub(0)),
-				"^"+entitySubfile+"I^"+strconv.Itoa(len(d.Entities))+"^"+strconv.Itoa(len(d.Entities)))
-			for j, e := range d.Entities {
-				esub := int64(j + 1)
-				prec := e.Precedence
-				if prec == 0 {
-					prec = 1
-				}
-				b.Set(rec(intSub(30), intSub(esub), intSub(0)), strconv.Itoa(prec)+"^"+e.EntityIEN)
-				b.Set(rec(intSub(30), strSub("B"), intSub(int64(prec)), intSub(esub)), "")
-			}
-		}
-	}
 }
 
 // emitRequiredBuildManifest writes the BLD #9.6 REQB multiple (#9.611) — the
@@ -159,23 +90,4 @@ func emitInstallHooks(b *Build, envCheck, preInstall, postInstall string) {
 	set("PRE", envCheck)
 	set("INI", preInstall)
 	set("INIT", postInstall)
-}
-
-// ParamDefNames returns the names of the #8989.51 PARAMETER DEFINITION components
-// in build order, read from the top-level KRN record 0-nodes — what `v pkg
-// verify`/`uninstall` use to probe and back out each parameter definition.
-func (b *Build) ParamDefNames() []string {
-	var names []string
-	for _, p := range b.Pairs() {
-		s := p.Subs
-		if len(s) == 4 && s[0].IsStr() && s[0].Str() == "KRN" &&
-			s[1].IsFloat() && s[1].fltV == paramDefFile && s[2].IsInt() && s[3].IsZeroInt() {
-			name := p.Value
-			if i := strings.IndexByte(name, '^'); i >= 0 {
-				name = name[:i]
-			}
-			names = append(names, name)
-		}
-	}
-	return names
 }

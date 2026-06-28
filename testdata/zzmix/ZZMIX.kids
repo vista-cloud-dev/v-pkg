@@ -1,0 +1,76 @@
+KIDS Distribution saved by v-pkg
+m-kids reassembled output
+**KIDS**:ZZMIX*1.0*1^
+
+**INSTALL NAME**
+ZZMIX*1.0*1
+"BLD",1,0)
+ZZMIX*1.0*1^ZZMIX^0^0
+"BLD",1,"KRN",0)
+^9.67PA^8989.51^2
+"BLD",1,"KRN",19,0)
+19
+"BLD",1,"KRN",19,"NM",0)
+^9.68A^1^1
+"BLD",1,"KRN",19,"NM",1,0)
+ZZMIX RUN ROUTINE^^0
+"BLD",1,"KRN",19,"NM","B","ZZMIX RUN ROUTINE",1)
+
+"BLD",1,"KRN","B",19,19)
+
+"BLD",1,"KRN",8989.51,0)
+8989.51
+"BLD",1,"KRN",8989.51,"NM",0)
+^9.68A^1^1
+"BLD",1,"KRN",8989.51,"NM",1,0)
+ZZMIX GREETING^^0
+"BLD",1,"KRN",8989.51,"NM","B","ZZMIX GREETING",1)
+
+"BLD",1,"KRN","B",8989.51,8989.51)
+
+"RTN")
+1
+"RTN","ZZMIXRT")
+0^5^0^0
+"RTN","ZZMIXRT",1,0)
+ZZMIXRT ;VCD/VSL - throwaway test package (option + param-def mixed KRN build) ;1.0
+"RTN","ZZMIXRT",2,0)
+ ;;1.0;ZZMIX;;
+"RTN","ZZMIXRT",3,0)
+ quit
+"RTN","ZZMIXRT",4,0)
+EN ;
+"RTN","ZZMIXRT",5,0)
+ quit
+"ORD",1,19)
+19;1;;;OPT^XPDTA;OPTF1^XPDIA;OPTE1^XPDIA;OPTF2^XPDIA;;OPTDEL^XPDIA
+"ORD",1,19,0)
+OPTION
+"KRN",19,1,-1)
+0^1
+"KRN",19,1,0)
+ZZMIX RUN ROUTINE^ZZMIX Run Routine Demo^^R
+"KRN",19,1,25)
+EN^ZZMIXRT
+"KRN",19,1,"U")
+ZZMIX RUN ROUTINE DEMO
+"ORD",2,8989.51)
+8989.51;2;1;;;;;;;
+"ORD",2,8989.51,0)
+PARAMETER DEFINITION
+"KRN",8989.51,1,-1)
+0
+"KRN",8989.51,1,0)
+ZZMIX GREETING^ZZMIX test greeting (throwaway)^
+"KRN",8989.51,1,1)
+F^^
+"KRN",8989.51,1,30,0)
+^8989.513I^1^1
+"KRN",8989.51,1,30,1,0)
+1^4.2
+"KRN",8989.51,1,30,"B",1,1)
+
+"VER")
+8.0^22.2
+**END**
+**END**

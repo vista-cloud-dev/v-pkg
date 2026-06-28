@@ -405,20 +405,15 @@ func TestParse_Options_Invalid(t *testing.T) {
 	}
 }
 
-// A single build that ships BOTH options and parameter definitions collides on
-// the shared "BLD",1,"KRN",0) manifest header (not yet computed across types) —
-// rejected with a clear message until that header is generalized (a follow-up).
-func TestParse_Options_MixedWithParamDefs_Rejected(t *testing.T) {
-	js := `{"package":"ZZOPT","version":"1.0","components":{
-	  "options":[{"name":"ZZOPT A","menuText":"x","type":"action","entryAction":"W 1"}],
-	  "parameterDefinitions":[{"name":"ZZOPT P","dataType":"free text"}]
+// A single build may now ship BOTH options and parameter definitions — they share
+// one computed "BLD",1,"KRN",0) manifest header across entry types (B.1).
+func TestParse_Options_WithParamDefs_Accepted(t *testing.T) {
+	js := `{"package":"ZZMIX","version":"1.0","components":{
+	  "options":[{"name":"ZZMIX A","menuText":"x","type":"action","entryAction":"W 1"}],
+	  "parameterDefinitions":[{"name":"ZZMIX P","dataType":"free text"}]
 	}}`
-	_, err := Parse([]byte(js))
-	if err == nil {
-		t.Fatal("mixing options + parameterDefinitions should error")
-	}
-	if !strings.Contains(err.Error(), "parameterDefinitions") || !strings.Contains(err.Error(), "options") {
-		t.Errorf("error should name both colliding types, got %v", err)
+	if _, err := Parse([]byte(js)); err != nil {
+		t.Errorf("a build mixing options + parameterDefinitions should be accepted now, got %v", err)
 	}
 }
 

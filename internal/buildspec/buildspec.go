@@ -353,15 +353,6 @@ func (s *Spec) Validate() error {
 	if err := validateOptions(s.Components.Options, maxName); err != nil {
 		return err
 	}
-	// Options and parameter definitions both ship through the #9.6 "KRN" manifest
-	// whose shared header ("BLD",1,"KRN",0)) is not yet computed across multiple
-	// entry types — reject a build that mixes them rather than emit a wrong header
-	// (the F1 honesty rule; generalizing the header is a Track-B follow-up).
-	if len(s.Components.Options) > 0 && len(s.Components.ParameterDefinitions) > 0 {
-		return fmt.Errorf("buildspec: %s ships both options and parameterDefinitions in one build — "+
-			"the shared KRN manifest header does not yet support multiple entry types; split them into "+
-			"separate builds", s.InstallName())
-	}
 	if err := validateFiles(s.Components.Files); err != nil {
 		return err
 	}

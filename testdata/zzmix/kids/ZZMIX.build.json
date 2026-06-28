@@ -1,0 +1,24 @@
+{
+  "package": "ZZMIX",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "routines": ["ZZMIXRT"],
+    "options": [
+      {
+        "name": "ZZMIX RUN ROUTINE",
+        "menuText": "ZZMIX Run Routine Demo",
+        "type": "run routine",
+        "routine": "EN^ZZMIXRT"
+      }
+    ],
+    "parameterDefinitions": [
+      {
+        "name": "ZZMIX GREETING",
+        "displayText": "ZZMIX test greeting (throwaway)",
+        "dataType": "free text",
+        "entities": [ { "entity": "SYS", "precedence": 1 } ]
+      }
+    ]
+  }
+}
