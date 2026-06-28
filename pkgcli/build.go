@@ -35,6 +35,7 @@ type buildResult struct {
 	RPCs           int    `json:"rpcs,omitempty"`
 	MailGroups     int    `json:"mailGroups,omitempty"`
 	ListTemplates  int    `json:"listTemplates,omitempty"`
+	HelpFrames     int    `json:"helpFrames,omitempty"`
 	Files          int    `json:"files,omitempty"`
 	RequiredBuilds int    `json:"requiredBuilds,omitempty"`
 }
@@ -67,6 +68,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 	rpcs := resolveRPCs(spec.Components.RPCs)
 	mailGroups := resolveMailGroups(spec.Components.MailGroups)
 	listTemplates := resolveListTemplates(spec.Components.ListTemplates)
+	helpFrames := resolveHelpFrames(spec.Components.HelpFrames)
 	reqBuilds := resolveRequiredBuilds(spec.RequiredBuilds)
 
 	pairs := kids.MakeBuildPairs(kids.BuildInput{
@@ -80,6 +82,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 		RPCs:           rpcs,
 		MailGroups:     mailGroups,
 		ListTemplates:  listTemplates,
+		HelpFrames:     helpFrames,
 		Files:          files,
 		RequiredBuilds: reqBuilds,
 		EnvCheck:       spec.EnvCheck,
@@ -101,11 +104,11 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 
 	return cc.Result(buildResult{
 		InstallName: spec.InstallName(), Out: out, Routines: len(rtns),
-		ParamDefs: len(paramDefs), Options: len(options), Keys: len(keys), Protocols: len(protocols), RPCs: len(rpcs), MailGroups: len(mailGroups), ListTemplates: len(listTemplates), Files: len(files), RequiredBuilds: len(reqBuilds),
+		ParamDefs: len(paramDefs), Options: len(options), Keys: len(keys), Protocols: len(protocols), RPCs: len(rpcs), MailGroups: len(mailGroups), ListTemplates: len(listTemplates), HelpFrames: len(helpFrames), Files: len(files), RequiredBuilds: len(reqBuilds),
 	}, func() {
 		cc.Title("pkg build")
-		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d option(s), %d key(s), %d protocol(s), %d rpc(s), %d mail group(s), %d list template(s), %d file(s), %d required build(s)) → %s\n",
-			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(options), len(keys), len(protocols), len(rpcs), len(mailGroups), len(listTemplates), len(files), len(reqBuilds), cc.Accent(out))
+		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d option(s), %d key(s), %d protocol(s), %d rpc(s), %d mail group(s), %d list template(s), %d help frame(s), %d file(s), %d required build(s)) → %s\n",
+			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(options), len(keys), len(protocols), len(rpcs), len(mailGroups), len(listTemplates), len(helpFrames), len(files), len(reqBuilds), cc.Accent(out))
 	})
 }
 
@@ -301,6 +304,16 @@ func resolveListTemplates(lts []buildspec.ListTemplateComp) []kids.ListTemplate 
 			HelpCode:     lt.HelpCode,
 			ArrayName:    lt.ArrayName,
 		})
+	}
+	return out
+}
+
+// resolveHelpFrames maps the spec's HELP FRAME components onto the kids emit shape
+// — a straight field carry-through (the volatile dates are dropped at emit time).
+func resolveHelpFrames(hfs []buildspec.HelpFrameComp) []kids.HelpFrame {
+	out := make([]kids.HelpFrame, 0, len(hfs))
+	for _, h := range hfs {
+		out = append(out, kids.HelpFrame{Name: h.Name, Header: h.Header, Text: h.Text})
 	}
 	return out
 }

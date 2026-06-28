@@ -70,6 +70,7 @@ type Components struct {
 	RPCs                 []RPCComp          `json:"rpcs,omitempty"`          // #8994 REMOTE PROCEDURE KRN components (B.1)
 	MailGroups           []MailGroupComp    `json:"mailGroups,omitempty"`    // #3.8 MAIL GROUP KRN components (B.1)
 	ListTemplates        []ListTemplateComp `json:"listTemplates,omitempty"` // #409.61 LIST TEMPLATE KRN components (B.1)
+	HelpFrames           []HelpFrameComp    `json:"helpFrames,omitempty"`    // #9.2 HELP FRAME KRN components (B.1)
 	HL7                  []string           `json:"hl7,omitempty"`
 }
 
@@ -77,7 +78,8 @@ func (c Components) empty() bool {
 	return len(c.Routines) == 0 && len(c.Files) == 0 && len(c.Options) == 0 &&
 		len(c.Keys) == 0 && len(c.Parameters) == 0 && len(c.ParameterDefinitions) == 0 &&
 		len(c.Protocols) == 0 && len(c.Templates) == 0 && len(c.RPCs) == 0 &&
-		len(c.MailGroups) == 0 && len(c.ListTemplates) == 0 && len(c.HL7) == 0
+		len(c.MailGroups) == 0 && len(c.ListTemplates) == 0 && len(c.HelpFrames) == 0 &&
+		len(c.HL7) == 0
 }
 
 // unsupported returns the JSON names of populated component slices the build
@@ -228,6 +230,16 @@ type ListTemplateComp struct {
 	ExitCode     string `json:"exitCode,omitempty"`     // EXIT CODE (M code, node "FNL")
 	HelpCode     string `json:"helpCode,omitempty"`     // HELP CODE (M code, node "HLP")
 	ArrayName    string `json:"arrayName,omitempty"`    // ARRAY NAME (display global ref, node "ARRAY")
+}
+
+// HelpFrameComp is a #9.2 HELP FRAME shipped as a KIDS KRN component (B.1). The
+// build files the frame: a name, a one-line HEADER summary, and the TEXT body (a
+// word-processing field — the help content). HELP FRAME names allow spaces AND
+// hyphens (e.g. "YS-PHY-EXAM-NORM"), unlike the space-only OPTION/RPC names.
+type HelpFrameComp struct {
+	Name   string   `json:"name"`             // #9.2 .01 NAME (3–30 chars, uppercase, hyphens/spaces)
+	Header string   `json:"header,omitempty"` // #9.2 field 1 HEADER — one-line summary
+	Text   []string `json:"text,omitempty"`   // #9.2 field 2 TEXT — the help body, one string per line
 }
 
 // OptionTypeCode maps a human option-type name to its #19 field 4 (TYPE)
@@ -383,6 +395,7 @@ var (
 	reReqBuild  = regexp.MustCompile(`^[A-Z%][A-Z0-9]*\*\d+\.\d+(\*\d+)?$`) // NS*VER[*PATCH]
 	reParamName = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // #8989.51 NAME (uppercase, internal spaces)
 	reEntryName = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // #19 OPTION .01 NAME (uppercase, internal spaces)
+	reHelpName  = regexp.MustCompile(`^[A-Z][A-Z0-9 -]*[A-Z0-9]$`)          // #9.2 HELP FRAME .01 NAME (uppercase, spaces AND hyphens)
 	reFileName  = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // FileMan FILE .01 name (uppercase, internal spaces)
 	reGlobalRt  = regexp.MustCompile(`^\^%?[A-Z][A-Z0-9]*\(.*,$`)           // open global root, e.g. ^DIZ(999000,
 	reLabel     = regexp.MustCompile(`^[A-Z][A-Z0-9]*$`)                    // M line label (entryref tag)
@@ -458,6 +471,9 @@ func (s *Spec) Validate() error {
 		return err
 	}
 	if err := validateListTemplates(s.Components.ListTemplates); err != nil {
+		return err
+	}
+	if err := validateHelpFrames(s.Components.HelpFrames); err != nil {
 		return err
 	}
 	if err := validateFiles(s.Components.Files); err != nil {
@@ -674,6 +690,22 @@ func validateListTemplates(lts []ListTemplateComp) error {
 			if m.v < 0 || m.v > 255 {
 				return fmt.Errorf("buildspec: list template %s %s %d out of range (0–255)", lt.Name, m.label, m.v)
 			}
+		}
+	}
+	return nil
+}
+
+// validateHelpFrames checks each HELP FRAME component: a valid #9.2 NAME (3–30
+// chars, uppercase, spaces/hyphens, not all-digit — matching the live .01 input
+// transform). The TEXT body is shipped verbatim. The record is filed by KRN^XPDIK;
+// only its build-side shape is validated here.
+func validateHelpFrames(hfs []HelpFrameComp) error {
+	for _, h := range hfs {
+		if h.Name == "" {
+			return fmt.Errorf("buildspec: a help frame is missing its name")
+		}
+		if l := len(h.Name); l < 3 || l > 30 || !reHelpName.MatchString(h.Name) {
+			return fmt.Errorf("buildspec: help frame name %q must be uppercase 3–30 chars (spaces/hyphens ok) (#9.2 HELP FRAME NAME)", h.Name)
 		}
 	}
 	return nil

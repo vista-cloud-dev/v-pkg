@@ -36,6 +36,7 @@ type BuildInput struct {
 	RPCs           []RPC          // #8994 REMOTE PROCEDURE KRN components (B.1)
 	MailGroups     []MailGroup    // #3.8 MAIL GROUP KRN components (B.1)
 	ListTemplates  []ListTemplate // #409.61 LIST TEMPLATE KRN components (B.1)
+	HelpFrames     []HelpFrame    // #9.2 HELP FRAME KRN components (B.1)
 	Files          []FileDD       // brand-new FileMan FILE DD components (FIA)
 	RequiredBuilds []ReqBuild     // Required Builds (#9.611) — prerequisites
 	EnvCheck       string         // environment-check routine (bare name) → top-level "PRE"
@@ -60,7 +61,7 @@ func MakeBuildPairs(in BuildInput) []Pair {
 	// so a routine-only build stays byte-identical to the live-proven ZZSKEL form).
 	// All KRN entry types (PARAMETER DEFINITION, OPTION, …) share one manifest +
 	// ORD numbering, computed once over the ordered group list.
-	groups := buildEntryGroups(in.ParamDefs, in.Options, in.Keys, in.Protocols, in.RPCs, in.MailGroups, in.ListTemplates)
+	groups := buildEntryGroups(in.ParamDefs, in.Options, in.Keys, in.Protocols, in.RPCs, in.MailGroups, in.ListTemplates, in.HelpFrames)
 	emitEntryManifest(b, groups)
 	emitFileManifest(b, in.Files)
 	emitRequiredBuildManifest(b, in.RequiredBuilds)

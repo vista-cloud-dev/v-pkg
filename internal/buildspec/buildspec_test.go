@@ -521,6 +521,50 @@ func TestParse_ListTemplates_Invalid(t *testing.T) {
 	}
 }
 
+func TestParse_HelpFrames(t *testing.T) {
+	js := `{"package":"ZZHF","version":"1.0","patch":"1","components":{
+	  "routines":["ZZHFRT"],
+	  "helpFrames":[{"name":"ZZHF-MAIN","header":"ZZ Main Help","text":["First help line.","Second help line."]}]
+	}}`
+	s, err := Parse([]byte(js))
+	if err != nil {
+		t.Fatalf("Parse helpFrames spec: %v", err)
+	}
+	if len(s.Components.HelpFrames) != 1 {
+		t.Fatalf("helpFrames = %+v", s.Components.HelpFrames)
+	}
+	h := s.Components.HelpFrames[0]
+	if h.Name != "ZZHF-MAIN" || h.Header != "ZZ Main Help" || len(h.Text) != 2 || h.Text[0] != "First help line." {
+		t.Errorf("helpFrame = %+v", h)
+	}
+	// A help-frame-only spec (hyphenated name, no text) is non-empty.
+	d, err := Parse([]byte(`{"package":"ZZHF","version":"1.0","components":{"helpFrames":[{"name":"ZZHF-A"}]}}`))
+	if err != nil {
+		t.Fatalf("Parse minimal help frame: %v", err)
+	}
+	if d.Components.empty() {
+		t.Error("spec with a help frame must not be empty")
+	}
+	// A space in the name is allowed (help frame names permit spaces and hyphens).
+	if _, err := Parse([]byte(`{"package":"ZZHF","version":"1.0","components":{"helpFrames":[{"name":"ZZHF MAIN MENU"}]}}`)); err != nil {
+		t.Errorf("space in help frame name should be allowed: %v", err)
+	}
+}
+
+func TestParse_HelpFrames_Invalid(t *testing.T) {
+	cases := map[string]string{
+		"no name":   `{"package":"ZZHF","version":"1.0","components":{"helpFrames":[{"header":"x"}]}}`,
+		"too short": `{"package":"ZZHF","version":"1.0","components":{"helpFrames":[{"name":"ZZ"}]}}`,
+		"lowercase": `{"package":"ZZHF","version":"1.0","components":{"helpFrames":[{"name":"zzhf-main"}]}}`,
+		"all digit": `{"package":"ZZHF","version":"1.0","components":{"helpFrames":[{"name":"12345"}]}}`,
+	}
+	for name, js := range cases {
+		if _, err := Parse([]byte(js)); err == nil {
+			t.Errorf("%s: expected an error, got nil", name)
+		}
+	}
+}
+
 func TestParse_Protocols(t *testing.T) {
 	js := `{"package":"ZZPROTO","version":"1.0","patch":"1","components":{
 	  "routines":["ZZPRORT"],

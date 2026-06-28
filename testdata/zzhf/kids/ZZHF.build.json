@@ -1,0 +1,19 @@
+{
+  "package": "ZZHF",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "routines": ["ZZHFRT"],
+    "helpFrames": [
+      {
+        "name": "ZZHF-MAIN",
+        "header": "ZZ Main Help",
+        "text": [
+          "This is the ZZHF demo help frame.",
+          "",
+          "It shows multi-line help text shipped as a KIDS KRN component."
+        ]
+      }
+    ]
+  }
+}

@@ -285,6 +285,51 @@ func TestMakeBuildPairs_ListTemplate_KRN(t *testing.T) {
 	}
 }
 
+func TestMakeBuildPairs_HelpFrame_KRN(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZHF*1.0*1",
+		Namespace:   "ZZHF",
+		Routines:    []RoutineSrc{{Name: "ZZHFRT", Lines: []string{"ZZHFRT ;x", " quit"}}},
+		HelpFrames: []HelpFrame{{
+			Name: "ZZHF-MAIN", Header: "ZZ Main Help",
+			Text: []string{"First help line.", "Second help line."},
+		}},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	want := map[string]string{
+		`"KRN",9.2,1,-1)`: "0^1",
+		// 0-node: .01 NAME ^ HEADER (the volatile DATE ENTERED / AUTHOR pieces omitted).
+		`"KRN",9.2,1,0)`: "ZZHF-MAIN^ZZ Main Help",
+		// field 2 TEXT — a word-processing field at node 1 (subfile 9.21). Header is
+		// date-less (^^<lastSeq>^<count>) for the deterministic-build invariant.
+		`"KRN",9.2,1,1,0)`:                          "^^2^2",
+		`"KRN",9.2,1,1,1,0)`:                        "First help line.",
+		`"KRN",9.2,1,1,2,0)`:                        "Second help line.",
+		`"ORD",1,9.2)`:                              "9.2;1;;;HELP^XPDTA1;HLPF1^XPDIA1;HLPE1^XPDIA1;HLPF2^XPDIA1;;HLPDEL^XPDIA1",
+		`"ORD",1,9.2,0)`:                            "HELP FRAME",
+		`"BLD",1,"KRN",0)`:                          "^9.67PA^9.2^1",
+		`"BLD",1,"KRN",9.2,0)`:                      "9.2",
+		`"BLD",1,"KRN",9.2,"NM",1,0)`:               "ZZHF-MAIN^^0",
+		`"BLD",1,"KRN",9.2,"NM","B","ZZHF-MAIN",1)`: "",
+		`"BLD",1,"KRN","B",9.2,9.2)`:                "",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+	b := newBuild()
+	for _, p := range MakeBuildPairs(in) {
+		b.Set(p.Subs, p.Value)
+	}
+	if hs := b.HelpFrameNames(); len(hs) != 1 || hs[0] != "ZZHF-MAIN" {
+		t.Errorf("HelpFrameNames = %v, want [ZZHF-MAIN]", hs)
+	}
+}
+
 // TestMakeBuildPairs_MixedEntryTypes proves the unified KRN manifest header spans
 // multiple entry types in one build (B.1 next step): an OPTION (#19) AND a
 // PARAMETER DEFINITION (#8989.51) share one "BLD",1,"KRN",0) header

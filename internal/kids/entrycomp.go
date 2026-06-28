@@ -60,10 +60,13 @@ type entryGroup struct {
 // types, so the shared "BLD",1,"KRN",0) header and the ORD ordering are computed
 // once across all of them. PARAMETER DEFINITION (#8989.51) and OPTION (#19) ride
 // the same path; new SEND/DELETE types append here.
-func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey, protos []Protocol, rpcs []RPC, mgs []MailGroup, lts []ListTemplate) []entryGroup {
+func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey, protos []Protocol, rpcs []RPC, mgs []MailGroup, lts []ListTemplate, hfs []HelpFrame) []entryGroup {
 	var groups []entryGroup
 	if len(mgs) > 0 {
 		groups = append(groups, entryGroup{mailGroupEntryType, mailGroupRecords(mgs)})
+	}
+	if len(hfs) > 0 {
+		groups = append(groups, entryGroup{helpFrameEntryType, helpFrameRecords(hfs)})
 	}
 	if len(lts) > 0 {
 		groups = append(groups, entryGroup{listTemplateEntryType, listTemplateRecords(lts)})
@@ -544,3 +547,56 @@ func listTemplateRecords(lts []ListTemplate) []entryRec {
 // ListTemplateNames returns the #409.61 LIST TEMPLATE component names in build order
 // — what `v pkg verify`/`uninstall` probe and back out.
 func (b *Build) ListTemplateNames() []string { return b.entryNames(listTemplateFile) }
+
+// --- HELP FRAME (#9.2) — the eighth type on the generic core ------------------
+
+const (
+	helpFrameFile     = 9.2
+	helpFrameFileName = "HELP FRAME"
+	// helpFrameOrdTail is the national-constant tail of the #9.2 ORD install line
+	// (pieces after "<file>;<ord>;"): the SEND/DELETE action routines KRN^XPDIK runs
+	// to file/relink/delete a HELP FRAME. One form across the corpus.
+	helpFrameOrdTail = ";;HELP^XPDTA1;HLPF1^XPDIA1;HLPE1^XPDIA1;HLPF2^XPDIA1;;HLPDEL^XPDIA1"
+)
+
+var helpFrameEntryType = entryType{number: helpFrameFile, name: helpFrameFileName, ordTail: helpFrameOrdTail}
+
+// HelpFrame is one #9.2 HELP FRAME record to ship as a KIDS KRN component
+// (SEND-TO-SITE). Stored in ^DIC(9.2,. The record is the 0-node (.01 NAME ^ HEADER)
+// plus the TEXT word-processing field (#9.2 field 2, subfile 9.21) at node 1 — the
+// help content, which is the whole point of the type. The volatile DATE ENTERED
+// (0;3) and DATE LAST UPDATED are OMITTED so the build stays deterministic, and the
+// WP header is shipped date-less; the RELATED FRAME / INVOKED BY ROUTINE multiples
+// are a follow-up.
+type HelpFrame struct {
+	Name   string   // #9.2 .01 NAME (0;1) — hyphen/space, 3–30 chars
+	Header string   // #9.2 field 1 HEADER (0;2) — one-line summary
+	Text   []string // #9.2 field 2 TEXT (WP, node 1) — the help body, in line order
+}
+
+// helpFrameRecords packs each HelpFrame into the generic entry-record shape: the
+// SEND XPDFL flag, the 0-node, and the TEXT word-processing field (header
+// ^^<lastSeq>^<count> + one node per line). The WP header is emitted date-less and
+// the 0-node carries no DATE ENTERED, so identical input yields a byte-identical
+// export (the deterministic-build invariant).
+func helpFrameRecords(hfs []HelpFrame) []entryRec {
+	recs := make([]entryRec, 0, len(hfs))
+	for _, h := range hfs {
+		img := []imageNode{
+			{Subs{intSub(0)}, h.Name + "^" + h.Header},
+		}
+		if n := len(h.Text); n > 0 {
+			ns := strconv.Itoa(n)
+			img = append(img, imageNode{Subs{intSub(1), intSub(0)}, "^^" + ns + "^" + ns})
+			for i, line := range h.Text {
+				img = append(img, imageNode{Subs{intSub(1), intSub(int64(i + 1)), intSub(0)}, line})
+			}
+		}
+		recs = append(recs, entryRec{name: h.Name, xpdfl: "0^1", image: img})
+	}
+	return recs
+}
+
+// HelpFrameNames returns the #9.2 HELP FRAME component names in build order — what
+// `v pkg verify`/`uninstall` probe and back out.
+func (b *Build) HelpFrameNames() []string { return b.entryNames(helpFrameFile) }

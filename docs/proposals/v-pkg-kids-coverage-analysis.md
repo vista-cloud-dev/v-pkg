@@ -445,13 +445,24 @@ not the populate-and-`EN^XPDIJ` shortcut.
     on vehu (YDB) + foia-t12 (IRIS): live `^SD(409.61,…,0)=ZZLM PATIENTS^1^^80^3^20^1^1^^^ZZ
     Patient List^1^^1` + `…,"HDR")` byte-identical on both, B-index gone after back-out.
     ([[option-entry-component]])
+  - **B.1-h ✅ DONE + LIVE-PROVEN 2026-06-28 — HELP FRAME (#9.2), both engines.** The
+    eighth type and the first whose word-processing body IS the point (vs KEY's deferred
+    optional WP). Stored in `^DIC(9.2,`. Record: `-1)=0^1`, `0)=NAME^HEADER`, and the
+    TEXT word-processing field (field 2, subfile 9.21) at node 1 (header `^^<n>^<n>` +
+    one node per line). ORD tail `;;HELP^XPDTA1;HLPF1^XPDIA1;HLPE1^XPDIA1;HLPF2^XPDIA1;;HLPDEL^XPDIA1`.
+    Two determinism wins (the WP playbook): ship the WP header **date-less**, and **omit
+    DATE ENTERED / AUTHOR** (FileMan auto-stamps both at install — proven live). Names
+    allow hyphens AND spaces (own `reHelpName` regex). TDD; lint/race/contract green;
+    corpus DRIFT=0; golden `testdata/zzhf/ZZHF.kids`. **Live install→verify→`--force`
+    uninstall→verify-clean** on vehu (YDB) + foia-t12 (IRIS): live NAME^HEADER + the WP
+    text byte-identical on both, B-index gone after back-out. ([[option-entry-component]])
   - **B.1 templates (#.4/.401/.402/.403) — DEFERRED 2026-06-28** (user decision). The
     transport mechanics generalize (one DIFROM ORD-tail covers all four + FUNCTION
     #.5/DIALOG #.84/BULLETIN #3.6), but the record image carries **compiled FileMan
     structures** (the `"DR"` edit string with embedded MUMPS, `"DIAB"` nodes, ScreenMan
     FORM/BLOCK subtrees) NOT derivable from a declarative spec. Needs a **read-live
     capture** image source (`--from-engine`); templates are its forcing function.
-    Remaining spec-derivable types: **HELP FRAME #9.2 → HL7 family**.
+    Remaining spec-derivable types: **HL7 family**.
     Detail: [[option-entry-component]].
 - **B.2 Real FILE DD + DATA (F3; the R3 enabler).** Extend `FileComp` to a
   multi-field DD (see §8 for the grounded node-set) and add **DATA** export with

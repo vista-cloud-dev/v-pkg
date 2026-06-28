@@ -478,6 +478,7 @@ type verifyResult struct {
 	RPCs          map[string]bool `json:"rpcs,omitempty"`          // #8994 REMOTE PROCEDUREs present
 	MailGroups    map[string]bool `json:"mailGroups,omitempty"`    // #3.8 MAIL GROUPs present
 	ListTemplates map[string]bool `json:"listTemplates,omitempty"` // #409.61 LIST TEMPLATEs present
+	HelpFrames    map[string]bool `json:"helpFrames,omitempty"`    // #9.2 HELP FRAMEs present
 	Files         map[string]bool `json:"files,omitempty"`         // FileMan FILE data dictionaries present
 	// Drift maps each routine -> "applied" | "drifted" | "absent" when --drift is
 	// requested: does the LIVE routine still match the source this patch shipped?
@@ -532,6 +533,11 @@ func (r verifyResult) ok() bool {
 			return false
 		}
 	}
+	for _, present := range r.HelpFrames {
+		if !present {
+			return false
+		}
+	}
 	for _, present := range r.Files {
 		if !present {
 			return false
@@ -568,12 +574,12 @@ func checkDrift(ctx context.Context, cl *mdriver.Client, b *kids.Build) (map[str
 	return drift, nil
 }
 
-func runVerify(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, files []string) (verifyResult, error) {
-	markers, _, err := runMScript(ctx, cl, rtnVerify, installspec.VerifyScript(name, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, files))
+func runVerify(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, files []string) (verifyResult, error) {
+	markers, _, err := runMScript(ctx, cl, rtnVerify, installspec.VerifyScript(name, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, files))
 	if err != nil {
 		return verifyResult{Name: name}, err
 	}
-	r := verifyResult{Name: name, Routines: map[string]bool{}, Params: map[string]bool{}, Options: map[string]bool{}, Keys: map[string]bool{}, Protocols: map[string]bool{}, RPCs: map[string]bool{}, MailGroups: map[string]bool{}, ListTemplates: map[string]bool{}, Files: map[string]bool{}}
+	r := verifyResult{Name: name, Routines: map[string]bool{}, Params: map[string]bool{}, Options: map[string]bool{}, Keys: map[string]bool{}, Protocols: map[string]bool{}, RPCs: map[string]bool{}, MailGroups: map[string]bool{}, ListTemplates: map[string]bool{}, HelpFrames: map[string]bool{}, Files: map[string]bool{}}
 	r.Installed = strings.TrimSpace(markers["installed"]) == "1"
 	r.Status, _ = strconv.Atoi(strings.TrimSpace(markers["status"]))
 	for _, rt := range routines {
@@ -600,6 +606,9 @@ func runVerify(ctx context.Context, cl *mdriver.Client, name string, routines, p
 	for _, lt := range listTemplates {
 		r.ListTemplates[lt] = strings.TrimSpace(markers["listtemplate:"+lt]) == "1"
 	}
+	for _, hf := range helpFrames {
+		r.HelpFrames[hf] = strings.TrimSpace(markers["helpframe:"+hf]) == "1"
+	}
 	for _, f := range files {
 		r.Files[f] = strings.TrimSpace(markers["file:"+f]) == "1"
 	}
@@ -622,7 +631,7 @@ func (c *verifyCmd) Run(cc *clikit.Context) error {
 		return c.noDriver(err)
 	}
 	ctx := context.Background()
-	res, err := runVerify(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), b.RPCNames(), b.MailGroupNames(), b.ListTemplateNames(), fileNumStrings(b))
+	res, err := runVerify(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), b.RPCNames(), b.MailGroupNames(), b.ListTemplateNames(), b.HelpFrameNames(), fileNumStrings(b))
 	if err != nil {
 		return clikit.Fail(clikit.ExitRuntime, "VERIFY_FAILED", err.Error(), "")
 	}
@@ -695,6 +704,13 @@ func (c *verifyCmd) Run(cc *clikit.Context) error {
 			}
 			fmt.Fprintf(cc.Stdout, "  list template %s %s\n", lt, mark)
 		}
+		for hf, present := range res.HelpFrames {
+			mark := cc.Success("ok")
+			if !present {
+				mark = cc.Failure("missing")
+			}
+			fmt.Fprintf(cc.Stdout, "  help frame %s %s\n", hf, mark)
+		}
 		for f, present := range res.Files {
 			mark := cc.Success("ok")
 			if !present {
@@ -736,8 +752,8 @@ type uninstallResult struct {
 	Uninstalled bool   `json:"uninstalled"`
 }
 
-func runUninstall(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, files []string) (uninstallResult, error) {
-	markers, _, err := runMScript(ctx, cl, rtnUninstall, installspec.UninstallScript(name, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, files))
+func runUninstall(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, files []string) (uninstallResult, error) {
+	markers, _, err := runMScript(ctx, cl, rtnUninstall, installspec.UninstallScript(name, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, files))
 	if err != nil {
 		return uninstallResult{Name: name}, err
 	}
@@ -895,7 +911,7 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 			}
 		}
 	default: // actDelete
-		ur, uerr := runUninstall(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), b.RPCNames(), b.MailGroupNames(), b.ListTemplateNames(), fileNumStrings(b))
+		ur, uerr := runUninstall(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), b.RPCNames(), b.MailGroupNames(), b.ListTemplateNames(), b.HelpFrameNames(), fileNumStrings(b))
 		if uerr != nil {
 			return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", uerr.Error(), "")
 		}

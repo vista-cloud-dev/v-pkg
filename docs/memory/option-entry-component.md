@@ -162,6 +162,36 @@ string-subscript nodes, so no core change was needed for the callback nodes.
 Remaining B.1 types in frequency order: HELP FRAME #9.2 → HL7 family. Templates
 (#.4/.402/…) still parked on read-live capture (below).
 
+## HELP FRAME (#9.2) — eighth type, live-proven both engines (2026-06-28)
+The first type whose **word-processing body is the point of the type** (unlike KEY's /
+mail group's optional, deferred WP DESCRIPTION). Stored in `^DIC(9.2,`. Record:
+`-1)=0^1`, `0)=NAME^HEADER` (.01 NAME ^ field 1 HEADER), and the **TEXT word-processing
+field** (field 2, subfile 9.21) at **node 1**: header `1,0)=^^<lastSeq>^<count>` + one
+node per line `1,<i>,0)`. ORD tail `;;HELP^XPDTA1;HLPF1^XPDIA1;HLPE1^XPDIA1;HLPF2^XPDIA1;;HLPDEL^XPDIA1`
+(bespoke-action-routine family). NM node plain `NAME^^0`.
+
+**Two determinism wins worth keeping (the WP-field playbook for future types):**
+1. **Ship the WP header date-less** — `^^<n>^<n>`, dropping the volatile `^<FMdate>`
+   piece real exports carry. It files cleanly: FileMan reads the line nodes, not the
+   header date. Proven live — `^DIC(9.2,IEN,1,1,0)` came back as the shipped text.
+2. **Omit the 0-node DATE ENTERED (0;3) + AUTHOR (0;4)** — ship only `NAME^HEADER`.
+   **FileMan auto-stamps both at install time** (live record showed
+   `…^3260628.221402^1` = today + DUZ), so the volatile data is added on-site, NOT in
+   the deterministic transport. This is the correct split: never ship a field FileMan
+   will populate itself.
+
+**HELP FRAME names allow hyphens AND spaces** (`YS-PHY-EXAM-NORM`, `PRSA ENTER TW`),
+3–30 chars, not all-digit — so they need their own `reHelpName` regex
+(`^[A-Z][A-Z0-9 -]*[A-Z0-9]$`), not the space-only `reEntryName`. The RELATED FRAME
+(field 3) / INVOKED BY ROUTINE (field 5) multiples are a follow-up. Live
+install→verify→`--force` uninstall→verify-clean on vehu (YDB) + foia-t12 (IRIS):
+`^DIC(9.2,…,0)` NAME^HEADER + the WP text byte-identical on both, B-index gone after
+back-out. Fixture `testdata/zzhf`. Verify probes `^DIC(9.2,"B",<name>)`, uninstall is
+`DIK` on `^DIC(9.2,`.
+
+Remaining B.1 types: HL7 family. Templates (#.4/.402/…) still parked on read-live
+capture (below).
+
 ## DEFERRED: the template/form family (#.4/.401/.402/.403) needs read-live, not author-from-spec
 Ground-truthed 2026-06-28 (user chose to defer + do MAIL GROUP instead). The transport
 MECHANICS generalize fine (the record still ships as `"KRN",<file>,<ien>,…` with a `-1`
