@@ -5,7 +5,7 @@ created: 2026-06-25
 last_modified: 2026-06-28
 corpus: WorldVistA/VistA (github), all Packages/**/*.KID[S] distributions
 method: static parse of the KIDS BUILD (#9.6) transport global in each .KID — see ~/data/kids-patches/analyze.py
-related: patch-existing-routines-proposal.md (the design these numbers justify); proposals/v-pkg-kids-coverage-analysis.md (F5/T0.2 — the correction)
+related: ../archive/patch-existing-routines-proposal.md (the design these numbers justify); ../proposals/v-pkg-kids-coverage-analysis.md (F5/T0.2 — the correction)
 ---
 
 # What 2,404 real KIDS patches actually do
@@ -32,7 +32,7 @@ related: patch-existing-routines-proposal.md (the design these numbers justify);
 > tracked separately — it gates real uninstall behavior, so it is not changed
 > here.) The corrected `analyze.py` writes `analysis-report.txt`.
 
-The v-pkg reversibility proposal ([patch-existing-routines-proposal.md](patch-existing-routines-proposal.md))
+The v-pkg reversibility proposal ([patch-existing-routines-proposal.md](../archive/patch-existing-routines-proposal.md))
 argued, from the single lived XWBBRK case, that **reversibility is a property of
 the whole patch, not the routine** — and that snapshot/restore is sound only for
 the narrow "pure routine-overwrite" class. To check that claim against reality we

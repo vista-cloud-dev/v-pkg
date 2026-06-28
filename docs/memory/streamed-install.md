@@ -52,4 +52,4 @@ Two phases, no SDK change:
 - A native `mdriver.Client.SetGlobal` would let the host populate `^XTMP` directly
   (no staging routines) — cleaner, but an SDK/coordinator change; not needed now.
 
-See `docs/kids-installation-automation.md §7` and the m-stdlib T0b.2 tracker.
+See `docs/design/kids-installation-automation.md §7` and the m-stdlib T0b.2 tracker.

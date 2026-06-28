@@ -19,11 +19,11 @@ append any new `§ Lessons learned`, and log directional decisions in `§ Q&A`.
 | **P1** | Core round-trip engine — `parse` / `decompose` / `assemble` / `roundtrip` / `canonicalize`, byte-identical to py-kids-vc on fixtures | ☑ | `internal/kids/*`, `kids_test.go` green | [§P1](#p1) |
 | **P2** | PIKS data-class gate — `lint` (gate K2), **new in the Go port** | ☑ | `internal/kids/piks.go` | [§P2](#p2) |
 | **P3** | Rename `kids-vc` → `m-kids` + docs + examples + merge to `main` + GitHub repo rename | ☑ | `593dcfe`, merge `040003d`, repo `m-kids` | [§P3](#p3) |
-| **P4** | Package extraction (live VistA → filesystem `KIDComponents/` tree) | ☐ design only | `docs/package-extraction-design.md` | [§P4](#p4) |
+| **P4** | Package extraction (live VistA → filesystem `KIDComponents/` tree) | ☐ design only | `docs/proposals/package-extraction-design.md` | [§P4](#p4) |
 | P4.1 | — Phase 1: inventory only (`#9.4`/`#9.6`/`#9.7` → `inventory.json`, zero writes, no PHI) | ☐ | — | [§P4](#p4) |
 | P4.2 | — Phase 2: definition extraction (S2/S3) behind the PIKS airlock | ☐ | — | [§P4](#p4) |
 | P4.3 | — Phase 3: S1 re-export → real `.KID` for `m-kids` round-trip | 🔒 | needs gold doc (P6) | [§P4](#p4) |
-| **P5** | KIDS install automation (silent/non-interactive install of a `.KID`) | ◑ built — `v pkg install/verify/uninstall` over the driver; **install now streams the transport global in size-bounded chunks → staging global → MERGE + `EN^XPDIJ`** (2026-06-12), fixing a silent partial-install of large packages (one-mega-routine staging truncated). YDB live-proven incl. the full 15-routine MSL base (test-in-place 15/15 suites); IRIS live-validation of the chunked path owed (T0b.2 IRIS leg). **(2026-06-16) Non-routine components: `v pkg build`/`install`/`verify`/`uninstall` now handle a #8989.51 PARAMETER DEFINITION as a KIDS KRN component + Required Builds (#9.611) — the VSL T1.3 enabler. Key fix: the direct-populate install seeds `^XPD(9.7,XPDA,"KRN")` from the build manifest, else `KRN^XPDIK` GVUNDEFs (status stuck at 2). Install→verify→uninstall→verify-clean proven on BOTH engines (vehu YDB + foia-t12 IRIS); `testdata/zzparam` golden + roundtrip-clean. See `docs/memory/krn-param-def-component.md`.** | `pkgcli/lifecycle.go`, `internal/installspec/*`, `internal/kids/krncomp.go`, `internal/buildspec/*`, `docs/kids-installation-automation.md §7` | [§P5](#p5) |
+| **P5** | KIDS install automation (silent/non-interactive install of a `.KID`) | ◑ built — `v pkg install/verify/uninstall` over the driver; **install now streams the transport global in size-bounded chunks → staging global → MERGE + `EN^XPDIJ`** (2026-06-12), fixing a silent partial-install of large packages (one-mega-routine staging truncated). YDB live-proven incl. the full 15-routine MSL base (test-in-place 15/15 suites); IRIS live-validation of the chunked path owed (T0b.2 IRIS leg). **(2026-06-16) Non-routine components: `v pkg build`/`install`/`verify`/`uninstall` now handle a #8989.51 PARAMETER DEFINITION as a KIDS KRN component + Required Builds (#9.611) — the VSL T1.3 enabler. Key fix: the direct-populate install seeds `^XPD(9.7,XPDA,"KRN")` from the build manifest, else `KRN^XPDIK` GVUNDEFs (status stuck at 2). Install→verify→uninstall→verify-clean proven on BOTH engines (vehu YDB + foia-t12 IRIS); `testdata/zzparam` golden + roundtrip-clean. See `docs/memory/krn-param-def-component.md`.** | `pkgcli/lifecycle.go`, `internal/installspec/*`, `internal/kids/krncomp.go`, `internal/buildspec/*`, `docs/design/kids-installation-automation.md §7` | [§P5](#p5) |
 | **P6** | Gold-doc gap — *Kernel 8.0 Developer's Guide: KIDS Developer Tools User Guide* (silent-install APIs + `XPD*` answer vars + re-export entry points) | ☐ | VDL fetch pending | [§P6](#p6) |
 | **P7** | Engine parity for extraction + install (`^XTMP`/`XINDEX`/KIDS identical under YottaDB & IRIS) | 🔒 | depends on `m-ydb`/`m-iris` real-engine spikes | [§P7](#p7) |
 
@@ -114,7 +114,7 @@ fixtures intentionally **left with literal `kids-vc` content** to avoid
 perturbing byte-identity round-trip tests.
 
 ### P4 — Package extraction (design only) {#p4}
-Per `docs/package-extraction-design.md`: read the live `#9.4`/`#9.6`/`#9.7`
+Per `docs/proposals/package-extraction-design.md`: read the live `#9.4`/`#9.6`/`#9.7`
 files to inventory installed packages, then extract definitions to a
 `KIDComponents/` tree behind the PIKS airlock, then (where build entries allow)
 re-export real `.KID`s for round-trip. Three strategies (S1 re-export / S2
@@ -123,7 +123,7 @@ engine-neutral driver contract (P7). **Phase 1 (inventory-only) is zero-write,
 no-PHI — ship first.** Open items tracked in `§ Q&A` (Q2, Q5).
 
 ### P5 — KIDS install automation (built; IRIS-live pending) {#p5}
-Per `docs/kids-installation-automation.md`: drive the authoritative 3-phase KIDS
+Per `docs/design/kids-installation-automation.md`: drive the authoritative 3-phase KIDS
 install (load distribution → install build → post-install) non-interactively.
 Two tiers: **Tier A** = native silent-install APIs + `XPD*` answer variables
 (needs P6 to confirm exact entry points); **Tier B** = expect-driven against the
@@ -237,13 +237,13 @@ Format: **Q<n> (date, STATUS):** question — *recommendation*. **A:** answer.
   back-out, VSLTAPBO-style · 3 forward-only=refuse, scaffold a forward back-out
   patch), add `snapshot`/`restore`, make `install`/`uninstall` class-aware, add
   patch-drift `verify`, and never over-claim reversibility. Full design:
-  [`patch-existing-routines-proposal.md`](patch-existing-routines-proposal.md).
+  [`patch-existing-routines-proposal.md`](archive/patch-existing-routines-proposal.md).
   **Now corpus-grounded** (2026-06-25): a static parse of all **2,404** WorldVistA
   KIDS distributions shows the pure-overwrite class is the **minority — 35%**;
   **64%** are side-effecting (51% run install code, 23% file FileMan entries, 23%
   ship DD/data, 96% declare required builds). So class-aware `uninstall` and the
   authored-back-out contract are the *common* path, not an edge case — see
-  [`kids-corpus-findings.md`](kids-corpus-findings.md).*
+  [`kids-corpus-findings.md`](design/kids-corpus-findings.md).*
   **A (partial, 2026-06-25):** keystone landed — `internal/kids/reversibility.go`
   + `v pkg classify` statically derive the reversibility class (no engine),
   corpus-validated (36%/63%). `make corpus` round-trips ALL 2,404 local KIDS
@@ -279,9 +279,9 @@ Format: **Q<n> (date, STATUS):** question — *recommendation*. **A:** answer.
 
 ## References
 
-- `docs/architecture.md` — assembly/disassembly process, data model, round-trip.
-- `docs/package-extraction-design.md` — P4 source.
-- `docs/kids-installation-automation.md` — P5 source.
+- `docs/design/architecture.md` — assembly/disassembly process, data model, round-trip.
+- `docs/proposals/package-extraction-design.md` — P4 source.
+- `docs/design/kids-installation-automation.md` — P5 source.
 - `examples/USER_GUIDE.md` — worked round-trip on XU\*8.0\*504.
 - Upstream: `github.com/rafael5/py-kids-vc` (Python), Sam Habiel's XPDK2VC (MUMPS).
 - `~/projects/py-kids-install` — sibling install-side Python project (feeds P5).

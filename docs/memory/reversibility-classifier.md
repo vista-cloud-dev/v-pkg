@@ -7,8 +7,8 @@ metadata:
 
 **Reversibility classifier + corpus harness (2026-06-25)** — the keystone the
 patch-existing-routines proposal gates on, plus the full-corpus test the user
-asked for. Grounds [[kids-corpus-reversibility]]; implements
-`docs/patch-existing-routines-proposal.md`.
+asked for. Grounded in the corpus findings (`docs/design/kids-corpus-findings.md`);
+implements `docs/archive/patch-existing-routines-proposal.md`.
 
 **`internal/kids/reversibility.go`** — `Classify(k)` / `ClassifyBuild(name,b)`
 derive `ClassPureOverwrite` (class 1, restore-reversible) vs `ClassSideEffecting`

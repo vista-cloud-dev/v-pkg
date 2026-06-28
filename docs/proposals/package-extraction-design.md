@@ -3,8 +3,8 @@
 A proposal for **pulling the installed software of a running VistA/M instance out
 to a git-friendly filesystem tree**, for analysis, diffing, drift detection, and
 archival. This is the *inbound* (system → filesystem) counterpart to
-[`kids-installation-automation.md`](kids-installation-automation.md) (filesystem
-→ system) and feeds directly into [`m-kids`](architecture.md) `decompose`.
+[`kids-installation-automation.md`](../design/kids-installation-automation.md) (filesystem
+→ system) and feeds directly into [`m-kids`](../design/architecture.md) `decompose`.
 
 Status: **design proposal.** It specifies the approach, the authoritative
 mechanisms it builds on, and the open questions — it is not yet implemented.

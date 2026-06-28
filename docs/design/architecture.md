@@ -12,7 +12,7 @@ is safe.
 > For installing a `.KID` into a live VistA instance, see
 > [`kids-installation-automation.md`](kids-installation-automation.md); for
 > pulling installed packages *out* of a running system, see
-> [`package-extraction-design.md`](package-extraction-design.md).
+> [`package-extraction-design.md`](../proposals/package-extraction-design.md).
 
 ---
 
@@ -261,7 +261,7 @@ XU_8.0_504/KIDComponents/
     └── SECURITY-KEY/XUKAAJEE_SAMPLE.zwr
 ```
 
-(See [`../examples/`](../examples/) for the full committed tree and a runnable
+(See [`../../examples/`](../../examples/) for the full committed tree and a runnable
 demo.)
 
 ---
@@ -408,7 +408,7 @@ flowchart LR
 
 - **Disassembly / assembly** (this tool) — `decompose` ⇄ `assemble`, with
   `roundtrip` as the oracle and `lint`/`canonicalize` as guards.
-- **Extraction** — see [`package-extraction-design.md`](package-extraction-design.md).
+- **Extraction** — see [`package-extraction-design.md`](../proposals/package-extraction-design.md).
 - **Installation** — see [`kids-installation-automation.md`](kids-installation-automation.md).
 
 ---

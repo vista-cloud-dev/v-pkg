@@ -1,0 +1,32 @@
+# v-pkg docs
+
+Documentation for **v-pkg** — the VistA KIDS round-trip + lifecycle tool fronted
+by `v pkg` (decompose / assemble / build / install / verify / uninstall /
+snapshot / restore / classify). Layout follows the org standard folder set
+(`~/vista-cloud-dev/CLAUDE.md`).
+
+## Live tracker (Tier D)
+
+- [`implementation-plan.md`](implementation-plan.md) — single source of truth for
+  status (P0–P7 tracking table + implementation notes). Updated in the same change
+  that lands work.
+
+## Folders
+
+- **`design/`** — this repo's own design + reference notes:
+  - [`architecture.md`](design/architecture.md) — how m-kids assembles /
+    disassembles a `.KID`, the data model, and the round-trip guarantee.
+  - [`kids-installation-automation.md`](design/kids-installation-automation.md) —
+    non-interactive KIDS install design + driver contract (P5).
+  - [`kids-corpus-findings.md`](design/kids-corpus-findings.md) — corpus evidence
+    (2,404 WorldVistA `.KID` builds) grounding the reversibility model.
+- **`proposals/`** — not-yet-built designs and active proposals:
+  - [`package-extraction-design.md`](proposals/package-extraction-design.md) —
+    live-VistA → filesystem extraction (P4, design only).
+  - [`v-pkg-install-fidelity-spike.md`](proposals/v-pkg-install-fidelity-spike.md) —
+    Track A install-fidelity spike.
+  - [`v-pkg-kids-coverage-analysis.md`](proposals/v-pkg-kids-coverage-analysis.md) —
+    adversarial coverage analysis vs the full KIDS model.
+- **`memory/`** — auto-memory (durable facts only); see
+  [`memory/MEMORY.md`](memory/MEMORY.md) for the index.
+- **`archive/`** — retired / completed docs (frozen, kept for history).

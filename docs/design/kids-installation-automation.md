@@ -252,7 +252,7 @@ same way against either engine.
 
 ## 7. Worked example: silent install of XU*8.0*504
 
-Conceptual flow for the sample build shipped in [`../examples/`](../examples/):
+Conceptual flow for the sample build shipped in [`../../examples/`](../../examples/):
 
 ```mermaid
 sequenceDiagram

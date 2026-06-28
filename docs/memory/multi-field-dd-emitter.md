@@ -8,7 +8,8 @@ metadata:
 # v-pkg: multi-field FileMan DD authoring — coverage-analysis B.2-a (2026-06-28)
 
 Generalizes the single-`.01` FILE DD emitter [[fileman-dd-component]] to **multiple
-typed fields**, the R3 enabler from [[kids-coverage-analysis]] (Track B item B.2).
+typed fields**, the R3 enabler from the coverage-analysis proposal
+(`docs/proposals/v-pkg-kids-coverage-analysis.md`, Track B item B.2).
 TDD; landed on `main` (trunk-based). Unblocks v-stdlib R3's multi-field `VSL AUDIT`
 file.
 
@@ -63,5 +64,6 @@ deterministic gate `TestBuild_ZZVSLAU_Deterministic`. Multi-field unit gate
 `TestMakeBuildPairs_File_MultiField`.
 
 Companion to [[fileman-dd-component]] (single-.01 lifecycle, live-proven) and
-[[krn-param-def-component]]; roadmap item per [[kids-coverage-analysis]]. Engine
+[[krn-param-def-component]]; roadmap item per the coverage-analysis proposal
+(`docs/proposals/v-pkg-kids-coverage-analysis.md`). Engine
 proof, when done, goes through [[engine-access-through-driver-stack]].

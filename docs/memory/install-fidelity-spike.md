@@ -104,5 +104,5 @@ container was stopped — `docker start foia-t12` (lifecycle, allowed; not exec)
 Next: A.1.2 (env-check+required-builds via `$$ENV^XPDIL1(1)`), A.1.3 (seed #9.7
 QUES), and B.3 authoring (emit pre/post routines so the fixture is reproducible
 end-to-end — INI/INIT are hand-injected today). Companion to
-[[kids-coverage-analysis]], [[fileman-dd-component]]; builds on
-kids-installation-automation.md §7.1.
+the coverage-analysis proposal (`docs/proposals/v-pkg-kids-coverage-analysis.md`),
+[[fileman-dd-component]]; builds on `docs/design/kids-installation-automation.md` §7.1.
