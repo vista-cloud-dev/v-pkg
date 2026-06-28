@@ -40,16 +40,23 @@ func (c ReversibilityClass) String() string {
 	}
 }
 
-// installRoleNames maps the #9.6 BUILD subnode key to the install-time role it
-// carries. A NON-EMPTY value at any of these means the build runs that code at
-// install (ground-truthed against the corpus: "INI"=env-check "YS60PRE",
-// "INIT"=post-install "YS60POST", "PRE"/"PRET"=pre-install/pre-transport). The
-// "INID" node is run-timing FLAGS ("^y^n"), not code, and is excluded.
+// installRoleNames maps the #9.6 BUILD install-routine subnode key to its role —
+// AUTHORITATIVE from the live #9.6 DD (field NAME → storage location node):
+// field 913 ENVIRONMENT CHECK ROUTINE → "PRE", 916 PRE-INSTALL ROUTINE → "INI",
+// 914 POST-INSTALL ROUTINE → "INIT", 900 PRE-TRANSPORTATION ROUTINE → "PRET".
+// (This map previously had PRE/INI SWAPPED from a corpus routine-name guess;
+// corrected after A.1.x live-proved ENV^XPDIL1 reads "PRE" as the env-check and
+// PRE^/POST^XPDIJ1 read "INI"/"INIT" as pre/post-install.) "INID" is the
+// delete-init-routine FLAGS, not code, and is excluded.
+//
+// NOTE: this is DISPLAY ONLY (the InstallCode[role] detail map / `v pkg classify`).
+// Classification (HasInstallCode) keys on the subnode key's PRESENCE in this map,
+// not the role string, so the label and the swap never affected the class verdict.
 var installRoleNames = map[string]string{
-	"INI":  "environment-check",
-	"INIT": "post-install",
-	"PRE":  "pre-install",
-	"PRET": "pre-transport",
+	"PRE":  "environment-check", // #9.6 field 913
+	"INI":  "pre-install",       // #9.6 field 916
+	"INIT": "post-install",      // #9.6 field 914
+	"PRET": "pre-transport",     // #9.6 field 900
 }
 
 // BuildReversibility is the per-build static analysis used to drive class-aware

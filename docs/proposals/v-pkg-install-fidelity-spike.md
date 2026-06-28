@@ -276,13 +276,15 @@ and the A.1.1 regression confirms env-check-on did not break pre/post firing.
 > sets `XPDABORT=1`, and `$$ENV` returns 1 → install refused `env-check-rejected^1^`,
 > nothing filed, on both engines.
 
-> **Follow-up finding (not fixed here).** `internal/kids/reversibility.go`'s
-> `installRoleNames` map labels the transport keys **`INI`/`PRE` swapped** vs ground
-> truth: live `ENV^XPDIL1` reads `^XTMP("XPDI",XPDA,"PRE")` as the **env-check**
-> routine and `"INI"` is the **pre-install** routine (A.1.1, live-proven), but the
-> map says `INI`=environment-check / `PRE`=pre-install. It is **display-only**
-> (classification keys on subnode *presence*, not the role name), so it's cosmetic —
-> but worth correcting so the `classify` output isn't misleading.
+> **Follow-up finding — FIXED 2026-06-28.** `internal/kids/reversibility.go`'s
+> `installRoleNames` map had the transport keys **`INI`/`PRE` swapped** vs ground
+> truth. Corrected against the authoritative live **#9.6 DD** (field 913 ENVIRONMENT
+> CHECK ROUTINE→`PRE`, 916 PRE-INSTALL ROUTINE→`INI`, 914 POST-INSTALL→`INIT`, 900
+> PRE-TRANSPORTATION→`PRET`) — matching what `ENV^XPDIL1` (reads `"PRE"` as env-check)
+> and `PRE^/POST^XPDIJ1` (read `"INI"/"INIT"`) do live. Display-only (classification
+> keys on subnode *presence*, not the role name), so no class verdict changed; the
+> `v pkg classify` `InstallCode` labels are now correct. Regression test
+> `TestInstallCodeRoleLabels`.
 
 ## B.3 — DONE + live-proven on BOTH engines (2026-06-28)
 
@@ -336,7 +338,9 @@ reached `$$ANSWER^XPDIQ`. This closes the A.1 install-fidelity track (A.1.1
 pre/post · A.1.2 env-check · A.1.3 questions).
 
 ## Recommended next steps
-- **Fix** the `reversibility.go` `INI`/`PRE` role-label swap (cosmetic, above).
+- The A.1 install-fidelity track + the `reversibility.go` role-label fix are
+  complete. Remaining work is Track B (authoring) — see
+  `v-pkg-kids-coverage-analysis.md`.
 
 ## Sources
 - Real `XPD*` routine source: WorldVistA/VistA-M `Packages/Kernel/Routines/`

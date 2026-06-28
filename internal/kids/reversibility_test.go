@@ -43,10 +43,13 @@ func TestClassifyBuild(t *testing.T) {
 			wantClass: ClassSideEffecting, wantRtns: true, wantCode: true,
 		},
 		{
-			name: "environment-check routine (INI) -> side-effecting",
+			// "INI" is the #9.6 PRE-INSTALL routine (field 916). The corpus build
+			// happens to NAME its pre-install routine YS60PRE — a naming convention,
+			// not the role (that name-vs-role confusion is what once mis-mapped INI).
+			name: "pre-install routine (INI) -> side-effecting",
 			build: buildFrom(
 				[2]string{`"RTN","YS60")`, `0^1`},
-				[2]string{`"BLD",19324,"INI")`, `YS60PRE`}, // env-check
+				[2]string{`"BLD",19324,"INI")`, `YS60PRE`}, // pre-install
 			),
 			wantClass: ClassSideEffecting, wantRtns: true, wantCode: true,
 		},
@@ -102,6 +105,31 @@ func TestClassifyBuild(t *testing.T) {
 				t.Errorf("ShipsFileDD = %v, want %v", got.ShipsFileDD, tc.wantDD)
 			}
 		})
+	}
+}
+
+// TestInstallCodeRoleLabels locks the corrected #9.6 BUILD subnode → role labels
+// (env-check "PRE" and pre-install "INI" were once swapped; the live #9.6 DD is
+// authoritative — field 913 ENVIRONMENT CHECK ROUTINE=PRE, 916 PRE-INSTALL=INI,
+// 914 POST-INSTALL=INIT, 900 PRE-TRANSPORTATION=PRET).
+func TestInstallCodeRoleLabels(t *testing.T) {
+	got := ClassifyBuild("ZZ*1.0*1", buildFrom(
+		[2]string{`"RTN","ZZ")`, `0^1`},
+		[2]string{`"BLD",1,"PRE")`, `ZZENV`},
+		[2]string{`"BLD",1,"INI")`, `PRE^ZZP`},
+		[2]string{`"BLD",1,"INIT")`, `POST^ZZP`},
+		[2]string{`"BLD",1,"PRET")`, `ZZPRET`},
+	))
+	want := map[string]string{
+		"environment-check": "ZZENV",
+		"pre-install":       "PRE^ZZP",
+		"post-install":      "POST^ZZP",
+		"pre-transport":     "ZZPRET",
+	}
+	for role, entry := range want {
+		if got.InstallCode[role] != entry {
+			t.Errorf("InstallCode[%q] = %q, want %q", role, got.InstallCode[role], entry)
+		}
 	}
 }
 
