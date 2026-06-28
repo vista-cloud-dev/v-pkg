@@ -63,6 +63,9 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 		ParamDefs:      paramDefs,
 		Files:          files,
 		RequiredBuilds: reqBuilds,
+		EnvCheck:       spec.EnvCheck,
+		PreInstall:     spec.PreInstall,
+		PostInstall:    spec.PostInstall,
 	})
 
 	out := c.Out

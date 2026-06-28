@@ -32,6 +32,9 @@ type BuildInput struct {
 	ParamDefs      []ParamDef   // #8989.51 PARAMETER DEFINITION KRN components
 	Files          []FileDD     // brand-new FileMan FILE DD components (FIA)
 	RequiredBuilds []ReqBuild   // Required Builds (#9.611) — prerequisites
+	EnvCheck       string       // environment-check routine (bare name) → top-level "PRE"
+	PreInstall     string       // pre-install routine entryref → top-level "INI"
+	PostInstall    string       // post-install routine entryref → top-level "INIT"
 	Platform       string       // VER node (Kernel^FileMan), default "8.0^22.2"
 }
 
@@ -52,6 +55,7 @@ func MakeBuildPairs(in BuildInput) []Pair {
 	emitParamDefManifest(b, in.ParamDefs)
 	emitFileManifest(b, in.Files)
 	emitRequiredBuildManifest(b, in.RequiredBuilds)
+	emitInstallHooks(b, in.EnvCheck, in.PreInstall, in.PostInstall)
 
 	b.Set(Subs{strSub("RTN")}, strconv.Itoa(len(in.Routines)))
 	for _, r := range in.Routines {

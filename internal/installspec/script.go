@@ -90,6 +90,12 @@ func FinalInstallScript(name, header string, nPairs int, runEnvCheck bool) strin
 	w(`S XPDST=0,XPDIT=1,XPDST("H1")=` + kids.MString(header+"  ;Created on "))
 	w(`S XPDA=$$INST^XPDIL1(` + nameLit + `)`)
 	w(`S ^XTMP("XPDI",0)=$$FMADD^XLFDT(DT,7)_U_DT`)
+	// Start from a CLEAN transport node, exactly as the real KIDS load does. A
+	// purged earlier install can free its #9.7 IEN; $$INST^XPDIL1 then re-assigns
+	// it, and any stale ^XTMP("XPDI",IEN,…) left at that IEN (e.g. a prior build's
+	// REQB / "PRE" nodes) would survive the MERGE below and corrupt the env-check /
+	// Required-Build enforcement. KILL first so the staged tree is the only content.
+	w(`K ^XTMP("XPDI",XPDA)`)
 	w(`M ^XTMP("XPDI",XPDA)=` + stageGbl) // staged tree → live transport global
 	// A.1.2 env-check + required-builds (install-fidelity-spike). The
 	// direct-populate path jumps to EN^XPDIJ (filing) and SKIPS the load/install

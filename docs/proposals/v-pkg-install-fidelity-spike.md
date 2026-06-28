@@ -268,12 +268,13 @@ Required Build `ZZNOPE*1.0*1` (action "DON'T INSTALL, LEAVE GLOBAL" = #9.611 cod
 `--skip-env-check` installs the bogus build anyway (status 3) — the bypass works,
 and the A.1.1 regression confirms env-check-on did not break pre/post firing.
 
-> **Scope note.** A.1.2 is proven via **Required-Build enforcement** (no routine
-> execution needed; `emitRequiredBuildManifest` already ships the #9.611 nodes).
-> The env-check **routine** path runs too (same `$$ENV` call) but isn't exercised
-> here: a build's own env-check routine isn't filed at env-check time, and emitting
-> the `"PRE"` transport node from `buildspec.envCheck` is a follow-up (sibling of
-> A.1.1's still-hand-injected `INI`/`INIT`).
+> **Scope note.** A.1.2 is proven here via **Required-Build enforcement** (no
+> routine execution needed; `emitRequiredBuildManifest` already ships the #9.611
+> nodes). The env-check **routine** path runs on the same `$$ENV` call but was not
+> exercised at the time of writing. **It is now — see B.3 below**: the rejecting
+> env-check routine `ZZA3RE` is SAVEd (`^%ZOSF("SAVE")`) and run by `ENV^XPDIL1`,
+> sets `XPDABORT=1`, and `$$ENV` returns 1 → install refused `env-check-rejected^1^`,
+> nothing filed, on both engines.
 
 > **Follow-up finding (not fixed here).** `internal/kids/reversibility.go`'s
 > `installRoleNames` map labels the transport keys **`INI`/`PRE` swapped** vs ground
@@ -283,12 +284,36 @@ and the A.1.1 regression confirms env-check-on did not break pre/post firing.
 > (classification keys on subnode *presence*, not the role name), so it's cosmetic —
 > but worth correcting so the `classify` output isn't misleading.
 
+## B.3 — DONE + live-proven on BOTH engines (2026-06-28)
+
+`v pkg build` now AUTHORS the three install-hook routines from the build spec, so
+the A.1.1/A.1.2 fixtures are reproducible **end-to-end with no hand-injection**:
+`buildspec` gained `envCheck` (already), `preInstall`, `postInstall`;
+`kids.emitInstallHooks` writes the top-level `"PRE")`/`"INI")`/`"INIT")` transport
+nodes (mirrored under `"BLD",1,…`), unset hooks emit nothing (corpus DRIFT=0
+preserved). Validation is shape-only — the routine may be shipped here or pre-exist
+on the target. Fixture `testdata/zza3-hooks/` (`ZZA3` positive, `ZZA3R` rejecting
+env-check), built via `v pkg build … --src src`.
+
+| Engine | positive `ZZA3` (env-check pass + pre + post) | negative `ZZA3R` (rejecting env-check) |
+|---|---|---|
+| vehu (YDB)      | `^ZZA3OUT ENV/PRE/POST=1`, `#9.7` status 3 | **REFUSED** `env-check-rejected^1^`, nothing filed |
+| foia-t12 (IRIS) | `^ZZA3OUT ENV/PRE/POST=1`, `#9.7` status 3 | **REFUSED** `env-check-rejected^1^`, nothing filed |
+
+This closes the env-check-**routine** scope gap left by A.1.2 (positive sentinel
+`ENV=1` proves the env-check routine RAN and passed; the rejecting routine proves
+the reject arm). **Installer fix discovered here:** `FinalInstallScript` now
+`K ^XTMP("XPDI",XPDA)` **before** the MERGE — a purged earlier install frees its
+#9.7 IEN, `$$INST^XPDIL1` re-assigns it, and stale REQB nodes at that IEN survived
+the MERGE and made `$$REQB` falsely reject (was the `^2^2` artifact). The real KIDS
+load always starts from a clean node. Regression test
+`TestFinalInstallScript_KillBeforeMerge`. **Gotcha:** env-check routine source must
+be ASCII — `^%ZOSF("SAVE")` compiles it before running, and a non-ASCII comment
+byte breaks the compile.
+
 ## Recommended next steps
 - **A.1.3** — seed `#9.7` `QUES` answers from an install-spec (the `installspec`
   package + `Answers.XPDDIQ()` already model this; wire it into the install script).
-- **B.3 (authoring)** — emit pre/post-install routines **and** the env-check `"PRE"`
-  node from a build spec so the A.1.1/A.1.2 fixtures are reproducible end-to-end
-  (the `INI`/`INIT`/`PRE` nodes are hand-injected / requirement-only today).
 - **Fix** the `reversibility.go` `INI`/`PRE` role-label swap (cosmetic, above).
 
 ## Sources

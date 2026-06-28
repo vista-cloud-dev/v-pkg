@@ -41,8 +41,10 @@ type Spec struct {
 	Patch          string          `json:"patch,omitempty"` // e.g. 1 (optional)
 	Components     Components      `json:"components"`
 	RequiredBuilds []RequiredBuild `json:"requiredBuilds,omitempty"`
-	EnvCheck       string          `json:"envCheck,omitempty"` // environment-check routine name (XPDENV)
-	ICRs           []ICR           `json:"icrs,omitempty"`     // DBIA/ICR agreements the package relies on
+	EnvCheck       string          `json:"envCheck,omitempty"`    // environment-check routine (bare name, XPDENV)
+	PreInstall     string          `json:"preInstall,omitempty"`  // pre-install routine entryref (TAG^RTN), run before component filing
+	PostInstall    string          `json:"postInstall,omitempty"` // post-install routine entryref (TAG^RTN), run after component filing
+	ICRs           []ICR           `json:"icrs,omitempty"`        // DBIA/ICR agreements the package relies on
 
 	// AllowLongNames opts the build out of the legacy 8-char SAC routine-name
 	// convention, raising the cap to the M engine limit (RoutineNameMaxLong).
@@ -262,6 +264,7 @@ var (
 	reParamName = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // #8989.51 NAME (uppercase, internal spaces)
 	reFileName  = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // FileMan FILE .01 name (uppercase, internal spaces)
 	reGlobalRt  = regexp.MustCompile(`^\^%?[A-Z][A-Z0-9]*\(.*,$`)           // open global root, e.g. ^DIZ(999000,
+	reLabel     = regexp.MustCompile(`^[A-Z][A-Z0-9]*$`)                    // M line label (entryref tag)
 )
 
 // Load reads and validates a build spec from a kids/<pkg>.build.json file.
@@ -329,8 +332,8 @@ func (s *Spec) Validate() error {
 			return fmt.Errorf("buildspec: required build %s action %q is not a KIDS install action", rb.Name, rb.Action)
 		}
 	}
-	if s.EnvCheck != "" && !isRoutineName(s.EnvCheck, maxName) {
-		return fmt.Errorf("buildspec: envCheck %q is not a valid routine name (≤%d chars)", s.EnvCheck, maxName)
+	if err := s.validateInstallHooks(maxName); err != nil {
+		return err
 	}
 	for _, icr := range s.ICRs {
 		if icr.Number <= 0 {
@@ -338,6 +341,44 @@ func (s *Spec) Validate() error {
 		}
 	}
 	return nil
+}
+
+// validateInstallHooks checks the env-check / pre-install / post-install routine
+// declarations (B.3). Env-check is a bare routine name (ENV does D @("^"_name), so
+// no tag); pre/post are entryrefs (TAG^RTN or RTN) that PRE^/POST^XPDIJ1 D @. Only
+// the shape is validated — the routine may be shipped in this build or pre-exist on
+// the target (a missing one surfaces clearly at install time).
+func (s *Spec) validateInstallHooks(maxName int) error {
+	if s.EnvCheck != "" && !isRoutineName(s.EnvCheck, maxName) {
+		return fmt.Errorf("buildspec: envCheck %q must be a bare routine name (≤%d chars, no tag)", s.EnvCheck, maxName)
+	}
+	for _, h := range []struct{ field, ref string }{
+		{"preInstall", s.PreInstall},
+		{"postInstall", s.PostInstall},
+	} {
+		if h.ref == "" {
+			continue
+		}
+		tag, rtn, ok := splitEntryref(h.ref)
+		if !ok || !isRoutineName(rtn, maxName) || (tag != "" && !reLabel.MatchString(tag)) {
+			return fmt.Errorf("buildspec: %s %q must be a routine entryref (ROUTINE or TAG^ROUTINE)", h.field, h.ref)
+		}
+	}
+	return nil
+}
+
+// splitEntryref splits an M entryref into its optional tag and routine. "RTN" →
+// ("", "RTN"); "TAG^RTN" → ("TAG", "RTN"). ok is false on an empty part or extra
+// carets.
+func splitEntryref(s string) (tag, rtn string, ok bool) {
+	switch parts := strings.Split(s, "^"); len(parts) {
+	case 1:
+		return "", parts[0], parts[0] != ""
+	case 2:
+		return parts[0], parts[1], parts[0] != "" && parts[1] != ""
+	default:
+		return "", "", false
+	}
 }
 
 // validateParamDefs checks each PARAMETER DEFINITION component: a valid #8989.51

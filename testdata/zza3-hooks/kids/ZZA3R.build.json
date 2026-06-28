@@ -1,0 +1,9 @@
+{
+  "package": "ZZA3R",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "routines": ["ZZA3RE"]
+  },
+  "envCheck": "ZZA3RE"
+}

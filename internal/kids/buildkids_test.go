@@ -5,6 +5,50 @@ import (
 	"testing"
 )
 
+// B.3: a build that declares an env-check + pre/post-install routine emits the
+// top-level "PRE"/"INI"/"INIT" transport nodes the install path reads, mirrored in
+// the #9.6 BLD manifest. Env-check is a bare routine; pre/post are entryrefs.
+func TestMakeBuildPairs_InstallHooks(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZA1*1.0*1", Namespace: "ZZA1",
+		Routines:    []RoutineSrc{{Name: "ZZA1P", Lines: []string{"ZZA1P ;x", " quit"}}},
+		EnvCheck:    "ZZA1ENV",
+		PreInstall:  "PRE^ZZA1P",
+		PostInstall: "POST^ZZA1P",
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	want := map[string]string{
+		`"PRE")`:          "ZZA1ENV",    // top-level env-check routine (read by ENV^XPDIL1)
+		`"INI")`:          "PRE^ZZA1P",  // top-level pre-install entryref
+		`"INIT")`:         "POST^ZZA1P", // top-level post-install entryref
+		`"BLD",1,"PRE")`:  "ZZA1ENV",    // #9.6 BLD manifest mirrors
+		`"BLD",1,"INI")`:  "PRE^ZZA1P",
+		`"BLD",1,"INIT")`: "POST^ZZA1P",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+}
+
+// A build with no install hooks emits none of those nodes (byte-identical to the
+// pre-B.3 routine-only shape).
+func TestMakeBuildPairs_NoInstallHooks(t *testing.T) {
+	for _, p := range MakeBuildPairs(BuildInput{
+		InstallName: "ZZSKEL*1.0*1", Namespace: "ZZSKEL",
+		Routines: []RoutineSrc{{Name: "ZZSKEL", Lines: []string{"ZZSKEL ;x", " quit"}}},
+	}) {
+		switch k := formatSubscript(p.Subs); k {
+		case `"PRE")`, `"INI")`, `"INIT")`, `"BLD",1,"PRE")`, `"BLD",1,"INI")`, `"BLD",1,"INIT")`:
+			t.Errorf("hook-free build leaked install-hook node: %s", k)
+		}
+	}
+}
+
 func TestMakeBuildPairs_Deterministic_And_Shape(t *testing.T) {
 	in := BuildInput{
 		InstallName: "ZZSKEL*1.0*1",

@@ -140,6 +140,27 @@ func emitMBREQ(b *Build, reqs []ReqBuild) {
 	b.Set(Subs{strSub("MBREQ")}, strconv.Itoa(len(reqs)))
 }
 
+// emitInstallHooks writes the install-time routine declarations (B.3): the
+// environment-check ("PRE"), pre-install ("INI"), and post-install ("INIT")
+// routines. Each is written both as the top-level transport node the install path
+// reads (ENV^XPDIL1 reads "PRE"; PKG^XPDIL1/$$NEWCP read "INI"/"INIT") and as the
+// #9.6 BLD manifest mirror (the build's self-description / round-trip). Env-check
+// is a bare routine name (ENV does D @("^"_name)); pre/post are entryrefs that
+// PRE^/POST^XPDIJ1 D @. Emits nothing when a hook is unset, so a hook-free build
+// stays byte-identical.
+func emitInstallHooks(b *Build, envCheck, preInstall, postInstall string) {
+	set := func(field, val string) {
+		if val == "" {
+			return
+		}
+		b.Set(Subs{strSub(field)}, val)
+		b.Set(Subs{strSub("BLD"), intSub(1), strSub(field)}, val)
+	}
+	set("PRE", envCheck)
+	set("INI", preInstall)
+	set("INIT", postInstall)
+}
+
 // ParamDefNames returns the names of the #8989.51 PARAMETER DEFINITION components
 // in build order, read from the top-level KRN record 0-nodes — what `v pkg
 // verify`/`uninstall` use to probe and back out each parameter definition.

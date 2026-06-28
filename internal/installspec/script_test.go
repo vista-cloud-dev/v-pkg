@@ -89,6 +89,24 @@ func TestFinalInstallScript(t *testing.T) {
 	}
 }
 
+// The transport node must be KILLed before the staged tree is MERGEd into it: a
+// purged earlier install can free its #9.7 IEN, $$INST^XPDIL1 re-assigns it, and
+// stale ^XTMP("XPDI",IEN,…) (e.g. a prior build's REQB nodes) would otherwise
+// survive the MERGE and corrupt env-check / Required-Build enforcement. The real
+// KIDS load always starts from a clean node. (Live-proven: a stale REQB made a
+// hook-only build's env-check return 2 until the KILL was added.)
+func TestFinalInstallScript_KillBeforeMerge(t *testing.T) {
+	got := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, true)
+	kill := strings.Index(got, `K ^XTMP("XPDI",XPDA)`)
+	merge := strings.Index(got, `M ^XTMP("XPDI",XPDA)=^XTMP("VPKGI")`)
+	if kill < 0 {
+		t.Fatalf("FinalInstallScript must KILL ^XTMP(\"XPDI\",XPDA) before the MERGE\n---\n%s", got)
+	}
+	if kill > merge {
+		t.Errorf("KILL of the transport node (%d) must precede the MERGE (%d)", kill, merge)
+	}
+}
+
 // A.1.1: before EN^XPDIJ, the script must create the INI/INIT checkpoints so the
 // build's pre/post-install routines fire (PRE^/POST^XPDIJ1 D @ the routine read
 // from the "...STARTED" checkpoint's callback). Mirrors PKG^XPDIL1: $$NEWCP^XPDUTL

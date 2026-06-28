@@ -218,6 +218,34 @@ func TestParse_Fields_Invalid(t *testing.T) {
 	}
 }
 
+func TestParse_InstallHooks(t *testing.T) {
+	js := `{"package":"ZZA1","version":"1.0","components":{"routines":["ZZA1P","ZZA1ENV"]},
+	  "envCheck":"ZZA1ENV","preInstall":"PRE^ZZA1P","postInstall":"POST^ZZA1P"}`
+	s, err := Parse([]byte(js))
+	if err != nil {
+		t.Fatalf("parse install hooks: %v", err)
+	}
+	if s.EnvCheck != "ZZA1ENV" || s.PreInstall != "PRE^ZZA1P" || s.PostInstall != "POST^ZZA1P" {
+		t.Errorf("hooks = %q/%q/%q", s.EnvCheck, s.PreInstall, s.PostInstall)
+	}
+}
+
+func TestParse_InstallHooks_Invalid(t *testing.T) {
+	base := `{"package":"ZZA1","version":"1.0","components":{"routines":["ZZA1P"]},%s}`
+	cases := map[string]string{
+		"envCheck has a tag":   `"envCheck":"PRE^ZZA1P"`, // env-check must be a bare routine
+		"envCheck lowercase":   `"envCheck":"lower"`,
+		"preInstall bad tag":   `"preInstall":"lower^ZZA1P"`,
+		"preInstall empty rtn": `"preInstall":"PRE^"`,
+		"postInstall 3 parts":  `"postInstall":"A^B^ZZA1P"`,
+	}
+	for name, frag := range cases {
+		if _, err := Parse([]byte(fmt.Sprintf(base, frag))); err == nil {
+			t.Errorf("%s: expected an error, got nil", name)
+		}
+	}
+}
+
 func TestInstallName_NoPatch(t *testing.T) {
 	s, err := Parse([]byte(`{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"]}}`))
 	if err != nil {
