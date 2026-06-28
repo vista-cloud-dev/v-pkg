@@ -1,0 +1,42 @@
+KIDS Distribution saved by v-pkg
+m-kids reassembled output
+**KIDS**:ZZHL*1.0*1^
+
+**INSTALL NAME**
+ZZHL*1.0*1
+"BLD",1,0)
+ZZHL*1.0*1^ZZHL^0^0
+"BLD",1,"KRN",0)
+^9.67PA^771^1
+"BLD",1,"KRN",771,0)
+771
+"BLD",1,"KRN",771,"NM",0)
+^9.68A^1^1
+"BLD",1,"KRN",771,"NM",1,0)
+ZZHL_APP^^0
+"BLD",1,"KRN",771,"NM","B","ZZHL_APP",1)
+
+"BLD",1,"KRN","B",771,771)
+
+"RTN")
+1
+"RTN","ZZHLRT")
+0^3^0^0
+"RTN","ZZHLRT",1,0)
+ZZHLRT ;VCD/VSL - throwaway test package (KRN hl7 application component) ;1.0
+"RTN","ZZHLRT",2,0)
+ ;;1.0;ZZHL;;
+"RTN","ZZHLRT",3,0)
+ quit
+"ORD",1,771)
+771;1;;;HLAP^XPDTA1;HLAPF1^XPDIA1;HLAPE1^XPDIA1;HLAPF2^XPDIA1;;HLAPDEL^XPDIA1(%)
+"ORD",1,771,0)
+HL7 APPLICATION PARAMETER
+"KRN",771,1,-1)
+0^1
+"KRN",771,1,0)
+ZZHL_APP^a^500^^^^USA
+"VER")
+8.0^22.2
+**END**
+**END**

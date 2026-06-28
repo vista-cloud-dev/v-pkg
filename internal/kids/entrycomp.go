@@ -60,13 +60,16 @@ type entryGroup struct {
 // types, so the shared "BLD",1,"KRN",0) header and the ORD ordering are computed
 // once across all of them. PARAMETER DEFINITION (#8989.51) and OPTION (#19) ride
 // the same path; new SEND/DELETE types append here.
-func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey, protos []Protocol, rpcs []RPC, mgs []MailGroup, lts []ListTemplate, hfs []HelpFrame) []entryGroup {
+func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey, protos []Protocol, rpcs []RPC, mgs []MailGroup, lts []ListTemplate, hfs []HelpFrame, h7s []HL7App) []entryGroup {
 	var groups []entryGroup
 	if len(mgs) > 0 {
 		groups = append(groups, entryGroup{mailGroupEntryType, mailGroupRecords(mgs)})
 	}
 	if len(hfs) > 0 {
 		groups = append(groups, entryGroup{helpFrameEntryType, helpFrameRecords(hfs)})
+	}
+	if len(h7s) > 0 {
+		groups = append(groups, entryGroup{hl7AppEntryType, hl7AppRecords(h7s)})
 	}
 	if len(lts) > 0 {
 		groups = append(groups, entryGroup{listTemplateEntryType, listTemplateRecords(lts)})
@@ -600,3 +603,51 @@ func helpFrameRecords(hfs []HelpFrame) []entryRec {
 // HelpFrameNames returns the #9.2 HELP FRAME component names in build order — what
 // `v pkg verify`/`uninstall` probe and back out.
 func (b *Build) HelpFrameNames() []string { return b.entryNames(helpFrameFile) }
+
+// --- HL7 APPLICATION PARAMETER (#771) — the ninth type on the generic core ----
+
+const (
+	hl7AppFile     = 771
+	hl7AppFileName = "HL7 APPLICATION PARAMETER"
+	// hl7AppOrdTail is the national-constant tail of the #771 ORD install line
+	// (pieces after "<file>;<ord>;"): the SEND/DELETE action routines KRN^XPDIK runs
+	// to file/relink/delete an HL7 application registration. One form across the
+	// corpus; the trailing "(%)" mirrors MAIL GROUP's delete-action arg list.
+	hl7AppOrdTail = ";;HLAP^XPDTA1;HLAPF1^XPDIA1;HLAPE1^XPDIA1;HLAPF2^XPDIA1;;HLAPDEL^XPDIA1(%)"
+)
+
+var hl7AppEntryType = entryType{number: hl7AppFile, name: hl7AppFileName, ordTail: hl7AppOrdTail}
+
+// HL7App is one #771 HL7 APPLICATION PARAMETER record to ship as a KIDS KRN
+// component (SEND-TO-SITE) — the canonical "register an HL7 application" entry.
+// Stored in ^HL(771,. The record is a single 0-node:
+// NAME ^ 2 ACTIVE/INACTIVE ^ 3 FACILITY NAME ^ ^ ^ ^ 7 COUNTRY CODE. The build
+// pins ACTIVE = "a" (a shipped application registration is always active) and the
+// country defaults to "USA"; the *HL7 SEGMENT/*HL7 MESSAGE legacy multiples are
+// obsolete and never shipped. (The HLO registry #779.2 and logical link #870 — the
+// other HL7-family files — are follow-ups; #870 carries site-specific network
+// config and is not portably authorable.)
+type HL7App struct {
+	Name        string // #771 .01 NAME (0;1)
+	Facility    string // #771 field 3 FACILITY NAME (0;3)
+	CountryCode string // #771 field 7 COUNTRY CODE (0;7) — e.g. "USA"
+}
+
+// hl7AppRecords packs each HL7App into the generic entry-record shape: the SEND
+// XPDFL flag and the single 7-piece 0-node, with ACTIVE pinned to "a".
+func hl7AppRecords(apps []HL7App) []entryRec {
+	recs := make([]entryRec, 0, len(apps))
+	for _, a := range apps {
+		zero := strings.Join([]string{a.Name, "a", a.Facility, "", "", "", a.CountryCode}, "^")
+		recs = append(recs, entryRec{
+			name:  a.Name,
+			xpdfl: "0^1",
+			image: []imageNode{{Subs{intSub(0)}, zero}},
+		})
+	}
+	return recs
+}
+
+// HL7AppNames returns the #771 HL7 APPLICATION PARAMETER component names in build
+// order — what `v pkg verify`/`uninstall` probe and back out.
+func (b *Build) HL7AppNames() []string { return b.entryNames(hl7AppFile) }

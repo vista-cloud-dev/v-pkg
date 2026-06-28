@@ -67,11 +67,11 @@ type Components struct {
 	ParameterDefinitions []ParamDef         `json:"parameterDefinitions,omitempty"` // XPAR #8989.51 PARAMETER DEFINITION components (shipped as data)
 	Protocols            []ProtocolComp     `json:"protocols,omitempty"`            // #101 PROTOCOL KRN components (B.1)
 	Templates            []string           `json:"templates,omitempty"`
-	RPCs                 []RPCComp          `json:"rpcs,omitempty"`          // #8994 REMOTE PROCEDURE KRN components (B.1)
-	MailGroups           []MailGroupComp    `json:"mailGroups,omitempty"`    // #3.8 MAIL GROUP KRN components (B.1)
-	ListTemplates        []ListTemplateComp `json:"listTemplates,omitempty"` // #409.61 LIST TEMPLATE KRN components (B.1)
-	HelpFrames           []HelpFrameComp    `json:"helpFrames,omitempty"`    // #9.2 HELP FRAME KRN components (B.1)
-	HL7                  []string           `json:"hl7,omitempty"`
+	RPCs                 []RPCComp          `json:"rpcs,omitempty"`            // #8994 REMOTE PROCEDURE KRN components (B.1)
+	MailGroups           []MailGroupComp    `json:"mailGroups,omitempty"`      // #3.8 MAIL GROUP KRN components (B.1)
+	ListTemplates        []ListTemplateComp `json:"listTemplates,omitempty"`   // #409.61 LIST TEMPLATE KRN components (B.1)
+	HelpFrames           []HelpFrameComp    `json:"helpFrames,omitempty"`      // #9.2 HELP FRAME KRN components (B.1)
+	HL7Applications      []HL7AppComp       `json:"hl7Applications,omitempty"` // #771 HL7 APPLICATION PARAMETER KRN components (B.1)
 }
 
 func (c Components) empty() bool {
@@ -79,7 +79,7 @@ func (c Components) empty() bool {
 		len(c.Keys) == 0 && len(c.Parameters) == 0 && len(c.ParameterDefinitions) == 0 &&
 		len(c.Protocols) == 0 && len(c.Templates) == 0 && len(c.RPCs) == 0 &&
 		len(c.MailGroups) == 0 && len(c.ListTemplates) == 0 && len(c.HelpFrames) == 0 &&
-		len(c.HL7) == 0
+		len(c.HL7Applications) == 0
 }
 
 // unsupported returns the JSON names of populated component slices the build
@@ -97,7 +97,6 @@ func (c Components) unsupported() []string {
 		n    int
 	}{
 		{"templates", len(c.Templates)},
-		{"hl7", len(c.HL7)},
 	} {
 		if e.n > 0 {
 			u = append(u, e.name)
@@ -240,6 +239,18 @@ type HelpFrameComp struct {
 	Name   string   `json:"name"`             // #9.2 .01 NAME (3–30 chars, uppercase, hyphens/spaces)
 	Header string   `json:"header,omitempty"` // #9.2 field 1 HEADER — one-line summary
 	Text   []string `json:"text,omitempty"`   // #9.2 field 2 TEXT — the help body, one string per line
+}
+
+// HL7AppComp is a #771 HL7 APPLICATION PARAMETER shipped as a KIDS KRN component
+// (B.1) — the registration of an application that sends/receives HL7 messages. The
+// build files the entry ACTIVE (a shipped registration is always active);
+// CountryCode defaults to "USA". HL7 application names allow spaces AND underscores
+// (e.g. "VISTA_VTS"), unlike the space-only OPTION/RPC names. (The HLO registry
+// #779.2 and logical link #870 are follow-ups.)
+type HL7AppComp struct {
+	Name        string `json:"name"`                  // #771 .01 NAME (uppercase, spaces/underscores)
+	Facility    string `json:"facility,omitempty"`    // #771 field 3 FACILITY NAME
+	CountryCode string `json:"countryCode,omitempty"` // #771 field 7 COUNTRY CODE (default "USA")
 }
 
 // OptionTypeCode maps a human option-type name to its #19 field 4 (TYPE)
@@ -396,6 +407,7 @@ var (
 	reParamName = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // #8989.51 NAME (uppercase, internal spaces)
 	reEntryName = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // #19 OPTION .01 NAME (uppercase, internal spaces)
 	reHelpName  = regexp.MustCompile(`^[A-Z][A-Z0-9 -]*[A-Z0-9]$`)          // #9.2 HELP FRAME .01 NAME (uppercase, spaces AND hyphens)
+	reHL7Name   = regexp.MustCompile(`^[A-Z][A-Z0-9 _]*[A-Z0-9]$`)          // #771 HL7 APPLICATION .01 NAME (uppercase, spaces AND underscores)
 	reFileName  = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // FileMan FILE .01 name (uppercase, internal spaces)
 	reGlobalRt  = regexp.MustCompile(`^\^%?[A-Z][A-Z0-9]*\(.*,$`)           // open global root, e.g. ^DIZ(999000,
 	reLabel     = regexp.MustCompile(`^[A-Z][A-Z0-9]*$`)                    // M line label (entryref tag)
@@ -474,6 +486,9 @@ func (s *Spec) Validate() error {
 		return err
 	}
 	if err := validateHelpFrames(s.Components.HelpFrames); err != nil {
+		return err
+	}
+	if err := validateHL7Applications(s.Components.HL7Applications); err != nil {
 		return err
 	}
 	if err := validateFiles(s.Components.Files); err != nil {
@@ -706,6 +721,21 @@ func validateHelpFrames(hfs []HelpFrameComp) error {
 		}
 		if l := len(h.Name); l < 3 || l > 30 || !reHelpName.MatchString(h.Name) {
 			return fmt.Errorf("buildspec: help frame name %q must be uppercase 3–30 chars (spaces/hyphens ok) (#9.2 HELP FRAME NAME)", h.Name)
+		}
+	}
+	return nil
+}
+
+// validateHL7Applications checks each HL7 APPLICATION PARAMETER component: a valid
+// #771 NAME (≤30 chars, uppercase, spaces/underscores). The record is filed by
+// KRN^XPDIK; only its build-side shape is validated here.
+func validateHL7Applications(apps []HL7AppComp) error {
+	for _, a := range apps {
+		if a.Name == "" {
+			return fmt.Errorf("buildspec: an hl7 application is missing its name")
+		}
+		if len(a.Name) > 30 || !reHL7Name.MatchString(a.Name) {
+			return fmt.Errorf("buildspec: hl7 application name %q must be uppercase ≤30 chars (spaces/underscores ok) (#771 HL7 APPLICATION PARAMETER NAME)", a.Name)
 		}
 	}
 	return nil

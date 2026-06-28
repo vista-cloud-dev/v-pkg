@@ -189,8 +189,27 @@ install→verify→`--force` uninstall→verify-clean on vehu (YDB) + foia-t12 (
 back-out. Fixture `testdata/zzhf`. Verify probes `^DIC(9.2,"B",<name>)`, uninstall is
 `DIK` on `^DIC(9.2,`.
 
-Remaining B.1 types: HL7 family. Templates (#.4/.402/…) still parked on read-live
-capture (below).
+HL7 APPLICATION PARAMETER #771 done (below). Templates (#.4/.402/…) still parked on
+read-live capture (below).
+
+## HL7 APPLICATION PARAMETER #771 (ninth type, 2026-06-28)
+The portable, fully spec-derivable member of the HL7 family — `v pkg` ships it
+author-from-spec like the other simple types. Global `^HL(771,`. Record image:
+`-1)=0^1`, `0)=NAME^a^FACILITY^^^^COUNTRY`. Field map (ground-truthed via
+`^DD(771,…`): field 2 STATUS = `a`(ACTIVE)/`i`(INACTIVE) at `0;2` — we always ship
+`a`; field 3 FACILITY NAME at `0;3`; field 7 COUNTRY CODE at `0;7` is a `#779.004`
+**pointer** — ship the plain `"USA"` and FileMan resolves it to its IEN at install
+(live record shows `…^1`, not `…^USA`). Single 0-node only (no multiples shipped).
+ORD tail `;;HLAP^XPDTA1;HLAPF1^XPDIA1;HLAPE1^XPDIA1;HLAPF2^XPDIA1;;HLAPDEL^XPDIA1(%)`
+(note the `(%)` DEL arg). Names allow spaces AND underscores (`ZZHL_APP`, `VISTA_VTS`)
+— own `reHL7Name` (`^[A-Z][A-Z0-9 _]*[A-Z0-9]$`, ≤30 chars). Build-spec: the
+`hl7Applications` array `[{name,facility,countryCode}]` REPLACED the old unsupported
+`"hl7"` string stub (removed from `unsupported()`, only `"templates"` remains).
+`HL7AppComp{Name,Facility,CountryCode}`; resolver defaults CountryCode→`"USA"`.
+Fixture `testdata/zzhl`. Verify probes `^HL(771,"B",<name>)`, uninstall is `DIK` on
+`^HL(771,`. **Deferred HL7 follow-ups:** #779.2 (HLO message registry — multiples +
+xrefs, more than a flat 0-node) and #870 (LOGICAL LINK — carries hardcoded IP/hostname,
+site-specific, NOT portable / spec-derivable).
 
 ## DEFERRED: the template/form family (#.4/.401/.402/.403) needs read-live, not author-from-spec
 Ground-truthed 2026-06-28 (user chose to defer + do MAIL GROUP instead). The transport

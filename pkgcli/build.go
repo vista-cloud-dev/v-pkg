@@ -25,19 +25,20 @@ type buildCmd struct {
 }
 
 type buildResult struct {
-	InstallName    string `json:"installName"`
-	Out            string `json:"out"`
-	Routines       int    `json:"routines"`
-	ParamDefs      int    `json:"paramDefs,omitempty"`
-	Options        int    `json:"options,omitempty"`
-	Keys           int    `json:"keys,omitempty"`
-	Protocols      int    `json:"protocols,omitempty"`
-	RPCs           int    `json:"rpcs,omitempty"`
-	MailGroups     int    `json:"mailGroups,omitempty"`
-	ListTemplates  int    `json:"listTemplates,omitempty"`
-	HelpFrames     int    `json:"helpFrames,omitempty"`
-	Files          int    `json:"files,omitempty"`
-	RequiredBuilds int    `json:"requiredBuilds,omitempty"`
+	InstallName     string `json:"installName"`
+	Out             string `json:"out"`
+	Routines        int    `json:"routines"`
+	ParamDefs       int    `json:"paramDefs,omitempty"`
+	Options         int    `json:"options,omitempty"`
+	Keys            int    `json:"keys,omitempty"`
+	Protocols       int    `json:"protocols,omitempty"`
+	RPCs            int    `json:"rpcs,omitempty"`
+	MailGroups      int    `json:"mailGroups,omitempty"`
+	ListTemplates   int    `json:"listTemplates,omitempty"`
+	HelpFrames      int    `json:"helpFrames,omitempty"`
+	HL7Applications int    `json:"hl7Applications,omitempty"`
+	Files           int    `json:"files,omitempty"`
+	RequiredBuilds  int    `json:"requiredBuilds,omitempty"`
 }
 
 func (c *buildCmd) Run(cc *clikit.Context) error {
@@ -69,6 +70,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 	mailGroups := resolveMailGroups(spec.Components.MailGroups)
 	listTemplates := resolveListTemplates(spec.Components.ListTemplates)
 	helpFrames := resolveHelpFrames(spec.Components.HelpFrames)
+	hl7Apps := resolveHL7Apps(spec.Components.HL7Applications)
 	reqBuilds := resolveRequiredBuilds(spec.RequiredBuilds)
 
 	pairs := kids.MakeBuildPairs(kids.BuildInput{
@@ -83,6 +85,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 		MailGroups:     mailGroups,
 		ListTemplates:  listTemplates,
 		HelpFrames:     helpFrames,
+		HL7Apps:        hl7Apps,
 		Files:          files,
 		RequiredBuilds: reqBuilds,
 		EnvCheck:       spec.EnvCheck,
@@ -104,11 +107,11 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 
 	return cc.Result(buildResult{
 		InstallName: spec.InstallName(), Out: out, Routines: len(rtns),
-		ParamDefs: len(paramDefs), Options: len(options), Keys: len(keys), Protocols: len(protocols), RPCs: len(rpcs), MailGroups: len(mailGroups), ListTemplates: len(listTemplates), HelpFrames: len(helpFrames), Files: len(files), RequiredBuilds: len(reqBuilds),
+		ParamDefs: len(paramDefs), Options: len(options), Keys: len(keys), Protocols: len(protocols), RPCs: len(rpcs), MailGroups: len(mailGroups), ListTemplates: len(listTemplates), HelpFrames: len(helpFrames), HL7Applications: len(hl7Apps), Files: len(files), RequiredBuilds: len(reqBuilds),
 	}, func() {
 		cc.Title("pkg build")
-		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d option(s), %d key(s), %d protocol(s), %d rpc(s), %d mail group(s), %d list template(s), %d help frame(s), %d file(s), %d required build(s)) → %s\n",
-			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(options), len(keys), len(protocols), len(rpcs), len(mailGroups), len(listTemplates), len(helpFrames), len(files), len(reqBuilds), cc.Accent(out))
+		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d option(s), %d key(s), %d protocol(s), %d rpc(s), %d mail group(s), %d list template(s), %d help frame(s), %d hl7 app(s), %d file(s), %d required build(s)) → %s\n",
+			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(options), len(keys), len(protocols), len(rpcs), len(mailGroups), len(listTemplates), len(helpFrames), len(hl7Apps), len(files), len(reqBuilds), cc.Accent(out))
 	})
 }
 
@@ -314,6 +317,21 @@ func resolveHelpFrames(hfs []buildspec.HelpFrameComp) []kids.HelpFrame {
 	out := make([]kids.HelpFrame, 0, len(hfs))
 	for _, h := range hfs {
 		out = append(out, kids.HelpFrame{Name: h.Name, Header: h.Header, Text: h.Text})
+	}
+	return out
+}
+
+// resolveHL7Apps maps the spec's HL7 APPLICATION PARAMETER components onto the kids
+// emit shape, defaulting the COUNTRY CODE to "USA" (the universal shipped value)
+// when omitted.
+func resolveHL7Apps(apps []buildspec.HL7AppComp) []kids.HL7App {
+	out := make([]kids.HL7App, 0, len(apps))
+	for _, a := range apps {
+		cc := a.CountryCode
+		if cc == "" {
+			cc = "USA"
+		}
+		out = append(out, kids.HL7App{Name: a.Name, Facility: a.Facility, CountryCode: cc})
 	}
 	return out
 }

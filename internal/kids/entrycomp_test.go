@@ -330,6 +330,59 @@ func TestMakeBuildPairs_HelpFrame_KRN(t *testing.T) {
 	}
 }
 
+func TestMakeBuildPairs_HL7App_KRN(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZHL*1.0*1",
+		Namespace:   "ZZHL",
+		Routines:    []RoutineSrc{{Name: "ZZHLRT", Lines: []string{"ZZHLRT ;x", " quit"}}},
+		HL7Apps:     []HL7App{{Name: "ZZHL_APP", Facility: "500", CountryCode: "USA"}},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	want := map[string]string{
+		`"KRN",771,1,-1)`: "0^1",
+		// 0-node: .01 NAME ^ 2 ACTIVE(a) ^ 3 FACILITY ^ ^ ^ ^ 7 COUNTRY CODE.
+		`"KRN",771,1,0)`:                           "ZZHL_APP^a^500^^^^USA",
+		`"ORD",1,771)`:                             "771;1;;;HLAP^XPDTA1;HLAPF1^XPDIA1;HLAPE1^XPDIA1;HLAPF2^XPDIA1;;HLAPDEL^XPDIA1(%)",
+		`"ORD",1,771,0)`:                           "HL7 APPLICATION PARAMETER",
+		`"BLD",1,"KRN",0)`:                         "^9.67PA^771^1",
+		`"BLD",1,"KRN",771,0)`:                     "771",
+		`"BLD",1,"KRN",771,"NM",1,0)`:              "ZZHL_APP^^0",
+		`"BLD",1,"KRN",771,"NM","B","ZZHL_APP",1)`: "",
+		`"BLD",1,"KRN","B",771,771)`:               "",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+	b := newBuild()
+	for _, p := range MakeBuildPairs(in) {
+		b.Set(p.Subs, p.Value)
+	}
+	if as := b.HL7AppNames(); len(as) != 1 || as[0] != "ZZHL_APP" {
+		t.Errorf("HL7AppNames = %v, want [ZZHL_APP]", as)
+	}
+}
+
+// A minimal HL7 application (just a name) still ships ACTIVE=a and the country code
+// default applied by the resolver — the 0-node always carries the fixed pieces.
+func TestMakeBuildPairs_HL7App_Minimal(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZHL*1.0*1", Namespace: "ZZHL",
+		HL7Apps: []HL7App{{Name: "ZZHL TWO", CountryCode: "USA"}},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	if v := got[`"KRN",771,1,0)`]; v != "ZZHL TWO^a^^^^^USA" {
+		t.Errorf(`"KRN",771,1,0) = %q, want "ZZHL TWO^a^^^^^USA"`, v)
+	}
+}
+
 // TestMakeBuildPairs_MixedEntryTypes proves the unified KRN manifest header spans
 // multiple entry types in one build (B.1 next step): an OPTION (#19) AND a
 // PARAMETER DEFINITION (#8989.51) share one "BLD",1,"KRN",0) header

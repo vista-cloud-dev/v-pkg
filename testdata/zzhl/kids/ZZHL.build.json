@@ -1,0 +1,15 @@
+{
+  "package": "ZZHL",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "routines": ["ZZHLRT"],
+    "hl7Applications": [
+      {
+        "name": "ZZHL_APP",
+        "facility": "500",
+        "countryCode": "USA"
+      }
+    ]
+  }
+}

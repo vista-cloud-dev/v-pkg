@@ -346,7 +346,6 @@ func TestParse_AllowLongNames_StillGated(t *testing.T) {
 func TestParse_UnsupportedComponents_Rejected(t *testing.T) {
 	cases := map[string]string{
 		"templates": `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"templates":["ZZSKEL TMPL"]}}`,
-		"hl7":       `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"hl7":["ZZSKEL HL7"]}}`,
 	}
 	for name, js := range cases {
 		_, err := Parse([]byte(js))
@@ -557,6 +556,45 @@ func TestParse_HelpFrames_Invalid(t *testing.T) {
 		"too short": `{"package":"ZZHF","version":"1.0","components":{"helpFrames":[{"name":"ZZ"}]}}`,
 		"lowercase": `{"package":"ZZHF","version":"1.0","components":{"helpFrames":[{"name":"zzhf-main"}]}}`,
 		"all digit": `{"package":"ZZHF","version":"1.0","components":{"helpFrames":[{"name":"12345"}]}}`,
+	}
+	for name, js := range cases {
+		if _, err := Parse([]byte(js)); err == nil {
+			t.Errorf("%s: expected an error, got nil", name)
+		}
+	}
+}
+
+func TestParse_HL7Applications(t *testing.T) {
+	js := `{"package":"ZZHL","version":"1.0","patch":"1","components":{
+	  "routines":["ZZHLRT"],
+	  "hl7Applications":[{"name":"ZZHL_APP","facility":"500","countryCode":"USA"}]
+	}}`
+	s, err := Parse([]byte(js))
+	if err != nil {
+		t.Fatalf("Parse hl7Applications spec: %v", err)
+	}
+	if len(s.Components.HL7Applications) != 1 {
+		t.Fatalf("hl7Applications = %+v", s.Components.HL7Applications)
+	}
+	a := s.Components.HL7Applications[0]
+	if a.Name != "ZZHL_APP" || a.Facility != "500" || a.CountryCode != "USA" {
+		t.Errorf("hl7App = %+v", a)
+	}
+	// An app-only spec (just a name; underscores allowed) is non-empty.
+	d, err := Parse([]byte(`{"package":"ZZHL","version":"1.0","components":{"hl7Applications":[{"name":"ZZHL APP TWO"}]}}`))
+	if err != nil {
+		t.Fatalf("Parse minimal hl7 app: %v", err)
+	}
+	if d.Components.empty() {
+		t.Error("spec with an hl7 application must not be empty")
+	}
+}
+
+func TestParse_HL7Applications_Invalid(t *testing.T) {
+	cases := map[string]string{
+		"no name":   `{"package":"ZZHL","version":"1.0","components":{"hl7Applications":[{"facility":"500"}]}}`,
+		"lowercase": `{"package":"ZZHL","version":"1.0","components":{"hl7Applications":[{"name":"zzhl app"}]}}`,
+		"bad char":  `{"package":"ZZHL","version":"1.0","components":{"hl7Applications":[{"name":"ZZHL@APP"}]}}`,
 	}
 	for name, js := range cases {
 		if _, err := Parse([]byte(js)); err == nil {

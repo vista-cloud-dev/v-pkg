@@ -464,6 +464,20 @@ not the populate-and-`EN^XPDIJ` shortcut.
     capture** image source (`--from-engine`); templates are its forcing function.
     Remaining spec-derivable types: **HL7 family**.
     Detail: [[option-entry-component]].
+  - **B.1-i ✅ DONE + LIVE-PROVEN 2026-06-28 — HL7 APPLICATION PARAMETER (#771), both
+    engines.** The ninth type; the portable, fully spec-derivable member of the HL7
+    family. Stored in `^HL(771,`. Record: `-1)=0^1`, `0)=NAME^a^FACILITY^^^^COUNTRY`
+    (field 2 ACTIVE=`a`/INACTIVE=`i`; field 3 FACILITY NAME; field 7 COUNTRY CODE, a
+    `#779.004` pointer that FileMan resolves from the shipped `"USA"` to its IEN at
+    install). ORD tail `;;HLAP^XPDTA1;HLAPF1^XPDIA1;HLAPE1^XPDIA1;HLAPF2^XPDIA1;;HLAPDEL^XPDIA1(%)`.
+    HL7 names allow spaces AND underscores (own `reHL7Name` regex; ≤30 chars). The
+    `hl7Applications` build-spec key replaced the old unsupported `"hl7"` stub. TDD;
+    lint/race/contract green; corpus DRIFT=0; golden `testdata/zzhl/ZZHL.kids`. **Live
+    install→verify→`--force` uninstall→verify-clean** on vehu (YDB) + foia-t12 (IRIS):
+    live 0-node `ZZHL_APP^a^500^^^^1` byte-identical on both (COUNTRY resolved to pointer
+    `1`), B-index gone after `DIK` on `^HL(771,` back-out. HL7 follow-ups remain: #779.2
+    (HLO message registry, multiples + xrefs) and #870 (logical link, hardcoded
+    IP/hostname — site-specific, NOT portable). ([[option-entry-component]])
 - **B.2 Real FILE DD + DATA (F3; the R3 enabler).** Extend `FileComp` to a
   multi-field DD (see §8 for the grounded node-set) and add **DATA** export with
   the four action codes (ADD-IF-NEW / MERGE / OVERWRITE / REPLACE) and FULL/PARTIAL
