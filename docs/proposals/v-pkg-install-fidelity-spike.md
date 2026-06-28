@@ -214,11 +214,37 @@ identical on both:
 already present after v-pkg's MERGE for any build that ships pre/post routines.
 Calls the **real** `$$NEWCP^XPDUTL` (not a reimplementation) → inside the waterline.
 
-## Recommended next step
-Implement **A.1.1 (pre/post-install routines)** first as a TDD increment with a
-live install→verify→uninstall gate on both engines — it is the highest-value,
-best-understood gap and validates the route end-to-end before A.1.2/A.1.3 build on
-it. *(Mechanism now live-confirmed above; proceeding.)*
+## A.1.1 — DONE + live-proven on BOTH engines (2026-06-28)
+Implemented in `internal/installspec/script.go` (`FinalInstallScript`): after the
+MERGE / before `EN^XPDIJ`, set `XPDCP` and call the real `$$NEWCP^XPDUTL` for the
+`INI`/`INIT` `COMPLETED` checkpoints plus the `STARTED` checkpoints carrying the
+pre/post routine names read from `^XTMP("XPDI",XPDA,"INI"/"INIT")` (only when the
+transport carries one). TDD: `TestFinalInstallScript_PrePostCheckpoints`;
+lint/race/contract green.
+
+**Live-proven through the real `v pkg install` path over the driver stack** with a
+fixture build (`testdata/zza1-prepost/`) that ships `ZZA1P` with `PRE`/`POST`
+entries setting `^ZZA1OUT("PRE"/"POST")`:
+
+| Engine | binary | install | `^ZZA1OUT("PRE")` / `("POST")` |
+|---|---|---|---|
+| vehu (YDB) | **pre-A.1.1** | ok, status 3 | **empty / empty** — routines silently skipped (F2) |
+| vehu (YDB) | **A.1.1** | ok, status 3 | **1 / 1** — both fired |
+| foia-t12 (IRIS) | **A.1.1** | ok, status 3 | **1 / 1** — both fired |
+
+The counterfactual is the proof: the same fixture on the same engine reports a
+"successful" install (status 3) under the old binary yet never runs the routines —
+A.1.1 is exactly what makes them fire, identically on YDB and IRIS. (Driver note:
+the YDB `exec load` needs `M_YDB_ROUTINES` set to the container's source dir, e.g.
+`/home/vehu/r`; IRIS needs `M_IRIS_NAMESPACE=VISTA`.)
+
+## Recommended next steps
+- **A.1.2** — env-check + required-builds via `$$ENV^XPDIL1(1)` before filing
+  (honor `XPDQUIT`/`XPDABORT`/`XPDREQAB`).
+- **A.1.3** — seed `#9.7` `QUES` answers from an install-spec.
+- **B.3 (authoring)** — emit pre/post-install routines from a build spec so the
+  A.1.1 fixture is reproducible end-to-end (the `INI`/`INIT` nodes are hand-injected
+  today).
 
 ## Sources
 - Real `XPD*` routine source: WorldVistA/VistA-M `Packages/Kernel/Routines/`

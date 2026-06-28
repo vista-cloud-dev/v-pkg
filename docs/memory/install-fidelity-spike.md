@@ -84,7 +84,25 @@ Gotcha (driver quirk): IRIS `m vista exec` returns empty stdout unless
 explicit `$O`/`$G` walks with full (non-naked) refs. The m-iris driver binary must
 be built first (`cd m-iris && make build`).
 
-Risk remaining: IRIS `^XTMP`/`$$ENV` *install-time* parity still proven only at the
-checkpoint-grammar level — the A.1.1 behavioral gate (pre/post routine actually
-fires) is the next live step. Companion to [[kids-coverage-analysis]],
-[[fileman-dd-component]]; builds on kids-installation-automation.md §7.1.
+## A.1.1 DONE + live-proven 2026-06-28 (vehu YDB + foia-t12 IRIS)
+`internal/installspec/script.go` `FinalInstallScript` now emits the checkpoint
+block (real `$$NEWCP^XPDUTL` for INI/INIT COMPLETED + STARTED-with-routine) before
+`EN^XPDIJ`. TDD `TestFinalInstallScript_PrePostCheckpoints`; gates green.
+Live-proven through the real `v pkg install` over the driver stack with fixture
+`testdata/zza1-prepost/` (ships `ZZA1P` PRE/POST setting `^ZZA1OUT`):
+- **vehu pre-A.1.1 binary:** install status 3 but `^ZZA1OUT` empty → routines
+  silently skipped (F2 confirmed live).
+- **vehu + foia-t12 A.1.1 binary:** `^ZZA1OUT("PRE")=1`, `("POST")=1` → both fired,
+  identical on YDB and IRIS. The old-vs-new counterfactual is the airtight proof.
+
+**Driver gotchas learned (live):** YDB `v pkg install` (`exec load`) needs
+`M_YDB_ROUTINES` = the container source dir (`/home/vehu/r`) — eval doesn't, only
+load/compile does; "driver loaded no routine" = this is unset. IRIS needs
+`M_IRIS_NAMESPACE=VISTA` + the built `m-iris/dist/m-iris` (`M_IRIS_BIN`). foia-t12
+container was stopped — `docker start foia-t12` (lifecycle, allowed; not exec).
+
+Next: A.1.2 (env-check+required-builds via `$$ENV^XPDIL1(1)`), A.1.3 (seed #9.7
+QUES), and B.3 authoring (emit pre/post routines so the fixture is reproducible
+end-to-end — INI/INIT are hand-injected today). Companion to
+[[kids-coverage-analysis]], [[fileman-dd-component]]; builds on
+kids-installation-automation.md §7.1.

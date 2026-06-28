@@ -89,6 +89,33 @@ func TestFinalInstallScript(t *testing.T) {
 	}
 }
 
+// A.1.1: before EN^XPDIJ, the script must create the INI/INIT checkpoints so the
+// build's pre/post-install routines fire (PRE^/POST^XPDIJ1 D @ the routine read
+// from the "...STARTED" checkpoint's callback). Mirrors PKG^XPDIL1: $$NEWCP^XPDUTL
+// for the COMPLETED checkpoint, then the STARTED one (carrying the routine) only
+// when the transport carries a pre/post routine name.
+func TestFinalInstallScript_PrePostCheckpoints(t *testing.T) {
+	got := FinalInstallScript("ZZSKEL*1.0*1", "ZZSKEL via v pkg install", 7)
+	for _, want := range []string{
+		`S XPDCP="INI"`, // pre-install checkpoint multiple (subfile 9.713)
+		`$$NEWCP^XPDUTL("XPD PREINSTALL COMPLETED")`, // base checkpoint
+		`$G(^XTMP("XPDI",XPDA,"INI"))`,               // pre-install routine name from the transport
+		`$$NEWCP^XPDUTL("XPD PREINSTALL STARTED",`,   // routine-bearing checkpoint
+		`S XPDCP="INIT"`,                             // post-install checkpoint multiple (subfile 9.716)
+		`$$NEWCP^XPDUTL("XPD POSTINSTALL COMPLETED")`,
+		`$G(^XTMP("XPDI",XPDA,"INIT"))`,
+		`$$NEWCP^XPDUTL("XPD POSTINSTALL STARTED",`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("FinalInstallScript missing %q\n---\n%s", want, got)
+		}
+	}
+	// The checkpoints must be created BEFORE the install runs them.
+	if iCP, iJ := strings.Index(got, `XPD PREINSTALL STARTED`), strings.Index(got, `D EN^XPDIJ`); iCP < 0 || iJ < 0 || iCP > iJ {
+		t.Errorf("checkpoint creation (%d) must precede EN^XPDIJ (%d)", iCP, iJ)
+	}
+}
+
 func TestVerifyScript(t *testing.T) {
 	got := VerifyScript("ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil)
 	for _, want := range []string{

@@ -105,6 +105,21 @@ func FinalInstallScript(name, header string, nPairs int) string {
 	// (status stuck at 2), exactly like the KRN seed.
 	w(`N XPF S XPF=0 I $D(^XTMP("XPDI",XPDA,"FIA")) F  S XPF=$O(^XTMP("XPDI",XPDA,"FIA",XPF)) Q:'XPF  S ^XTMP("XPDI",XPDA,"FIA",XPF,0,2)=1`)
 	w(`D:$D(^XTMP("XPDI",XPDA,"FIA")) XPCK^XPDIK("FIA")`)
+	// Pre/Post-install routine checkpoints (A.1.1, install-fidelity-spike). The
+	// real load (PKG^XPDIL1) creates the #9.7 INI/INIT checkpoints; the
+	// direct-populate path bypasses the load, so EN^XPDIJ's PRE^/POST^XPDIJ1 loops
+	// find no checkpoint and the build's pre/post routines silently never run.
+	// Mirror PKG^XPDIL1 exactly: with XPDA + XPDCP in scope, call the *real*
+	// $$NEWCP^XPDUTL for the "...COMPLETED" base checkpoint, then the
+	// "...STARTED" checkpoint carrying the routine name — but only when the
+	// transport carries one (^XTMP("XPDI",XPDA,"INI"/"INIT")), so a build with no
+	// pre/post routine just gets the (harmless) base checkpoint. $$NEWCP reads
+	// XPDCP (INI→subfile 9.713, INIT→9.716) and files field 2 = the callback
+	// routine, which PRE^/POST^XPDIJ1 D @ at install time.
+	w(`S XPDCP="INI",XPDCPY=$$NEWCP^XPDUTL("XPD PREINSTALL COMPLETED")`)
+	w(`S XPDCPR=$G(^XTMP("XPDI",XPDA,"INI")) I XPDCPR]"" S XPDCPY=$$NEWCP^XPDUTL("XPD PREINSTALL STARTED",XPDCPR)`)
+	w(`S XPDCP="INIT",XPDCPY=$$NEWCP^XPDUTL("XPD POSTINSTALL COMPLETED")`)
+	w(`S XPDCPR=$G(^XTMP("XPDI",XPDA,"INIT")) I XPDCPR]"" S XPDCPY=$$NEWCP^XPDUTL("XPD POSTINSTALL STARTED",XPDCPR)`)
 	w(`D EN^XPDIJ`)
 	w(`K ` + stageGbl)
 	w(`W "` + ResultMarker + `status=",$P($G(^XPD(9.7,XPDA,0)),U,9),!`)
