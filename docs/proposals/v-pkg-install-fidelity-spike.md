@@ -1,0 +1,206 @@
+---
+title: "v-pkg install-fidelity spike (Track A.1) — driving real KIDS phases non-interactively"
+status: proposed
+created: 2026-06-28
+last_modified: 2026-06-28
+revisions: 1
+doc_type: [PROPOSAL, SPIKE]
+grounding:
+  - "Real XPD* routine source (WorldVistA/VistA-M, Kernel/Routines): XPDIJ, XPDIJ1, XPDI, XPDI1, XPDIL, XPDIL1, XPDIP, XPDIQ, XPDID — fetched verbatim, control flow traced"
+  - "vdocs GOLD corpus — Kernel 8.0 Developer's Guide: KIDS UG (XU/krn_8_0_dg_kids_ug) + Systems Management KIDS UG (XU/krn_8_0_sm_kids_ug)"
+  - "v-pkg source — internal/installspec/script.go, pkgcli/lifecycle.go (HEAD 2026-06-28)"
+  - "prior live ground truth — kids-installation-automation.md §7.1 (ZZSKEL on YDB FOIA vehu, 2026-06-12)"
+related:
+  - kids-installation-automation.md
+  - v-pkg-kids-coverage-analysis.md
+  - implementation-plan.md (P5/P6)
+---
+
+# v-pkg install-fidelity spike (coverage-analysis Track A.1)
+
+This is the grounded scoping spike the coverage analysis called "**THE pivotal
+decision**": make `v pkg install` run real KIDS load/install semantics
+(environment check, required-build enforcement, pre/post-install routines,
+questions) instead of the `^XTMP`-populate + direct `EN^XPDIJ` shortcut (finding
+F2). It ends in a **route recommendation**, not code.
+
+## Verdict (recommendation)
+
+**Recommended route: (c) augmented direct-populate — keep the proven
+direct-`^XTMP` + `EN^XPDIJ` path and close F2's gaps by calling the *real* KIDS
+phase functions explicitly, in priority order.** Neither the "drive the
+interactive install option headless" route (a) nor the "expect-driven menus"
+route (b) fits the driver's stdin-less `Exec` seam; route (c) does, stays inside
+the waterline + the [[bespoke-installer-forbidden]] ban (it *invokes* KIDS, never
+reimplements it), and lands incrementally with a live gate per step.
+
+**Two findings up front that change the plan:**
+
+1. **A.1 is NOT blocked on a missing document.** The roadmap flagged the *Kernel
+   8.0 KIDS Developer Tools UG* as absent from the gold corpus and a prerequisite.
+   It is **not a standalone guide** — its developer-variable content (`XPDENV`,
+   `XPDQUIT`/`XPDABORT`, `XPDDIQ`, `XPDNOQUE`, `XPDQUES`, `EN^XPDIJ`/ICR 2243)
+   lives as a *section inside* `krn_8_0_dg_kids_ug`, which **is** in the corpus.
+   The routine source closes the rest. So this updates P6: the gap is largely
+   illusory; we have what we need to scope and build A.1. *(Engine-specific
+   validation is still required — see Risks.)*
+
+2. **There is no documented headless "load + seed every answer + run" API.** KIDS
+   is architected interactive (DG confirms: prompt-suppression is the build's own
+   env-check pre-seeding `XPDDIQ`, and `EN^XPDIJ` only *tasks an already-loaded*
+   install — ICR 2243). So "faithful non-interactive install" is necessarily a
+   *reconstruction* of the pre-`XPDIJ` phase, not a single API call. Route (c)
+   reconstructs it by calling the real sub-functions.
+
+---
+
+## The phase boundary (ground truth)
+
+Traced from real `XPD*` source. **`EN^XPDIJ` is only the *filing* half of KIDS.**
+Everything that decides *whether/how* to install runs earlier — in the LOAD phase
+(`EN1^XPDIL`→`XPDIL1`) and the interactive install option (`EN^XPDI`→`XPDI1`).
+`EN^XPDIJ` performs *actuations* (pre/post routines, inhibit-logons,
+disable-options) but each is **gated on data the earlier phases must have already
+written** into `^XPD(9.7,XPDA,…)` / `^XTMP("XPDI",XPDA,…)`.
+
+| Step | Inside `EN^XPDIJ`? | Where it really lives / the catch |
+|---|---|---|
+| **Environment-check routine** | **NO** | `ENV^XPDIL1` only; called from `PKG^XPDIL1` (load, `XPDENV=0`) and `EN^XPDI` (`$$ENV^XPDIL1(1)`, `XPDENV=1`). Env-check name in `^XTMP("XPDI",XPDA,"PRE")`. |
+| **Required builds (#9.611)** | **NO** | `REQB^XPDIL1`, reached *only* via `ENV`. Reads `^XTMP("XPDI",XPDA,"BLD",bld,"REQB",…)`; action code `XPDACT` 0=warn / 1=abort+kill / 2=abort → sets `XPDABORT`/`XPDREQAB`. |
+| **Pre-install routine** | **YES** (conditional) | `PRE^XPDIJ1`: `D @XPDRTN` over `^XPD(9.7,XPDA,"INI",*,1)`. Fires *iff* the load phase created the `INI` checkpoint (`$$NEWCP^XPDUTL` in `PKG^XPDIL1`, name from `^XTMP("XPDI",XPDA,"INI")`). |
+| **Post-install routine** | **YES** (conditional) | `POST^XPDIJ1`: `D @XPDRTN` over `^XPD(9.7,XPDA,"INIT",*,1)`. Same checkpoint dependency. |
+| **Prompting the questions** | **NO** | `DIR^XPDIQ` in `EN^XPDI`/`QUES^XPDI1`, stored to #9.7 subfile 9.701. `EN^XPDIJ` only *reads* answers via `$$ANSWER^XPDIQ`. |
+| **Disable options/protocols (actuate)** | **YES** (gated) | `OFF^XQOO1`, gated on `^XPD(9.7,XPDA,0)` pc 8 + `^XTMP("XQOO",set)` — written only in `EN^XPDI`. Absent ⇒ skipped. |
+| **Inhibit logons (actuate)** | **YES** (gated) | `INHIBIT^XPDIJ1`, gated on `$$ANSWER^XPDIQ("XPI1")`. Question asked only in `EN^XPDI`. |
+
+**Key reads `EN^XPDIJ` makes** (verbatim): `I $$ANSWER^XPDIQ("XPI1") D INHIBIT^XPDIJ1("Y")`
+(inhibit), `I $$ANSWER^XPDIQ("XPO1") D …KIDS^XQ81` (menu rebuild). `$$ANSWER^XPDIQ`
+returns `$G(^XPD(9.7,XPDA,"QUES",IEN,1))` found via the `"QUES","B"` cross-reference
+— so an **unseeded** standard question returns `""` (falsy) ⇒ the actuation is
+**skipped**, which is the *safe automation default* (no inhibit, no disable, no
+forced menu rebuild).
+
+---
+
+## What v-pkg's install runs and skips today
+
+`internal/installspec/script.go` + `pkgcli/lifecycle.go`: create the #9.7 entry
+via `$$INST^XPDIL1`, stream the parsed `.KID` pairs into `^XTMP("VPKGI")`, MERGE
+into `^XTMP("XPDI",XPDA)`, seed the KRN + FIA component-tracking nodes, then
+`D EN^XPDIJ`. Mapping that against the boundary above:
+
+| Phase | v-pkg today | Why |
+|---|---|---|
+| Component filing (routines, DD, data, KRN, FIA) | ✅ runs | `EN^XPDIJ` |
+| **Pre/Post-install routines** | ❌ **silently skipped** | direct-populate never creates the `^XPD(9.7,XPDA,"INI"/"INIT",2,1)` checkpoints, so `PRE^/POST^XPDIJ1`'s `$O(…,"INI",…)` loop finds nothing and falls through (no error) |
+| **Environment check** | ❌ skipped | no call to `ENV^XPDIL1`; jumps straight to `EN^XPDIJ` |
+| **Required builds (#9.611)** | ❌ not enforced | `REQB` is reachable only via `ENV` |
+| **Questions / answers** | ⚠️ defaults only | no answers seeded ⇒ `$$ANSWER` returns `""` ⇒ standard actuations skipped (safe), but **build-defined pre/post questions a routine reads via `XPDQUES` are empty** |
+| Disable-options / inhibit-logons | ⏭️ intentionally off | the safe automation default |
+
+So the install is **faithful for component filing but silently omits the build's
+own gating + migration logic** — exactly F2. The sharpest single gap is
+pre/post-install routines (a build's data migration / xref rebuild simply doesn't
+run), and its mechanism is now known precisely.
+
+---
+
+## The three routes
+
+### (a) Silent `XPD*` answer-variable seeding — drive `EN^XPDI` headless — REJECTED
+Pre-seed answers + `XPDDIQ` and call the real interactive install option
+non-interactively. **Why it doesn't fit:** `EN^XPDI` prompts via `DIR^XPDIQ` and
+**always selects a device** (`DEVICE: HOME//`); the DG documents an `XPDDIQ`
+suppression knob for only **two** prompts (`XPZ1` disable, `XPZ2` move-routines) —
+**no documented knob for rebuild-menu-trees (`XPO1`), inhibit-logons (`XPI1`), or
+the DEVICE prompt** (`XPDNOQUE` only *forbids queuing*, the device prompt remains).
+The driver `Exec` is subprocess + JSON with **no interactive stdin**, so the
+un-suppressible prompts have nothing to read and the option hangs/aborts. Driving
+`EN^XPDI` headless means out-prompting a routine designed to prompt — brittle and
+not fully achievable from docs.
+
+### (b) Expect-driven pseudo-terminal — FALLBACK ONLY
+Spawn a TTY, match prompt → send answer. Cross-engine brittle, needs a
+stdin-capable transport the reference `mdriver.Client` doesn't expose, and re-couples
+us to scraped output. Keep strictly as the last-resort cross-engine fallback
+(matches the existing "Tier B"); not the path.
+
+### (c) Augmented direct-populate — RECOMMENDED
+Keep the proven, driver-friendly direct-populate + `EN^XPDIJ` core; **add explicit
+calls to the real KIDS phase functions** so the skipped phases run natively. Each
+addition seeds the *data structures real KIDS reads* (the same blessed pattern as
+the existing KRN/FIA seeds) and/or *invokes a real KIDS entry* — never reimplements
+KIDS logic. Lands as independent, live-gated increments:
+
+- **A.1.1 — Pre/Post-install routines (highest value).** Reproduce the load-phase
+  checkpoint creation: from the build's pre/post routine names (carried in the
+  transport as `^XTMP("XPDI",XPDA,"INI"/"INIT")`, or read from #9.6), create the
+  `^XPD(9.7,XPDA,"INI",2,0/1)` + `("INIT",2,0/1)` checkpoint nodes (preferably via
+  the real `$$NEWCP^XPDUTL` / `PKG^XPDIL1` path, not a hand-SET) so `IN^XPDIJ1`'s
+  `PRE`/`POST` loops fire `D @XPDRTN`. Result: a build's data migration / xref
+  rebuild actually runs.
+- **A.1.2 — Env-check + required-builds.** Before `EN^XPDIJ`, set `XPDENV=1` and call
+  **`$$ENV^XPDIL1(1)`** (which runs the build's env-check routine *and* `REQB`
+  enforcement in one). Honor `XPDQUIT` / `XPDABORT` / `XPDREQAB` → convert to a
+  structured `<<VPKG>>error=…` and refuse to file. The inputs it needs
+  (`^XTMP("XPDI",XPDA,"PRE")` env-check name; the `BLD…REQB` nodes) are already in
+  the direct-populated transport.
+- **A.1.3 — Question answers.** Add an `install-spec` answer map; for each answer
+  seed `^XPD(9.7,XPDA,"QUES",IEN,0/1/"B")` (+ the mandatory `"QUES","B"` xref) —
+  ideally via FileMan filing to subfile 9.701 so the xref builds itself. Standard
+  `XPI1`/`XPZ1`/`XPO1` stay unseeded = safe-NO by default; build-defined pre/post
+  questions become available to their routines via `XPDQUES`.
+- **A.1.4 — (Track A.3) PACKAGE #9.4 footprint.** Write VERSION (#22) + PATCH
+  APPLICATION HISTORY so downstream `$$PATCH^XPDUTL` stays honest. Sequenced after
+  A.1.1–A.1.3 (tracked separately as A.3).
+
+**Future, cleaner option to revisit:** if the SDK gains a native `SetGlobal` (and/or
+a stdin-capable `Exec`), the *most* faithful path is to write the `.KID` to a host
+file and call the **real `EN1^XPDIL` load** (which natively creates checkpoints +
+runs the load-time env-check), eliminating the reconstruction in A.1.1. Out of
+scope now (no SDK change available); route (c) needs none.
+
+---
+
+## Waterline & bespoke-installer compliance
+Route (c) stays inside all four waterline rules: every engine touch is through
+`mdriver.Client`; KIDS knowledge stays in v-pkg (the `v` layer); no transport is
+hand-rolled. It is the **opposite of a bespoke installer**
+([[bespoke-installer-forbidden]]) — it *adds* real KIDS phase calls
+(`$$ENV^XPDIL1`, `$$NEWCP^XPDUTL`, `IN^XPDIJ1` via `EN^XPDIJ`, the build's own
+`@XPDRTN`) the current shortcut omits. The only synthesized artifacts are *data
+nodes KIDS reads* (#9.7 checkpoints / QUES answers), seeded to match what the real
+load would write — the identical, already-accepted pattern as the KRN/FIA seeds.
+
+## Risks & open questions
+- **Live validation is mandatory before relying on any of this.** Every claim here
+  is from routine source + docs; confirm on **vehu (YDB)** and **foia-t12 (IRIS)**
+  via the driver stack, same discipline as §7.1. A pre/post routine that aborts
+  (`S XPDABORT=1`) leaves options disabled with **no cleanup** (documented) — the
+  tool must surface that loudly.
+- **IRIS parity (P7).** `XPD*` are Kernel routines present on both engines, but
+  checkpoint/`^XTMP` and `$$ENV` behavior under IRIS must be re-proven, not assumed.
+- **`XPDQUES` phase-scoping.** The DG says `XPDQUES` is populated *only during*
+  pre/post-install; A.1.3's seeded answers must land where `QUES^XPDIQ` reads them
+  (`^XPD(9.7,XPDA,"QUES",…)`), verified live.
+- **Idempotency / half-installs.** Keep the existing already-installed guard and the
+  corrupt-#9.7 purge (§7.1 gotcha); A.1.2 aborts must leave a clean, restartable
+  state.
+
+## Recommended next step
+Implement **A.1.1 (pre/post-install routines)** first as a TDD increment with a
+live install→verify→uninstall gate on both engines — it is the highest-value,
+best-understood gap and validates the route end-to-end before A.1.2/A.1.3 build on
+it.
+
+## Sources
+- Real `XPD*` routine source: WorldVistA/VistA-M `Packages/Kernel/Routines/`
+  (`XPDIJ`, `XPDIJ1`, `XPDI`, `XPDI1`, `XPDIL`, `XPDIL1`, `XPDIP`, `XPDIQ`,
+  `XPDID`).
+- `XU/krn_8_0_dg_kids_ug` (Developer's Guide: KIDS UG) — `XPDENV` (Table 6),
+  `XPDQUIT`/`XPDABORT` (Table 7), `XPDDIQ` `XPZ1`/`XPZ2` (Tables 8–9), `XPDNOQUE`,
+  `XPDQUES`, `required-builds` (Table 15), `EN^XPDIJ` (ICR 2243); the "Developer
+  Tools" material is a section of *this* guide, not a separate UG.
+- `XU/krn_8_0_sm_kids_ug` — the three install phases, re-answering questions.
+- v-pkg: `internal/installspec/script.go`, `pkgcli/lifecycle.go`;
+  `docs/kids-installation-automation.md` §7.1 (live ZZSKEL ground truth).

@@ -146,14 +146,28 @@ FOIA** engine (`foia` container) is the M0a exit gate (three invariants green on
 both engines). `v pkg <verb>` takes the built `.KID` + `--engine ydb|iris`
 `--transport local|docker|remote`.
 
+**Install fidelity (coverage-analysis Track A.1) — SCOPED 2026-06-28:**
+`docs/proposals/v-pkg-install-fidelity-spike.md`. The direct-populate path is
+faithful for component *filing* but silently omits the build's env-check,
+required-builds, and **pre/post-install routines** (the load-phase `INI`/`INIT`
+checkpoints it never creates). Recommended **route (c) augmented direct-populate**:
+add explicit calls to the real phase functions (`$$ENV^XPDIL1(1)`,
+`$$NEWCP^XPDUTL` checkpoints, seeded `#9.7` QUES answers); land **A.1.1 pre/post
+routines** first, live-gated on both engines. (Routes (a) headless `EN^XPDI` /
+(b) expect rejected/fallback — see the spike.)
+
 ### P6 — Gold-doc gap {#p6}
-The *Kernel 8.0 Developer's Guide: KIDS Developer Tools User Guide* is **not** in
-the `~/data/vdocs` gold corpus and is required for the exact silent-install APIs,
-the full `XPD*` answer-variable set, and the `XPD TRANSPORT PACKAGE` /
-re-export entry points (blocks Tier A in P5 and Phase 3 in P4.3). The companion
-*KIDS User Guide* (`krn_8_0_sm_kids_ug`) **was** fetched from VDL during P3 and
-staged. Note from that fetch: WebFetch's model can't read the PDF but `pdftotext`
-extracts it cleanly.
+**Update 2026-06-28: the gap is largely illusory.** The *KIDS Developer Tools*
+material is **not** a standalone guide — it is a *section inside* the **Developer's
+Guide: KIDS UG** (`krn_8_0_dg_kids_ug`), which **is** in the gold corpus. It
+documents `XPDENV`, `XPDQUIT`/`XPDABORT`, `XPDDIQ` (`XPZ1`/`XPZ2` only), `XPDNOQUE`,
+`XPDQUES`, required-builds, and `EN^XPDIJ` (ICR 2243). Combined with real `XPD*`
+routine source (WorldVistA/VistA-M), this was enough to fully scope Track A.1 (no
+documented headless silent-install API exists — that finding is itself grounded,
+not a missing doc). Residual: engine-specific behavior (`^XTMP`/checkpoints/`$$ENV`
+under IRIS) still needs live confirmation (P7), not more docs. The companion
+*KIDS User Guide* (`krn_8_0_sm_kids_ug`) is staged. Note: WebFetch's model can't
+read the PDF but `pdftotext` extracts it cleanly.
 
 ### P7 — Engine parity {#p7}
 Confirm `^XTMP`, `XINDEX`, and KIDS behave identically under YottaDB and IRIS via

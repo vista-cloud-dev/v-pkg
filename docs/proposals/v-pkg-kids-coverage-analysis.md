@@ -319,14 +319,20 @@ fix.
 ### Track A — Install fidelity (install the existing ~2,400)
 The goal: take any reconstructed transport global and run it through *real* KIDS,
 not the populate-and-`EN^XPDIJ` shortcut.
-- **A.1 Drive the real load + phases (F2).** Replace the `^XTMP`-populate path with
-  one that exercises `XPD LOAD DISTRIBUTION` → `XPD INSTALL BUILD` semantics so the
-  build's **Environment Check, Pre/Post-Install, and standard questions** actually
-  run. Two viable routes (decide explicitly — see Risks): (a) a **silent-install
-  XPD\* answer-variable harness** that pre-seeds `XPDQUES`/answer vars and calls the
-  real load+install entry points non-interactively; (b) an **expect-driven** driver
-  over the interactive menus as the cross-engine fallback. (a) is preferred where
-  the Kernel silent-install API exists.
+- **A.1 Drive the real load + phases (F2). ✅ SCOPED 2026-06-28 —
+  [`v-pkg-install-fidelity-spike.md`](v-pkg-install-fidelity-spike.md).** The spike
+  ground-truthed the KIDS phase boundary against real `XPD*` source: `EN^XPDIJ` is
+  only the *filing* engine; env-check + required-builds (`ENV`/`REQB^XPDIL1`) and
+  question-prompting (`EN^XPDI`) run earlier, and pre/post-install routines fire in
+  `EN^XPDIJ` **only if** the load-phase `INI`/`INIT` checkpoints exist (which the
+  direct-populate never creates — so they're silently skipped). **Recommended route
+  (c): augmented direct-populate** — keep the proven core, add explicit calls to the
+  *real* phase functions (`$$ENV^XPDIL1(1)`, `$$NEWCP^XPDUTL` checkpoints, seeded
+  `#9.7` QUES answers). Route (a) "drive `EN^XPDI` headless" is rejected (the device
+  + `XPO1`/`XPI1` prompts have no documented suppression and the driver `Exec` has no
+  stdin); (b) expect stays the cross-engine fallback. **The flagged blocker is
+  resolved:** the "KIDS Developer Tools UG" is a *section of* `krn_8_0_dg_kids_ug`
+  (in the corpus), not a missing doc. Land A.1.1 (pre/post routines) first.
 - **A.2 Enforce Required Builds (F4).** Run KIDS' #9.611 check (or replicate it
   against #9.4 → #22 → #9.49,1105) and honor WARNING / DON'T-INSTALL-LEAVE /
   DON'T-INSTALL-REMOVE before filing.

@@ -51,6 +51,13 @@ test-range file-number restriction (permanent-number namespace policy, org
 coordination). B.2-a is **build-side only — not yet live-install-proven** on an
 engine (single-`.01` lifecycle was; multi-field is the next engine step).
 
+**Track A.1 SCOPED 2026-06-28** ([[install-fidelity-spike]]): the install-fidelity
+spike ground-truthed the KIDS phase boundary (`EN^XPDIJ` is filing-only; env-check/
+required-builds/questions run earlier; pre/post routines need the load-phase INI/INIT
+checkpoints the direct-populate never makes → silently skipped). Recommends **route
+(c) augmented direct-populate**; the flagged "missing Developer Tools UG" blocker is
+resolved (it's a section of `krn_8_0_dg_kids_ug`, in the corpus).
+
 Reorders/extends the existing `implementation-plan.md` + `kids-installation-automation.md`
 threads, not a fork. Waterline + [[bespoke-installer-forbidden]] preserved
 (Track A is *more* KIDS-native, not a bespoke installer). The re-tally also owes a
