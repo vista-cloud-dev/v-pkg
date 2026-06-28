@@ -254,6 +254,43 @@ func TestBuild_ZZPROTO_Deterministic(t *testing.T) {
 	}
 }
 
+// TestBuild_ZZRPC_Deterministic is the B.1 gate for a package shipping a REMOTE
+// PROCEDURE (#8994) as a KIDS KRN component (the fifth type on the generic
+// emitter): two builds are byte-identical and match the committed golden .KID.
+func TestBuild_ZZRPC_Deterministic(t *testing.T) {
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a.kids")
+	b := filepath.Join(dir, "b.kids")
+	runBuildPkg(t, "zzrpc", "ZZRPC", a)
+	runBuildPkg(t, "zzrpc", "ZZRPC", b)
+
+	gotA, err := os.ReadFile(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotB, err := os.ReadFile(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(gotA, gotB) {
+		t.Fatal("v pkg build (rpc) is not deterministic — two builds differ")
+	}
+
+	golden := filepath.Join("..", "testdata", "zzrpc", "ZZRPC.kids")
+	if os.Getenv("UPDATE_GOLDEN") == "1" {
+		if err := os.WriteFile(golden, gotA, 0o644); err != nil {
+			t.Fatalf("write golden: %v", err)
+		}
+	}
+	want, err := os.ReadFile(golden)
+	if err != nil {
+		t.Fatalf("read golden (UPDATE_GOLDEN=1 to create): %v", err)
+	}
+	if !bytes.Equal(gotA, want) {
+		t.Errorf("ZZRPC.kids drift — run UPDATE_GOLDEN=1\n--- got ---\n%s", gotA)
+	}
+}
+
 // TestBuild_ZZMIX_Deterministic is the B.1 multi-type gate: one build shipping
 // BOTH an OPTION (#19) and a PARAMETER DEFINITION (#8989.51) — they share a single
 // computed "BLD",1,"KRN",0) manifest header and take distinct ORD orders. Two

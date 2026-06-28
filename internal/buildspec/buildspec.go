@@ -67,7 +67,7 @@ type Components struct {
 	ParameterDefinitions []ParamDef     `json:"parameterDefinitions,omitempty"` // XPAR #8989.51 PARAMETER DEFINITION components (shipped as data)
 	Protocols            []ProtocolComp `json:"protocols,omitempty"`            // #101 PROTOCOL KRN components (B.1)
 	Templates            []string       `json:"templates,omitempty"`
-	RPCs                 []string       `json:"rpcs,omitempty"`
+	RPCs                 []RPCComp      `json:"rpcs,omitempty"` // #8994 REMOTE PROCEDURE KRN components (B.1)
 	MailGroups           []string       `json:"mailGroups,omitempty"`
 	HL7                  []string       `json:"hl7,omitempty"`
 }
@@ -94,7 +94,6 @@ func (c Components) unsupported() []string {
 		n    int
 	}{
 		{"templates", len(c.Templates)},
-		{"rpcs", len(c.RPCs)},
 		{"mailGroups", len(c.MailGroups)},
 		{"hl7", len(c.HL7)},
 	} {
@@ -134,6 +133,28 @@ type OptionComp struct {
 	Routine     string `json:"routine,omitempty"`     // #19 field 25 ROUTINE entryref (required for "run routine")
 	EntryAction string `json:"entryAction,omitempty"` // #19 field 20 ENTRY ACTION (M code)
 	ExitAction  string `json:"exitAction,omitempty"`  // #19 field 15 EXIT ACTION (M code)
+}
+
+// RPCComp is a #8994 REMOTE PROCEDURE shipped as a KIDS KRN component (B.1). The
+// DD-required fields are Name (.01) + Routine (.03) + ReturnType (.04); Tag (.02)
+// is functionally required for the RPC to run. ReturnType is a human name resolved
+// to its #8994 field .04 set-of-codes value by RPCReturnTypeCode (default "single
+// value").
+type RPCComp struct {
+	Name       string `json:"name"`                 // #8994 .01 NAME (uppercase, e.g. "ZZRPC ECHO")
+	Tag        string `json:"tag,omitempty"`        // #8994 .02 TAG — the M entry tag
+	Routine    string `json:"routine"`              // #8994 .03 ROUTINE — the M routine
+	ReturnType string `json:"returnType,omitempty"` // value type; default "single value"
+}
+
+// RPCReturnTypeCode maps a human return-value-type name to its #8994 field .04
+// (RETURN VALUE TYPE) set-of-codes value. National constants.
+var RPCReturnTypeCode = map[string]string{
+	"single value":    "1",
+	"array":           "2",
+	"word processing": "3",
+	"global array":    "4",
+	"global instance": "5",
 }
 
 // ProtocolComp is a #101 PROTOCOL shipped as a KIDS KRN component (B.1). Type is a
@@ -392,6 +413,9 @@ func (s *Spec) Validate() error {
 	if err := validateProtocols(s.Components.Protocols); err != nil {
 		return err
 	}
+	if err := validateRPCs(s.Components.RPCs, maxName); err != nil {
+		return err
+	}
 	if err := validateFiles(s.Components.Files); err != nil {
 		return err
 	}
@@ -502,6 +526,33 @@ func validateOptions(opts []OptionComp, maxName int) error {
 			tag, rtn, ok := splitEntryref(o.Routine)
 			if !ok || !isRoutineName(rtn, maxName) || (tag != "" && !reLabel.MatchString(tag)) {
 				return fmt.Errorf("buildspec: option %s routine %q must be a routine entryref (ROUTINE or TAG^ROUTINE)", o.Name, o.Routine)
+			}
+		}
+	}
+	return nil
+}
+
+// validateRPCs checks each REMOTE PROCEDURE component: a valid #8994 NAME (≤30
+// chars, uppercase), a ROUTINE that is a valid M routine name (the DD-required
+// .03), an optional TAG that is a valid M label, and a known return-value type (or
+// empty, defaulted to "single value" at emit). The record is filed by KRN^XPDIK.
+func validateRPCs(rpcs []RPCComp, maxName int) error {
+	for _, r := range rpcs {
+		if r.Name == "" {
+			return fmt.Errorf("buildspec: an rpc is missing its name")
+		}
+		if len(r.Name) > 30 || !reEntryName.MatchString(r.Name) {
+			return fmt.Errorf("buildspec: rpc name %q must be uppercase ≤30 chars (#8994 REMOTE PROCEDURE NAME)", r.Name)
+		}
+		if !isRoutineName(r.Routine, maxName) {
+			return fmt.Errorf("buildspec: rpc %s routine %q must be a valid M routine name (#8994 ROUTINE is required)", r.Name, r.Routine)
+		}
+		if r.Tag != "" && !reLabel.MatchString(r.Tag) {
+			return fmt.Errorf("buildspec: rpc %s tag %q must be a valid M label", r.Name, r.Tag)
+		}
+		if r.ReturnType != "" {
+			if _, ok := RPCReturnTypeCode[r.ReturnType]; !ok {
+				return fmt.Errorf("buildspec: rpc %s returnType %q is not a known #8994 return-value type", r.Name, r.ReturnType)
 			}
 		}
 	}

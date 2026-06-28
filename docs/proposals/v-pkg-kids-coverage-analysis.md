@@ -406,6 +406,19 @@ not the populate-and-`EN^XPDIJ` shortcut.
     `testdata/zzproto/ZZPROTO.kids`. **Live install→verify→`--force` uninstall→clean**
     on vehu (YDB, `^ORD(101,…,0)=ZZPROTO ACTION^…^^A`, node 20=`Q`) + foia-t12 (IRIS).
     Next: **RPC #8994**. ([[option-entry-component]])
+  - **B.1-e ✅ DONE + LIVE-PROVEN 2026-06-28 — REMOTE PROCEDURE (#8994), both
+    engines.** The fifth type, and the simplest record yet: a single 0-node
+    `NAME^TAG^ROUTINE^RETURNTYPE` in its own data global `^XWB(8994,` — no action/exit
+    nodes, no "U" xref. ORD action-routine tail (corpus modal): `1;;;;;;;RPCDEL^XPDIA1`.
+    `RPCComp` carries `tag`/`routine`/`returnType`; `returnType` is a human name
+    resolved to its #8994 field .04 set-of-codes value (single value→1, array→2, word
+    processing→3, global array→4, global instance→5), **defaulting to "single value"**
+    when omitted (the field is DD-required). TDD; lint/race/contract green; corpus
+    DRIFT=0; golden `testdata/zzrpc/ZZRPC.kids`. **Live install→verify→`--force`
+    uninstall→verify-clean** on vehu (YDB) + foia-t12 (IRIS): live
+    `^XWB(8994,…,0)=ZZRPC ECHO^ECHO^ZZRPCRT^1` **byte-identical on both**, B-index gone
+    after back-out. Input-parameter (#8994.02) authoring is a follow-up. Next:
+    **template/form family** (#.4/.402/.401/.403). ([[option-entry-component]])
 - **B.2 Real FILE DD + DATA (F3; the R3 enabler).** Extend `FileComp` to a
   multi-field DD (see §8 for the grounded node-set) and add **DATA** export with
   the four action codes (ADD-IF-NEW / MERGE / OVERWRITE / REPLACE) and FULL/PARTIAL

@@ -1,0 +1,48 @@
+KIDS Distribution saved by v-pkg
+m-kids reassembled output
+**KIDS**:ZZRPC*1.0*1^
+
+**INSTALL NAME**
+ZZRPC*1.0*1
+"BLD",1,0)
+ZZRPC*1.0*1^ZZRPC^0^0
+"BLD",1,"KRN",0)
+^9.67PA^8994^1
+"BLD",1,"KRN",8994,0)
+8994
+"BLD",1,"KRN",8994,"NM",0)
+^9.68A^1^1
+"BLD",1,"KRN",8994,"NM",1,0)
+ZZRPC ECHO^^0
+"BLD",1,"KRN",8994,"NM","B","ZZRPC ECHO",1)
+
+"BLD",1,"KRN","B",8994,8994)
+
+"RTN")
+1
+"RTN","ZZRPCRT")
+0^6^0^0
+"RTN","ZZRPCRT",1,0)
+ZZRPCRT ;VCD/VSL - throwaway test package (KRN rpc component) ;1.0
+"RTN","ZZRPCRT",2,0)
+ ;;1.0;ZZRPC;;
+"RTN","ZZRPCRT",3,0)
+ quit
+"RTN","ZZRPCRT",4,0)
+ECHO(RESULT,VALUE) ;
+"RTN","ZZRPCRT",5,0)
+ set RESULT=$get(VALUE)
+"RTN","ZZRPCRT",6,0)
+ quit
+"ORD",1,8994)
+8994;1;1;;;;;;;RPCDEL^XPDIA1
+"ORD",1,8994,0)
+REMOTE PROCEDURE
+"KRN",8994,1,-1)
+0^1
+"KRN",8994,1,0)
+ZZRPC ECHO^ECHO^ZZRPCRT^1
+"VER")
+8.0^22.2
+**END**
+**END**

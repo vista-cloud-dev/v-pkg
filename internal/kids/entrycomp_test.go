@@ -143,6 +143,47 @@ func TestMakeBuildPairs_Protocol_KRN(t *testing.T) {
 	}
 }
 
+// TestMakeBuildPairs_RPC_KRN locks the transport shape for a REMOTE PROCEDURE
+// (#8994) shipped as a KRN component — the fifth type on the generic emitter. The
+// record is a single 0-node NAME^TAG^ROUTINE^RETURN VALUE TYPE (the three required
+// fields + TAG), stored in ^XWB(8994,. Its ORD line carries the xref flag (1) and
+// only a delete action routine (RPCDEL^XPDIA1) — RPCs need no menu relinking.
+func TestMakeBuildPairs_RPC_KRN(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZRPC*1.0*1",
+		Namespace:   "ZZRPC",
+		Routines:    []RoutineSrc{{Name: "ZZRPCRT", Lines: []string{"ZZRPCRT ;x", " quit"}}},
+		RPCs:        []RPC{{Name: "ZZRPC ECHO", Tag: "ECHO", Routine: "ZZRPCRT", ReturnTypeCode: "1"}},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	want := map[string]string{
+		`"KRN",8994,1,-1)`:                            "0^1",
+		`"KRN",8994,1,0)`:                             "ZZRPC ECHO^ECHO^ZZRPCRT^1", // .01^.02 TAG^.03 ROUTINE^.04 RETURN TYPE
+		`"ORD",1,8994)`:                               "8994;1;1;;;;;;;RPCDEL^XPDIA1",
+		`"ORD",1,8994,0)`:                             "REMOTE PROCEDURE",
+		`"BLD",1,"KRN",0)`:                            "^9.67PA^8994^1",
+		`"BLD",1,"KRN",8994,0)`:                       "8994",
+		`"BLD",1,"KRN",8994,"NM",1,0)`:                "ZZRPC ECHO^^0",
+		`"BLD",1,"KRN",8994,"NM","B","ZZRPC ECHO",1)`: "",
+		`"BLD",1,"KRN","B",8994,8994)`:                "",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+	b := newBuild()
+	for _, p := range MakeBuildPairs(in) {
+		b.Set(p.Subs, p.Value)
+	}
+	if rs := b.RPCNames(); len(rs) != 1 || rs[0] != "ZZRPC ECHO" {
+		t.Errorf("RPCNames = %v, want [ZZRPC ECHO]", rs)
+	}
+}
+
 // TestMakeBuildPairs_MixedEntryTypes proves the unified KRN manifest header spans
 // multiple entry types in one build (B.1 next step): an OPTION (#19) AND a
 // PARAMETER DEFINITION (#8989.51) share one "BLD",1,"KRN",0) header

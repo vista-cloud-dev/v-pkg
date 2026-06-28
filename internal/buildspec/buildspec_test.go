@@ -346,7 +346,6 @@ func TestParse_AllowLongNames_StillGated(t *testing.T) {
 func TestParse_UnsupportedComponents_Rejected(t *testing.T) {
 	cases := map[string]string{
 		"templates":  `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"templates":["ZZSKEL TMPL"]}}`,
-		"rpcs":       `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"rpcs":["ZZSKEL RPC"]}}`,
 		"mailGroups": `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"mailGroups":["ZZSKEL MG"]}}`,
 		"hl7":        `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"hl7":["ZZSKEL HL7"]}}`,
 	}
@@ -395,6 +394,47 @@ func TestParse_Options_Invalid(t *testing.T) {
 		"bad type":        `{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"ZZOPT A","type":"bogus"}]}}`,
 		"run no routine":  `{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"ZZOPT A","type":"run routine"}]}}`,
 		"bad routine ref": `{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"ZZOPT A","type":"run routine","routine":"EN^123BAD"}]}}`,
+	}
+	for name, js := range cases {
+		if _, err := Parse([]byte(js)); err == nil {
+			t.Errorf("%s: expected an error, got nil", name)
+		}
+	}
+}
+
+func TestParse_RPCs(t *testing.T) {
+	js := `{"package":"ZZRPC","version":"1.0","patch":"1","components":{
+	  "routines":["ZZRPCRT"],
+	  "rpcs":[{"name":"ZZRPC ECHO","tag":"ECHO","routine":"ZZRPCRT","returnType":"single value"}]
+	}}`
+	s, err := Parse([]byte(js))
+	if err != nil {
+		t.Fatalf("Parse rpcs spec: %v", err)
+	}
+	if len(s.Components.RPCs) != 1 {
+		t.Fatalf("rpcs = %+v", s.Components.RPCs)
+	}
+	r := s.Components.RPCs[0]
+	if r.Name != "ZZRPC ECHO" || r.Tag != "ECHO" || r.Routine != "ZZRPCRT" || r.ReturnType != "single value" {
+		t.Errorf("rpc = %+v", r)
+	}
+	// returnType defaults to single value when omitted.
+	d, err := Parse([]byte(`{"package":"ZZRPC","version":"1.0","components":{"rpcs":[{"name":"ZZRPC A","tag":"A","routine":"ZZRPCRT"}]}}`))
+	if err != nil {
+		t.Fatalf("Parse rpc without returnType: %v", err)
+	}
+	if d.Components.empty() {
+		t.Error("spec with an rpc must not be empty")
+	}
+}
+
+func TestParse_RPCs_Invalid(t *testing.T) {
+	cases := map[string]string{
+		"no name":     `{"package":"ZZR","version":"1.0","components":{"rpcs":[{"routine":"ZZRPCRT"}]}}`,
+		"bad name":    `{"package":"ZZR","version":"1.0","components":{"rpcs":[{"name":"lower","routine":"ZZRPCRT"}]}}`,
+		"no routine":  `{"package":"ZZR","version":"1.0","components":{"rpcs":[{"name":"ZZR A"}]}}`,
+		"bad routine": `{"package":"ZZR","version":"1.0","components":{"rpcs":[{"name":"ZZR A","routine":"123BAD"}]}}`,
+		"bad rtype":   `{"package":"ZZR","version":"1.0","components":{"rpcs":[{"name":"ZZR A","routine":"ZZRPCRT","returnType":"bogus"}]}}`,
 	}
 	for name, js := range cases {
 		if _, err := Parse([]byte(js)); err == nil {

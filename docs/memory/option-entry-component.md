@@ -101,8 +101,23 @@ ENTRY ACTION) — the #101.01 ITEM multiple (menu items) + extended menu-actions
 `^ORD(101,"B",<name>)`, uninstall is `DIK` on `^ORD(101,`. #101 is integer-numbered
 (re-parses as int) — the `subNum` numeric-match fix covers it.
 
-Remaining B.1 types in frequency order: RPC #8994 → templates (.4/.402/.401/.403) →
-LIST TEMPLATE #409.61 → MAIL GROUP #3.8 → HL7 family.
+## REMOTE PROCEDURE (#8994) — fifth type, live-proven both engines (2026-06-28)
+The **simplest record of any type so far**: a single 0-node
+`NAME^TAG^ROUTINE^RETURNTYPE` in its own data global `^XWB(8994,` — **no action/exit
+nodes, no "U" xref**. `RPCComp{name,tag,routine,returnType}`; `returnType` is a human
+name resolved to #8994 field **.04** set-of-codes via `RPCReturnTypeCode` (single
+value→1, array→2, word processing→3, global array→4, global instance→5), **defaulting
+to "single value" (1)** when omitted — field .04 is DD-required, so an empty value
+would file a malformed RPC. ORD tail (corpus modal): `1;;;;;;;RPCDEL^XPDIA1`. `-1`
+XPDFL = `0^1` (send). #8994 is integer-numbered → relies on the `subNum` numeric-match
+fix. Live install→verify→`--force` uninstall→verify-clean on vehu (YDB) + foia-t12
+(IRIS): live `^XWB(8994,…,0)=ZZRPC ECHO^ECHO^ZZRPCRT^1` **byte-identical on both**,
+`^XWB(8994,"B",…)` gone after back-out. Verify probes `^XWB(8994,"B",<name>)`,
+uninstall is `DIK` on `^XWB(8994,`. Fixture `testdata/zzrpc` (ZZRPC ECHO → `ECHO^ZZRPCRT`,
+single value). RPC **input parameters** (#8994.02 multiple) are a follow-up.
+
+Remaining B.1 types in frequency order: templates (.4/.402/.401/.403) → LIST TEMPLATE
+#409.61 → MAIL GROUP #3.8 → HL7 family.
 
 ## Proof
 **Live install→verify→uninstall→clean on BOTH engines** via the driver stack

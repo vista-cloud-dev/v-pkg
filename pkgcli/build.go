@@ -31,6 +31,7 @@ type buildResult struct {
 	Options        int    `json:"options,omitempty"`
 	Keys           int    `json:"keys,omitempty"`
 	Protocols      int    `json:"protocols,omitempty"`
+	RPCs           int    `json:"rpcs,omitempty"`
 	Files          int    `json:"files,omitempty"`
 	RequiredBuilds int    `json:"requiredBuilds,omitempty"`
 }
@@ -60,6 +61,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 	options := resolveOptions(spec.Components.Options)
 	keys := resolveKeys(spec.Components.Keys)
 	protocols := resolveProtocols(spec.Components.Protocols)
+	rpcs := resolveRPCs(spec.Components.RPCs)
 	reqBuilds := resolveRequiredBuilds(spec.RequiredBuilds)
 
 	pairs := kids.MakeBuildPairs(kids.BuildInput{
@@ -70,6 +72,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 		Options:        options,
 		Keys:           keys,
 		Protocols:      protocols,
+		RPCs:           rpcs,
 		Files:          files,
 		RequiredBuilds: reqBuilds,
 		EnvCheck:       spec.EnvCheck,
@@ -91,11 +94,11 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 
 	return cc.Result(buildResult{
 		InstallName: spec.InstallName(), Out: out, Routines: len(rtns),
-		ParamDefs: len(paramDefs), Options: len(options), Keys: len(keys), Protocols: len(protocols), Files: len(files), RequiredBuilds: len(reqBuilds),
+		ParamDefs: len(paramDefs), Options: len(options), Keys: len(keys), Protocols: len(protocols), RPCs: len(rpcs), Files: len(files), RequiredBuilds: len(reqBuilds),
 	}, func() {
 		cc.Title("pkg build")
-		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d option(s), %d key(s), %d protocol(s), %d file(s), %d required build(s)) → %s\n",
-			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(options), len(keys), len(protocols), len(files), len(reqBuilds), cc.Accent(out))
+		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d option(s), %d key(s), %d protocol(s), %d rpc(s), %d file(s), %d required build(s)) → %s\n",
+			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(options), len(keys), len(protocols), len(rpcs), len(files), len(reqBuilds), cc.Accent(out))
 	})
 }
 
@@ -218,6 +221,26 @@ func resolveProtocols(protos []buildspec.ProtocolComp) []kids.Protocol {
 			TypeCode:    buildspec.ProtocolTypeCode[p.Type],
 			EntryAction: p.EntryAction,
 			ExitAction:  p.ExitAction,
+		})
+	}
+	return out
+}
+
+// resolveRPCs maps the spec's REMOTE PROCEDURE components onto the kids emit shape
+// — return-value-type name → #8994 field .04 set-of-codes value, defaulting to
+// "single value" (code 1) when omitted (the field is DD-required).
+func resolveRPCs(rpcs []buildspec.RPCComp) []kids.RPC {
+	out := make([]kids.RPC, 0, len(rpcs))
+	for _, r := range rpcs {
+		rt := r.ReturnType
+		if rt == "" {
+			rt = "single value"
+		}
+		out = append(out, kids.RPC{
+			Name:           r.Name,
+			Tag:            r.Tag,
+			Routine:        r.Routine,
+			ReturnTypeCode: buildspec.RPCReturnTypeCode[rt],
 		})
 	}
 	return out

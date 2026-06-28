@@ -60,7 +60,7 @@ type entryGroup struct {
 // types, so the shared "BLD",1,"KRN",0) header and the ORD ordering are computed
 // once across all of them. PARAMETER DEFINITION (#8989.51) and OPTION (#19) ride
 // the same path; new SEND/DELETE types append here.
-func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey, protos []Protocol) []entryGroup {
+func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey, protos []Protocol, rpcs []RPC) []entryGroup {
 	var groups []entryGroup
 	if len(opts) > 0 {
 		groups = append(groups, entryGroup{optionEntryType, optionRecords(opts)})
@@ -70,6 +70,9 @@ func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey, protos
 	}
 	if len(protos) > 0 {
 		groups = append(groups, entryGroup{protocolEntryType, protocolRecords(protos)})
+	}
+	if len(rpcs) > 0 {
+		groups = append(groups, entryGroup{rpcEntryType, rpcRecords(rpcs)})
 	}
 	if len(defs) > 0 {
 		groups = append(groups, entryGroup{paramDefEntryType, paramDefRecords(defs)})
@@ -353,3 +356,47 @@ func protocolRecords(protos []Protocol) []entryRec {
 // ProtocolNames returns the #101 PROTOCOL component names in build order — what
 // `v pkg verify`/`uninstall` probe and back out.
 func (b *Build) ProtocolNames() []string { return b.entryNames(protocolFile) }
+
+// --- REMOTE PROCEDURE / RPC (#8994) — the fifth type on the generic core ------
+
+const (
+	rpcFile     = 8994
+	rpcFileName = "REMOTE PROCEDURE"
+	// rpcOrdTail is the national-constant tail of the #8994 ORD install line
+	// (pieces after "<file>;<ord>;"): the xref flag (1 → IX1^DIK rebuilds the "B"
+	// xref) plus only a delete action routine (RPCDEL^XPDIA1) — an RPC needs no
+	// menu/file relink actions. Dominant form across the corpus.
+	rpcOrdTail = "1;;;;;;;RPCDEL^XPDIA1"
+)
+
+var rpcEntryType = entryType{number: rpcFile, name: rpcFileName, ordTail: rpcOrdTail}
+
+// RPC is one #8994 REMOTE PROCEDURE record to ship as a KIDS KRN component
+// (SEND-TO-SITE). Stored in ^XWB(8994,; the record is a single 0-node carrying the
+// three DD-required fields (NAME/.01, ROUTINE/.03, RETURN VALUE TYPE/.04) plus TAG
+// (.02, functionally required for the RPC to run). ReturnTypeCode is the #8994
+// field .04 set-of-codes value (1 single value, 2 array, 3 word processing, …).
+type RPC struct {
+	Name           string // #8994 .01 NAME (0;1)
+	Tag            string // #8994 .02 TAG — the M entry tag (0;2)
+	Routine        string // #8994 .03 ROUTINE — the M routine (0;3)
+	ReturnTypeCode string // #8994 .04 RETURN VALUE TYPE set-of-codes value (0;4)
+}
+
+// rpcRecords packs each RPC into the generic entry-record shape: the SEND XPDFL
+// flag and a single 0-node NAME^TAG^ROUTINE^RETURN VALUE TYPE.
+func rpcRecords(rpcs []RPC) []entryRec {
+	recs := make([]entryRec, 0, len(rpcs))
+	for _, r := range rpcs {
+		recs = append(recs, entryRec{
+			name:  r.Name,
+			xpdfl: "0^1",
+			image: []imageNode{{Subs{intSub(0)}, r.Name + "^" + r.Tag + "^" + r.Routine + "^" + r.ReturnTypeCode}},
+		})
+	}
+	return recs
+}
+
+// RPCNames returns the #8994 REMOTE PROCEDURE component names in build order —
+// what `v pkg verify`/`uninstall` probe and back out.
+func (b *Build) RPCNames() []string { return b.entryNames(rpcFile) }

@@ -475,6 +475,7 @@ type verifyResult struct {
 	Options   map[string]bool `json:"options,omitempty"`   // #19 OPTIONs present
 	Keys      map[string]bool `json:"keys,omitempty"`      // #19.1 SECURITY KEYs present
 	Protocols map[string]bool `json:"protocols,omitempty"` // #101 PROTOCOLs present
+	RPCs      map[string]bool `json:"rpcs,omitempty"`      // #8994 REMOTE PROCEDUREs present
 	Files     map[string]bool `json:"files,omitempty"`     // FileMan FILE data dictionaries present
 	// Drift maps each routine -> "applied" | "drifted" | "absent" when --drift is
 	// requested: does the LIVE routine still match the source this patch shipped?
@@ -510,6 +511,11 @@ func (r verifyResult) ok() bool {
 		}
 	}
 	for _, present := range r.Protocols {
+		if !present {
+			return false
+		}
+	}
+	for _, present := range r.RPCs {
 		if !present {
 			return false
 		}
@@ -550,12 +556,12 @@ func checkDrift(ctx context.Context, cl *mdriver.Client, b *kids.Build) (map[str
 	return drift, nil
 }
 
-func runVerify(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs, options, keys, protocols, files []string) (verifyResult, error) {
-	markers, _, err := runMScript(ctx, cl, rtnVerify, installspec.VerifyScript(name, routines, paramDefs, options, keys, protocols, files))
+func runVerify(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs, options, keys, protocols, rpcs, files []string) (verifyResult, error) {
+	markers, _, err := runMScript(ctx, cl, rtnVerify, installspec.VerifyScript(name, routines, paramDefs, options, keys, protocols, rpcs, files))
 	if err != nil {
 		return verifyResult{Name: name}, err
 	}
-	r := verifyResult{Name: name, Routines: map[string]bool{}, Params: map[string]bool{}, Options: map[string]bool{}, Keys: map[string]bool{}, Protocols: map[string]bool{}, Files: map[string]bool{}}
+	r := verifyResult{Name: name, Routines: map[string]bool{}, Params: map[string]bool{}, Options: map[string]bool{}, Keys: map[string]bool{}, Protocols: map[string]bool{}, RPCs: map[string]bool{}, Files: map[string]bool{}}
 	r.Installed = strings.TrimSpace(markers["installed"]) == "1"
 	r.Status, _ = strconv.Atoi(strings.TrimSpace(markers["status"]))
 	for _, rt := range routines {
@@ -572,6 +578,9 @@ func runVerify(ctx context.Context, cl *mdriver.Client, name string, routines, p
 	}
 	for _, pr := range protocols {
 		r.Protocols[pr] = strings.TrimSpace(markers["protocol:"+pr]) == "1"
+	}
+	for _, rp := range rpcs {
+		r.RPCs[rp] = strings.TrimSpace(markers["rpc:"+rp]) == "1"
 	}
 	for _, f := range files {
 		r.Files[f] = strings.TrimSpace(markers["file:"+f]) == "1"
@@ -595,7 +604,7 @@ func (c *verifyCmd) Run(cc *clikit.Context) error {
 		return c.noDriver(err)
 	}
 	ctx := context.Background()
-	res, err := runVerify(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), fileNumStrings(b))
+	res, err := runVerify(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), b.RPCNames(), fileNumStrings(b))
 	if err != nil {
 		return clikit.Fail(clikit.ExitRuntime, "VERIFY_FAILED", err.Error(), "")
 	}
@@ -647,6 +656,13 @@ func (c *verifyCmd) Run(cc *clikit.Context) error {
 			}
 			fmt.Fprintf(cc.Stdout, "  protocol %s %s\n", pr, mark)
 		}
+		for rp, present := range res.RPCs {
+			mark := cc.Success("ok")
+			if !present {
+				mark = cc.Failure("missing")
+			}
+			fmt.Fprintf(cc.Stdout, "  rpc %s %s\n", rp, mark)
+		}
 		for f, present := range res.Files {
 			mark := cc.Success("ok")
 			if !present {
@@ -688,8 +704,8 @@ type uninstallResult struct {
 	Uninstalled bool   `json:"uninstalled"`
 }
 
-func runUninstall(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs, options, keys, protocols, files []string) (uninstallResult, error) {
-	markers, _, err := runMScript(ctx, cl, rtnUninstall, installspec.UninstallScript(name, routines, paramDefs, options, keys, protocols, files))
+func runUninstall(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs, options, keys, protocols, rpcs, files []string) (uninstallResult, error) {
+	markers, _, err := runMScript(ctx, cl, rtnUninstall, installspec.UninstallScript(name, routines, paramDefs, options, keys, protocols, rpcs, files))
 	if err != nil {
 		return uninstallResult{Name: name}, err
 	}
@@ -847,7 +863,7 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 			}
 		}
 	default: // actDelete
-		ur, uerr := runUninstall(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), fileNumStrings(b))
+		ur, uerr := runUninstall(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), b.RPCNames(), fileNumStrings(b))
 		if uerr != nil {
 			return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", uerr.Error(), "")
 		}
