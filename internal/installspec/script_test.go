@@ -67,7 +67,7 @@ func TestStageChunks_CoversAllPairsBounded(t *testing.T) {
 // FinalInstallScript verifies the staged count, then installs in one process:
 // INST → MERGE the staged tree into ^XTMP("XPDI",XPDA) → EN^XPDIJ.
 func TestFinalInstallScript(t *testing.T) {
-	got := FinalInstallScript("ZZSKEL*1.0*1", "ZZSKEL via v pkg install", 7, true)
+	got := FinalInstallScript("ZZSKEL*1.0*1", "ZZSKEL via v pkg install", 7, true, nil)
 	for _, want := range []string{
 		`I $D(^XPD(9.7,"B","ZZSKEL*1.0*1"))`,            // already-installed guard
 		`DUZ(0)="@"`,                                    // full FM priv for EN^XPDIJ
@@ -96,7 +96,7 @@ func TestFinalInstallScript(t *testing.T) {
 // KIDS load always starts from a clean node. (Live-proven: a stale REQB made a
 // hook-only build's env-check return 2 until the KILL was added.)
 func TestFinalInstallScript_KillBeforeMerge(t *testing.T) {
-	got := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, true)
+	got := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, true, nil)
 	kill := strings.Index(got, `K ^XTMP("XPDI",XPDA)`)
 	merge := strings.Index(got, `M ^XTMP("XPDI",XPDA)=^XTMP("VPKGI")`)
 	if kill < 0 {
@@ -113,7 +113,7 @@ func TestFinalInstallScript_KillBeforeMerge(t *testing.T) {
 // for the COMPLETED checkpoint, then the STARTED one (carrying the routine) only
 // when the transport carries a pre/post routine name.
 func TestFinalInstallScript_PrePostCheckpoints(t *testing.T) {
-	got := FinalInstallScript("ZZSKEL*1.0*1", "ZZSKEL via v pkg install", 7, true)
+	got := FinalInstallScript("ZZSKEL*1.0*1", "ZZSKEL via v pkg install", 7, true, nil)
 	for _, want := range []string{
 		`S XPDCP="INI"`, // pre-install checkpoint multiple (subfile 9.713)
 		`$$NEWCP^XPDUTL("XPD PREINSTALL COMPLETED")`, // base checkpoint
@@ -140,7 +140,7 @@ func TestFinalInstallScript_PrePostCheckpoints(t *testing.T) {
 // on a non-zero reject. With runEnvCheck=false it must emit none of that (the
 // restore/back-out callers must not re-run env-check).
 func TestFinalInstallScript_EnvCheck(t *testing.T) {
-	on := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, true)
+	on := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, true, nil)
 	for _, want := range []string{
 		`S XPDT(XPDIT)=XPDA_U_XPDNM`,                 // seed XPDT (else ENV self-rejects)
 		`XPDPKG=+$P($G(^XPD(9.7,XPDA,0)),U,2)`,       // package pointer for the version check
@@ -156,9 +156,36 @@ func TestFinalInstallScript_EnvCheck(t *testing.T) {
 	if iE, iJ := strings.Index(on, `$$ENV^XPDIL1(1)`), strings.Index(on, `D EN^XPDIJ`); iE < 0 || iJ < 0 || iE > iJ {
 		t.Errorf("env-check (%d) must precede EN^XPDIJ (%d)", iE, iJ)
 	}
-	off := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, false)
+	off := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, false, nil)
 	if strings.Contains(off, `$$ENV^XPDIL1`) {
 		t.Errorf("runEnvCheck=false must NOT call $$ENV^XPDIL1\n---\n%s", off)
+	}
+}
+
+// A.1.3: pre-answered install questions are seeded into the #9.7 "QUES" scratch
+// tree — the three nodes $$ANSWER^XPDIQ reads (name .01, answer node 1, "B" xref),
+// IEN per answer — BEFORE EN^XPDIJ runs the pre/post routines that read them. No
+// answers → none of those sets (byte-identical to the pre-A.1.3 script).
+func TestFinalInstallScript_QuesAnswers(t *testing.T) {
+	got := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, true, []QuesAnswer{
+		{Name: "ZZ4Q", Value: "HELLO"},
+		{Name: "RUN MODE", Value: "1"},
+	})
+	for _, want := range []string{
+		`S ^XPD(9.7,XPDA,"QUES",1,0)="ZZ4Q",^XPD(9.7,XPDA,"QUES",1,1)="HELLO",^XPD(9.7,XPDA,"QUES","B","ZZ4Q",1)=""`,
+		`S ^XPD(9.7,XPDA,"QUES",2,0)="RUN MODE",^XPD(9.7,XPDA,"QUES",2,1)="1",^XPD(9.7,XPDA,"QUES","B","RUN MODE",2)=""`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("FinalInstallScript missing QUES seed %q\n---\n%s", want, got)
+		}
+	}
+	// The answers must be seeded BEFORE the install runs the pre/post routines.
+	if iQ, iJ := strings.Index(got, `"QUES",1,0)`), strings.Index(got, `D EN^XPDIJ`); iQ < 0 || iJ < 0 || iQ > iJ {
+		t.Errorf("QUES seed (%d) must precede EN^XPDIJ (%d)", iQ, iJ)
+	}
+	// No answers → no QUES sets at all.
+	if none := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, true, nil); strings.Contains(none, `"QUES"`) {
+		t.Errorf("hook-free build must not seed QUES\n---\n%s", none)
 	}
 }
 

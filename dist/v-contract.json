@@ -220,6 +220,11 @@
           "name": "skip-env-check",
           "type": "bool",
           "help": "Skip the build's environment-check routine + Required-Build (#9.611) enforcement before filing (default: run them, KIDS-faithful)."
+        },
+        {
+          "name": "answer",
+          "type": "list",
+          "help": "Pre-answer a build install question as NAME=VALUE (the internal answer $ANSWER^XPDIQ returns); repeatable."
         }
       ],
       "args": [

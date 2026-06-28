@@ -221,14 +221,14 @@ const stageChunkBytes = 40000
 // finalize routine verifies the staged count and runs INST → MERGE → EN^XPDIJ in
 // one process. The outcome is read from the #9.7 status marker (or the
 // already-installed guard). A staged-count mismatch is surfaced as an error.
-func runInstall(ctx context.Context, cl *mdriver.Client, name, header string, pairs []kids.Pair, runEnvCheck bool) (installResult, error) {
+func runInstall(ctx context.Context, cl *mdriver.Client, name, header string, pairs []kids.Pair, runEnvCheck bool, ques []installspec.QuesAnswer) (installResult, error) {
 	chunks := installspec.StageChunks(pairs, stageChunkBytes)
 	for i, body := range chunks {
 		if _, _, err := runMScript(ctx, cl, rtnInstall, body); err != nil {
 			return installResult{Name: name}, fmt.Errorf("stage chunk %d/%d: %w", i+1, len(chunks), err)
 		}
 	}
-	markers, _, err := runMScript(ctx, cl, rtnInstall, installspec.FinalInstallScript(name, header, len(pairs), runEnvCheck))
+	markers, _, err := runMScript(ctx, cl, rtnInstall, installspec.FinalInstallScript(name, header, len(pairs), runEnvCheck, ques))
 	if err != nil {
 		return installResult{Name: name}, err
 	}
@@ -312,7 +312,8 @@ type liveInstallInput struct {
 	pairs          []kids.Pair
 	snapshotPath   string // "" = no pre-image requested
 	allowOverwrite bool
-	runEnvCheck    bool // run the build's env-check + Required-Build enforcement before filing (A.1.2)
+	runEnvCheck    bool                     // run the build's env-check + Required-Build enforcement before filing (A.1.2)
+	quesAnswers    []installspec.QuesAnswer // pre-answered build install questions (A.1.3)
 }
 
 // liveInstall is the ONE class-aware install path (waterline rule: no caller
@@ -346,7 +347,7 @@ func liveInstall(ctx context.Context, cl *mdriver.Client, in liveInstallInput) (
 		}
 		res.Snapshot = in.snapshotPath
 	}
-	ir, ierr := runInstall(ctx, cl, in.name, in.header, in.pairs, in.runEnvCheck)
+	ir, ierr := runInstall(ctx, cl, in.name, in.header, in.pairs, in.runEnvCheck, in.quesAnswers)
 	if ierr != nil {
 		return res, clikit.Fail(clikit.ExitRuntime, "INSTALL_FAILED", ierr.Error(), "")
 	}
@@ -358,11 +359,27 @@ func liveInstall(ctx context.Context, cl *mdriver.Client, in liveInstallInput) (
 
 type installCmd struct {
 	engineConn
-	KidFile        string `arg:"" help:"Path to the built .KID transport file to install on the live engine."`
-	Snapshot       string `help:"Capture the pre-image of any routine this install overwrites to this .KID before installing (enables uninstall --restore)."`
-	AutoSnapshot   bool   `help:"Like --snapshot, but to the conventional sidecar path (<kid>.preimage.kids) that uninstall auto-detects."`
-	AllowOverwrite bool   `help:"Overwrite existing routines WITHOUT capturing a pre-image (unsafe: uninstall cannot then restore them)."`
-	SkipEnvCheck   bool   `help:"Skip the build's environment-check routine + Required-Build (#9.611) enforcement before filing (default: run them, KIDS-faithful)."`
+	KidFile        string   `arg:"" help:"Path to the built .KID transport file to install on the live engine."`
+	Snapshot       string   `help:"Capture the pre-image of any routine this install overwrites to this .KID before installing (enables uninstall --restore)."`
+	AutoSnapshot   bool     `help:"Like --snapshot, but to the conventional sidecar path (<kid>.preimage.kids) that uninstall auto-detects."`
+	AllowOverwrite bool     `help:"Overwrite existing routines WITHOUT capturing a pre-image (unsafe: uninstall cannot then restore them)."`
+	SkipEnvCheck   bool     `help:"Skip the build's environment-check routine + Required-Build (#9.611) enforcement before filing (default: run them, KIDS-faithful)."`
+	Answer         []string `help:"Pre-answer a build install question as NAME=VALUE (the internal answer $$ANSWER^XPDIQ returns); repeatable." placeholder:"NAME=VALUE"`
+}
+
+// parseAnswers turns the repeatable --answer NAME=VALUE flags into ordered QUES
+// answers. The name is everything before the first '=', the value everything after
+// (so a value may itself contain '='); order is preserved for deterministic IENs.
+func parseAnswers(flags []string) ([]installspec.QuesAnswer, error) {
+	out := make([]installspec.QuesAnswer, 0, len(flags))
+	for _, f := range flags {
+		i := strings.IndexByte(f, '=')
+		if i <= 0 {
+			return nil, fmt.Errorf("--answer %q must be NAME=VALUE", f)
+		}
+		out = append(out, installspec.QuesAnswer{Name: f[:i], Value: f[i+1:]})
+	}
+	return out, nil
 }
 
 type installReport struct {
@@ -403,11 +420,15 @@ func (c *installCmd) Run(cc *clikit.Context) error {
 	if snapshot == "" && c.AutoSnapshot {
 		snapshot = defaultPreimagePath(c.KidFile)
 	}
+	answers, aerr := parseAnswers(c.Answer)
+	if aerr != nil {
+		return clikit.Fail(clikit.ExitUsage, "BAD_ANSWER", aerr.Error(), "use --answer NAME=VALUE")
+	}
 	res, ferr := liveInstall(ctx, cl, liveInstallInput{
 		name: name, header: name + " via v pkg install", className: rev.ClassName,
 		routineNames: b.RoutineNames(), pairs: b.Pairs(),
 		snapshotPath: snapshot, allowOverwrite: c.AllowOverwrite,
-		runEnvCheck: !c.SkipEnvCheck,
+		runEnvCheck: !c.SkipEnvCheck, quesAnswers: answers,
 	})
 	if ferr != nil {
 		return ferr
@@ -757,7 +778,7 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 		if lerr != nil {
 			return clikit.Fail(clikit.ExitRuntime, "READ_FAILED", lerr.Error(), "")
 		}
-		ir, ierr := runInstall(ctx, cl, rname, rname+" via v pkg uninstall --"+action.String(), rb.Pairs(), false)
+		ir, ierr := runInstall(ctx, cl, rname, rname+" via v pkg uninstall --"+action.String(), rb.Pairs(), false, nil)
 		if ierr != nil {
 			return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", ierr.Error(), "")
 		}

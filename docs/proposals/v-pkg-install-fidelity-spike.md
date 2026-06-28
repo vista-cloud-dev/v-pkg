@@ -311,9 +311,31 @@ load always starts from a clean node. Regression test
 be ASCII — `^%ZOSF("SAVE")` compiles it before running, and a non-ASCII comment
 byte breaks the compile.
 
+## A.1.3 — DONE + live-proven on BOTH engines (2026-06-28)
+
+`v pkg install --answer NAME=VALUE` pre-answers a build's install questions so a
+pre/post-install routine reads them via the real `$$ANSWER^XPDIQ` — the
+non-interactive equivalent of the `EN^XPDIQ` question phase the direct-populate
+path skips. Ground truth (from `ANSWER^XPDIQ`): the answer lives at
+`^XPD(9.7,XPDA,"QUES",IEN,1)`, found via the `"QUES","B",NAME,IEN` xref. The
+`"QUES"` subtree is **internal install scratch — not a #9.7 FileMan field** (no
+`*QUEST*` field in the DD), so the seed is exactly three nodes per answer (`,IEN,0)`
+name, `,IEN,1)` value, `"B",name,IEN)` xref) — no multiple header. `FinalInstallScript`
+seeds them after the env-check and before `EN^XPDIJ` runs the pre/post routines;
+`installspec.QuesAnswer` + the repeatable `--answer` flag (`parseAnswers` splits on
+the first `=`, order-preserved → deterministic IENs) carry them.
+
+| Engine | `--answer ZZA4Q=HELLO` | control (no `--answer`) |
+|---|---|---|
+| vehu (YDB)      | `^ZZA4OUT("Q")="HELLO"`, `#9.7` status 3 | `^ZZA4OUT("Q")=""` (default) |
+| foia-t12 (IRIS) | `^ZZA4OUT("Q")="HELLO"`, `#9.7` status 3 | `^ZZA4OUT("Q")=""` (default) |
+
+Fixture `testdata/zza4-ques/` (`ZZA4P` post-install does
+`S ^ZZA4OUT("Q")=$$ANSWER^XPDIQ("ZZA4Q")`). The counterfactual proves the seed
+reached `$$ANSWER^XPDIQ`. This closes the A.1 install-fidelity track (A.1.1
+pre/post · A.1.2 env-check · A.1.3 questions).
+
 ## Recommended next steps
-- **A.1.3** — seed `#9.7` `QUES` answers from an install-spec (the `installspec`
-  package + `Answers.XPDDIQ()` already model this; wire it into the install script).
 - **Fix** the `reversibility.go` `INI`/`PRE` role-label swap (cosmetic, above).
 
 ## Sources

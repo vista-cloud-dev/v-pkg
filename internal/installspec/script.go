@@ -66,12 +66,24 @@ func StageChunks(pairs []kids.Pair, maxBytes int) []string {
 	return chunks
 }
 
+// QuesAnswer is one pre-answered KIDS install question (A.1.3): the question NAME
+// (the build's #9.6 QUES .01, looked up by ENV/pre/post code via $$ANSWER^XPDIQ)
+// and its INTERNAL answer value. It is seeded into the #9.7 INSTALL record's
+// internal "QUES" scratch tree so the non-interactive direct-populate path answers
+// build-specific questions that the interactive question phase (skipped here) would.
+type QuesAnswer struct {
+	Name  string // question name — the $$ANSWER^XPDIQ(name) lookup key
+	Value string // internal answer value $$ANSWER^XPDIQ returns
+}
+
 // FinalInstallScript returns the constant-size install routine run after
 // StageChunks has populated ^XTMP("VPKGI",…). nPairs is the expected staged-node
 // count: the routine counts the staging global and refuses to install if it does
 // not match (so a silently-truncated stage fails loudly instead of installing a
-// partial package). header is the #9.7 install header (cosmetic).
-func FinalInstallScript(name, header string, nPairs int, runEnvCheck bool) string {
+// partial package). header is the #9.7 install header (cosmetic). ques pre-answers
+// the build's install questions (A.1.3) so pre/post routines read them via
+// $$ANSWER^XPDIQ.
+func FinalInstallScript(name, header string, nPairs int, runEnvCheck bool, ques []QuesAnswer) string {
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
 	nameLit := kids.MString(name)
@@ -113,6 +125,21 @@ func FinalInstallScript(name, header string, nPairs int, runEnvCheck bool) strin
 		w(`S XPDT(XPDIT)=XPDA_U_XPDNM,XPDT("NM",XPDA)=XPDIT,XPDT("DA",XPDNM)=XPDIT`)
 		w(`N XPDENV,XPDENVRC S XPDENV=1,XPDENVRC=$$ENV^XPDIL1(1)`)
 		w(`I XPDENVRC K ^XPD(9.7,"B",XPDNM,XPDA),^XPD(9.7,XPDA),` + stageGbl + ` W "` + ResultMarker + `error=env-check-rejected^"_XPDENVRC_"^"_$G(XPDREQAB),! Q`)
+	}
+	// Pre-answer the build's install questions (A.1.3). The interactive question
+	// phase (EN^XPDIQ, via EN^XPDI) is skipped by the direct-populate path, so a
+	// pre/post-install routine that calls $$ANSWER^XPDIQ(name) would get "" (= NO)
+	// for every question. $$ANSWER reads ^XPD(9.7,XPDA,"QUES","B",name,IEN) → IEN →
+	// node 1 (live-ground-truthed); the "QUES" subtree is internal install scratch
+	// (no #9.7 FileMan field), so the three nodes below are the whole faithful
+	// record. Seeded after the env-check (only a build that passes is worth
+	// answering) and before EN^XPDIJ runs the pre/post routines.
+	for i, q := range ques {
+		ien := strconv.Itoa(i + 1)
+		nm := kids.MString(q.Name)
+		w(`S ^XPD(9.7,XPDA,"QUES",` + ien + `,0)=` + nm +
+			`,^XPD(9.7,XPDA,"QUES",` + ien + `,1)=` + kids.MString(q.Value) +
+			`,^XPD(9.7,XPDA,"QUES","B",` + nm + `,` + ien + `)=""`)
 	}
 	// Seed the #9.7 INSTALL record's KRN component-tracking multiple from the build
 	// manifest. A real KIDS load fills this; the direct-populate path does not, and

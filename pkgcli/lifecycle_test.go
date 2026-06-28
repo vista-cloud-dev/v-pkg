@@ -113,7 +113,7 @@ func TestLoadBuild_ZZSKEL(t *testing.T) {
 
 func TestRunInstall_Success(t *testing.T) {
 	f := &fakeDriver{runStdout: installspec.ResultMarker + "status=3\n"}
-	res, err := runInstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", "hdr", zzskelPairs(), true)
+	res, err := runInstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", "hdr", zzskelPairs(), true, nil)
 	if err != nil {
 		t.Fatalf("runInstall: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestRunInstall_MultiChunkStages(t *testing.T) {
 	if len(chunks) < 2 {
 		t.Fatalf("test needs a multi-chunk build, got %d chunks for %d pairs", len(chunks), len(pairs))
 	}
-	res, err := runInstall(context.Background(), fakeClient(f), "ZZBIG*1.0*1", "hdr", pairs, true)
+	res, err := runInstall(context.Background(), fakeClient(f), "ZZBIG*1.0*1", "hdr", pairs, true, nil)
 	if err != nil {
 		t.Fatalf("runInstall: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestRunInstall_MultiChunkStages(t *testing.T) {
 
 func TestRunInstall_AlreadyInstalled(t *testing.T) {
 	f := &fakeDriver{runStdout: installspec.ResultMarker + "error=already-installed\n"}
-	res, err := runInstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", "hdr", zzskelPairs(), true)
+	res, err := runInstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", "hdr", zzskelPairs(), true, nil)
 	if err != nil {
 		t.Fatalf("runInstall: %v", err)
 	}
@@ -172,7 +172,7 @@ func TestRunInstall_AlreadyInstalled(t *testing.T) {
 
 func TestRunInstall_EngineError(t *testing.T) {
 	f := &fakeDriver{runEng: &mdriver.EngineError{Mnemonic: "%GTM-E-UNDEF", Text: "XPDA"}}
-	_, err := runInstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", "hdr", zzskelPairs(), true)
+	_, err := runInstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", "hdr", zzskelPairs(), true, nil)
 	if err == nil || !strings.Contains(err.Error(), "UNDEF") {
 		t.Errorf("want engine fault surfaced, got %v", err)
 	}
@@ -180,7 +180,7 @@ func TestRunInstall_EngineError(t *testing.T) {
 
 func TestRunInstall_LoadError(t *testing.T) {
 	f := &fakeDriver{loadEng: &mdriver.EngineError{Mnemonic: "%GTM-E-ZLINKFILE", Text: "bad"}}
-	_, err := runInstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", "hdr", zzskelPairs(), true)
+	_, err := runInstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", "hdr", zzskelPairs(), true, nil)
 	if err == nil || !strings.Contains(err.Error(), "stage") {
 		t.Errorf("want stage error, got %v", err)
 	}
@@ -190,7 +190,7 @@ func TestRunInstall_SilentLoadNoOp(t *testing.T) {
 	// Driver reports no fault but stages nothing (e.g. no routine source dir) —
 	// must fail at staging, not proceed to a confusing run-time link error.
 	f := &fakeDriver{loadEmpty: true}
-	_, err := runInstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", "hdr", zzskelPairs(), true)
+	_, err := runInstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", "hdr", zzskelPairs(), true, nil)
 	if err == nil || !strings.Contains(err.Error(), "loaded no routine") {
 		t.Errorf("want staging no-op surfaced, got %v", err)
 	}
