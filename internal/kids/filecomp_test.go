@@ -112,8 +112,10 @@ func TestMakeBuildPairs_File_MultiField(t *testing.T) {
 		`"^DD",999001,999001,2,0)`: "EVENT TYPE^S^I:INFO;W:WARN;E:ERROR;^0;3^Q",
 		// Date with time: %DT flags "ET".
 		`"^DD",999001,999001,3,0)`: `TIMESTAMP^D^^0;4^S %DT="ET" D ^%DT S X=Y K:Y<1 X`,
-		// Required pointer: RP<file>'; piece 3 is the pointed-to global root.
-		`"^DD",999001,999001,4,0)`: "USER^RP200'^^VA(200,^0;5^Q",
+		// Required pointer: RP<file>'; piece 3 is the pointed-to global root WITHOUT
+		// the leading "^" (the buildspec's "^VA(200," has its caret stripped — a
+		// literal "^" would be the piece delimiter); storage 0;5 stays in piece 4.
+		`"^DD",999001,999001,4,0)`: "USER^RP200'^VA(200,^0;5^Q",
 		// Free-text with an explicit help string.
 		`"^DD",999001,999001,5,0)`: `DETAIL^F^^0;6^K:$L(X)>245!($L(X)<1) X`,
 		`"^DD",999001,999001,5,3)`: "Free-text detail, up to 245 characters.",

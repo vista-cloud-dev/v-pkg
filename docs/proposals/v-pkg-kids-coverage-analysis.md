@@ -365,11 +365,20 @@ not the populate-and-`EN^XPDIJ` shortcut.
     **corpus round-trip DRIFT=0 over 2,404 dists**; deterministic golden
     `testdata/zzvslaudit/ZZVSLAU.kids` (#999001, all 5 types). `internal/kids/filecomp.go`,
     `internal/buildspec/buildspec.go`, `pkgcli/build.go`. ([[multi-field-dd-emitter]])
-  - **B.2-b (remaining) — file DATA + the 4 action codes, and relaxing the
-    test-range file-number restriction** (permanent-number namespace policy needs
-    org coordination). B.2-a is **build-side only — not yet live-install-proven**;
-    a multi-field DD install→verify→uninstall→file-a-record on vehu+foia-t12 (via
-    the driver stack) is the next engine step.
+  - **B.2-a ✅ LIVE-INSTALL-PROVEN 2026-06-28 — both engines.** The multi-field DD
+    (#999001, all 5 typed fields) installs to **#9.7 status 3**, registers
+    (`^DIC("B")`), and **files a record** exercising every type (`EVT-A^42^W^…`
+    stored at the right pieces, `.01` xref, `UPDATE^DIE` dierr=0); `v pkg verify`
+    confirms; clean uninstall — on vehu (YDB) + foia-t12 (IRIS) via the driver
+    stack. **Bug found+fixed:** the pointer field def shipped `RP200'^^VA(200,`
+    (empty piece 3) because `PointRoot` carries a leading `^` (the piece delimiter)
+    — DD piece-3 wants the root with NO caret; `fieldDef` now strips it (was
+    `FIA^XPDIK` NULSUBSC → status 2, file half-registered). Minor open gap: the
+    pointed-to back-ref `^DD(200,"PT",…)` is not shipped (records still file fine).
+    ([[multi-field-dd-emitter]])
+  - **B.2-b (remaining) — file DATA + the 4 action codes** (ADD-IF-NEW / MERGE /
+    OVERWRITE / REPLACE), **and relaxing the test-range file-number restriction**
+    (permanent-number namespace policy needs org coordination).
 - **B.3 Install-time code authoring.** Let a build declare and ship Environment
   Check / Pre / Post-Install routines (the spec already has `envCheck`; wire it to
   emit + register), so authored packages can gate and migrate.

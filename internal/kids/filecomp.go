@@ -218,7 +218,13 @@ func fieldDef(f FileField) string {
 		xform = "Q"
 	case FieldPointer:
 		typ = "P" + mNum(f.PointTo) + "'"
-		p3 = f.PointRoot
+		// Piece 3 is the pointed-to global root WITHOUT a leading "^" (real DD:
+		// STATE→"DIC(5,", NAME COMPONENTS→"VA(20,"). The buildspec stores it with
+		// the caret (its global-root regex requires one), so strip it — a literal
+		// "^" here is the piece delimiter and would inject an empty piece, shoving
+		// the storage location into piece 5 and faulting FIA^XPDIK (NULSUBSC) at
+		// install (caught live: a pointer field left the new file half-registered).
+		p3 = strings.TrimPrefix(f.PointRoot, "^")
 		xform = "Q"
 	default: // FieldFreeText
 		typ = "F"
