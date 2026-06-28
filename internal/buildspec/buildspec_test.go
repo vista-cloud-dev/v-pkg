@@ -345,7 +345,6 @@ func TestParse_AllowLongNames_StillGated(t *testing.T) {
 // be a hard error that NAMES the type, not a silent omission.
 func TestParse_UnsupportedComponents_Rejected(t *testing.T) {
 	cases := map[string]string{
-		"keys":       `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"keys":["ZZSKEL KEY"]}}`,
 		"protocols":  `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"protocols":["ZZSKEL PROTO"]}}`,
 		"templates":  `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"templates":["ZZSKEL TMPL"]}}`,
 		"rpcs":       `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"rpcs":["ZZSKEL RPC"]}}`,
@@ -397,6 +396,40 @@ func TestParse_Options_Invalid(t *testing.T) {
 		"bad type":        `{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"ZZOPT A","type":"bogus"}]}}`,
 		"run no routine":  `{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"ZZOPT A","type":"run routine"}]}}`,
 		"bad routine ref": `{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"ZZOPT A","type":"run routine","routine":"EN^123BAD"}]}}`,
+	}
+	for name, js := range cases {
+		if _, err := Parse([]byte(js)); err == nil {
+			t.Errorf("%s: expected an error, got nil", name)
+		}
+	}
+}
+
+func TestParse_Keys(t *testing.T) {
+	js := `{"package":"ZZKEY","version":"1.0","patch":"1","components":{
+	  "routines":["ZZKEYRT"],
+	  "keys":[{"name":"ZZKEY MANAGER"}]
+	}}`
+	s, err := Parse([]byte(js))
+	if err != nil {
+		t.Fatalf("Parse keys spec: %v", err)
+	}
+	if len(s.Components.Keys) != 1 || s.Components.Keys[0].Name != "ZZKEY MANAGER" {
+		t.Fatalf("keys = %+v", s.Components.Keys)
+	}
+	// A spec carrying only a key (no routines) is still non-empty.
+	k, err := Parse([]byte(`{"package":"ZZKEY","version":"1.0","components":{"keys":[{"name":"ZZKEY A"}]}}`))
+	if err != nil {
+		t.Fatalf("Parse key-only spec: %v", err)
+	}
+	if k.Components.empty() {
+		t.Error("spec with a key must not be empty")
+	}
+}
+
+func TestParse_Keys_Invalid(t *testing.T) {
+	cases := map[string]string{
+		"no name":  `{"package":"ZZKEY","version":"1.0","components":{"keys":[{}]}}`,
+		"bad name": `{"package":"ZZKEY","version":"1.0","components":{"keys":[{"name":"lower case"}]}}`,
 	}
 	for name, js := range cases {
 		if _, err := Parse([]byte(js)); err == nil {

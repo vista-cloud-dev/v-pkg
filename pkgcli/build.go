@@ -29,6 +29,7 @@ type buildResult struct {
 	Routines       int    `json:"routines"`
 	ParamDefs      int    `json:"paramDefs,omitempty"`
 	Options        int    `json:"options,omitempty"`
+	Keys           int    `json:"keys,omitempty"`
 	Files          int    `json:"files,omitempty"`
 	RequiredBuilds int    `json:"requiredBuilds,omitempty"`
 }
@@ -56,6 +57,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 	}
 	files := resolveFiles(spec.Components.Files)
 	options := resolveOptions(spec.Components.Options)
+	keys := resolveKeys(spec.Components.Keys)
 	reqBuilds := resolveRequiredBuilds(spec.RequiredBuilds)
 
 	pairs := kids.MakeBuildPairs(kids.BuildInput{
@@ -64,6 +66,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 		Routines:       rtns,
 		ParamDefs:      paramDefs,
 		Options:        options,
+		Keys:           keys,
 		Files:          files,
 		RequiredBuilds: reqBuilds,
 		EnvCheck:       spec.EnvCheck,
@@ -85,11 +88,11 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 
 	return cc.Result(buildResult{
 		InstallName: spec.InstallName(), Out: out, Routines: len(rtns),
-		ParamDefs: len(paramDefs), Options: len(options), Files: len(files), RequiredBuilds: len(reqBuilds),
+		ParamDefs: len(paramDefs), Options: len(options), Keys: len(keys), Files: len(files), RequiredBuilds: len(reqBuilds),
 	}, func() {
 		cc.Title("pkg build")
-		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d option(s), %d file(s), %d required build(s)) → %s\n",
-			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(options), len(files), len(reqBuilds), cc.Accent(out))
+		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d option(s), %d key(s), %d file(s), %d required build(s)) → %s\n",
+			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(options), len(keys), len(files), len(reqBuilds), cc.Accent(out))
 	})
 }
 
@@ -187,6 +190,15 @@ func resolveOptions(opts []buildspec.OptionComp) []kids.Option {
 			EntryAction: o.EntryAction,
 			ExitAction:  o.ExitAction,
 		})
+	}
+	return out
+}
+
+// resolveKeys maps the spec's SECURITY KEY components onto the kids emit shape.
+func resolveKeys(keys []buildspec.KeyComp) []kids.SecurityKey {
+	out := make([]kids.SecurityKey, 0, len(keys))
+	for _, k := range keys {
+		out = append(out, kids.SecurityKey{Name: k.Name})
 	}
 	return out
 }

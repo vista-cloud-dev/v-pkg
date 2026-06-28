@@ -59,6 +59,48 @@ func TestMakeBuildPairs_Option_KRN(t *testing.T) {
 	}
 }
 
+// TestMakeBuildPairs_SecurityKey_KRN locks the transport shape for a SECURITY KEY
+// (#19.1) shipped as a KRN component — the third type on the generic emitter.
+// Ground-truthed against the WorldVistA corpus: a key record is minimal (-1 XPDFL
+// flag + 0-node = just the .01 NAME), plus the national-constant #19.1 ORD
+// action-routine line and the #9.6 BLD manifest.
+func TestMakeBuildPairs_SecurityKey_KRN(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZKEY*1.0*1",
+		Namespace:   "ZZKEY",
+		Routines:    []RoutineSrc{{Name: "ZZKEYRT", Lines: []string{"ZZKEYRT ;x", " quit"}}},
+		Keys:        []SecurityKey{{Name: "ZZKEY MANAGER"}},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	want := map[string]string{
+		`"KRN",19.1,1,-1)`:                               "0^1",           // XPDFL: send/add-or-update
+		`"KRN",19.1,1,0)`:                                "ZZKEY MANAGER", // .01 NAME — the whole record
+		`"ORD",1,19.1)`:                                  "19.1;1;;;KEY^XPDTA1;KEYF1^XPDIA1;KEYE1^XPDIA1;KEYF2^XPDIA1;;KEYDEL^XPDIA1",
+		`"ORD",1,19.1,0)`:                                "SECURITY KEY",
+		`"BLD",1,"KRN",0)`:                               "^9.67PA^19.1^1",
+		`"BLD",1,"KRN",19.1,0)`:                          "19.1",
+		`"BLD",1,"KRN",19.1,"NM",0)`:                     "^9.68A^1^1",
+		`"BLD",1,"KRN",19.1,"NM",1,0)`:                   "ZZKEY MANAGER^^0",
+		`"BLD",1,"KRN",19.1,"NM","B","ZZKEY MANAGER",1)`: "",
+		`"BLD",1,"KRN","B",19.1,19.1)`:                   "",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+	b := newBuild()
+	for _, p := range MakeBuildPairs(in) {
+		b.Set(p.Subs, p.Value)
+	}
+	if ks := b.KeyNames(); len(ks) != 1 || ks[0] != "ZZKEY MANAGER" {
+		t.Errorf("KeyNames = %v, want [ZZKEY MANAGER]", ks)
+	}
+}
+
 // TestMakeBuildPairs_MixedEntryTypes proves the unified KRN manifest header spans
 // multiple entry types in one build (B.1 next step): an OPTION (#19) AND a
 // PARAMETER DEFINITION (#8989.51) share one "BLD",1,"KRN",0) header

@@ -383,6 +383,17 @@ not the populate-and-`EN^XPDIJ` shortcut.
     ORD 2, both types filed + verified + backed out) on vehu (YDB) + foia-t12 (IRIS).
     Next: **SECURITY KEY #19.1** (a one-`entryType` addition to `buildEntryGroups`).
     ([[option-entry-component]])
+  - **B.1-c ✅ DONE + LIVE-PROVEN 2026-06-28 — SECURITY KEY (#19.1), both engines.**
+    The third type on the generic core, and the proof that a new SEND/DELETE type is
+    now ~30 lines (an `entryType` with its national ORD action-routine tail
+    `;;KEY^XPDTA1;KEYF1^XPDIA1;KEYE1^XPDIA1;KEYF2^XPDIA1;;KEYDEL^XPDIA1`, a record
+    packer, the `buildEntryGroups` line, a `KeyNames` reader, verify/uninstall
+    threading). A key's record image is **minimal** — `-1`=`0^1` + `0`=the .01 NAME
+    alone (stored in `^DIC(19.1,`); shipped **name-only** (the optional DESCRIPTION
+    word-processing field is deferred). TDD; lint/race/contract green; corpus
+    DRIFT=0; golden `testdata/zzkey/ZZKEY.kids`. **Live install→verify→`--force`
+    uninstall→clean** on vehu (YDB, `^DIC(19.1,…,0)=ZZKEY MANAGER`) + foia-t12 (IRIS).
+    Next: **PROTOCOL #101** (richer record image — items/types). ([[option-entry-component]])
 - **B.2 Real FILE DD + DATA (F3; the R3 enabler).** Extend `FileComp` to a
   multi-field DD (see §8 for the grounded node-set) and add **DATA** export with
   the four action codes (ADD-IF-NEW / MERGE / OVERWRITE / REPLACE) and FULL/PARTIAL

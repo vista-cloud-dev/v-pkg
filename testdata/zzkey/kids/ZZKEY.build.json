@@ -1,0 +1,11 @@
+{
+  "package": "ZZKEY",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "routines": ["ZZKEYRT"],
+    "keys": [
+      { "name": "ZZKEY MANAGER" }
+    ]
+  }
+}

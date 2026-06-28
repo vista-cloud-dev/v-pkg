@@ -180,9 +180,10 @@ func FinalInstallScript(name, header string, nPairs int, runEnvCheck bool, ques 
 // #9.7 INSTALL presence + status (piece 9; 3 = "Install Completed"), per routine
 // whether it is loaded ($T probe), per PARAMETER DEFINITION whether it is present
 // in #8989.51 (the "B" index), per OPTION whether it is present in #19 (the "B"
-// index), and per FileMan FILE whether its data dictionary installed (^DD(file,0)
-// present). Each fact is a ResultMarker line.
-func VerifyScript(name string, routines, paramDefs, options, files []string) string {
+// index), per SECURITY KEY whether it is present in #19.1 (the "B" index), and per
+// FileMan FILE whether its data dictionary installed (^DD(file,0) present). Each
+// fact is a ResultMarker line.
+func VerifyScript(name string, routines, paramDefs, options, keys, files []string) string {
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
 
@@ -199,6 +200,9 @@ func VerifyScript(name string, routines, paramDefs, options, files []string) str
 	for _, o := range options {
 		w(`W "` + ResultMarker + `option:` + o + `=",$S($D(^DIC(19,"B",` + kids.MString(o) + `)):1,1:0),!`)
 	}
+	for _, k := range keys {
+		w(`W "` + ResultMarker + `key:` + k + `=",$S($D(^DIC(19.1,"B",` + kids.MString(k) + `)):1,1:0),!`)
+	}
 	for _, f := range files {
 		w(`W "` + ResultMarker + `file:` + f + `=",$S($D(^DD(` + f + `,0)):1,1:0),!`)
 	}
@@ -208,11 +212,12 @@ func VerifyScript(name string, routines, paramDefs, options, files []string) str
 // UninstallScript returns M source that reverses an install (T0a.4): delete each
 // routine (^%ZOSF("DEL") removes the .m + .o), each PARAMETER DEFINITION from
 // #8989.51 (FileMan DIK by IEN — clears its "B" and subfile xrefs), each OPTION
-// from #19 (FileMan DIK by IEN), each FileMan FILE (its DD, data global, and
-// dict-of-files pointer — KIDS ships no generic file uninstall), and the #9.7
-// INSTALL and #9.6 BUILD entries via DIK. The monotonic #9.x / #8989.51 / #19 IEN
-// counters are not rolled back (inherent to FileMan, not a leak).
-func UninstallScript(name string, routines, paramDefs, options, files []string) string {
+// from #19 (FileMan DIK by IEN), each SECURITY KEY from #19.1 (FileMan DIK by
+// IEN), each FileMan FILE (its DD, data global, and dict-of-files pointer — KIDS
+// ships no generic file uninstall), and the #9.7 INSTALL and #9.6 BUILD entries
+// via DIK. The monotonic #9.x / #8989.51 / #19 / #19.1 IEN counters are not rolled
+// back (inherent to FileMan, not a leak).
+func UninstallScript(name string, routines, paramDefs, options, keys, files []string) string {
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
 
@@ -225,6 +230,9 @@ func UninstallScript(name string, routines, paramDefs, options, files []string) 
 	}
 	for _, o := range options {
 		w(`S DA=$O(^DIC(19,"B",` + kids.MString(o) + `,0)),DIK="^DIC(19," I DA D ^DIK`)
+	}
+	for _, k := range keys {
+		w(`S DA=$O(^DIC(19.1,"B",` + kids.MString(k) + `,0)),DIK="^DIC(19.1," I DA D ^DIK`)
 	}
 	// FileMan FILE back-out: read the data global root + name BEFORE killing the
 	// dictionary, then remove the DD (^DD/^DIC), the data global, and the

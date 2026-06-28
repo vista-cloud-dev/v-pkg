@@ -1,0 +1,42 @@
+KIDS Distribution saved by v-pkg
+m-kids reassembled output
+**KIDS**:ZZKEY*1.0*1^
+
+**INSTALL NAME**
+ZZKEY*1.0*1
+"BLD",1,0)
+ZZKEY*1.0*1^ZZKEY^0^0
+"BLD",1,"KRN",0)
+^9.67PA^19.1^1
+"BLD",1,"KRN",19.1,0)
+19.1
+"BLD",1,"KRN",19.1,"NM",0)
+^9.68A^1^1
+"BLD",1,"KRN",19.1,"NM",1,0)
+ZZKEY MANAGER^^0
+"BLD",1,"KRN",19.1,"NM","B","ZZKEY MANAGER",1)
+
+"BLD",1,"KRN","B",19.1,19.1)
+
+"RTN")
+1
+"RTN","ZZKEYRT")
+0^3^0^0
+"RTN","ZZKEYRT",1,0)
+ZZKEYRT ;VCD/VSL - throwaway test package (KRN security-key component) ;1.0
+"RTN","ZZKEYRT",2,0)
+ ;;1.0;ZZKEY;;
+"RTN","ZZKEYRT",3,0)
+ quit
+"ORD",1,19.1)
+19.1;1;;;KEY^XPDTA1;KEYF1^XPDIA1;KEYE1^XPDIA1;KEYF2^XPDIA1;;KEYDEL^XPDIA1
+"ORD",1,19.1,0)
+SECURITY KEY
+"KRN",19.1,1,-1)
+0^1
+"KRN",19.1,1,0)
+ZZKEY MANAGER
+"VER")
+8.0^22.2
+**END**
+**END**

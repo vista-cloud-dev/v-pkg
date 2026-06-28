@@ -62,7 +62,7 @@ type Components struct {
 	Routines             []string     `json:"routines,omitempty"`
 	Files                []FileComp   `json:"files,omitempty"`
 	Options              []OptionComp `json:"options,omitempty"`              // #19 OPTION KRN components (B.1)
-	Keys                 []string     `json:"keys,omitempty"`                 // security keys
+	Keys                 []KeyComp    `json:"keys,omitempty"`                 // #19.1 SECURITY KEY KRN components (B.1)
 	Parameters           []string     `json:"parameters,omitempty"`           // XPAR parameter names (reference only)
 	ParameterDefinitions []ParamDef   `json:"parameterDefinitions,omitempty"` // XPAR #8989.51 PARAMETER DEFINITION components (shipped as data)
 	Protocols            []string     `json:"protocols,omitempty"`
@@ -93,7 +93,6 @@ func (c Components) unsupported() []string {
 		name string
 		n    int
 	}{
-		{"keys", len(c.Keys)},
 		{"protocols", len(c.Protocols)},
 		{"templates", len(c.Templates)},
 		{"rpcs", len(c.RPCs)},
@@ -136,6 +135,13 @@ type OptionComp struct {
 	Routine     string `json:"routine,omitempty"`     // #19 field 25 ROUTINE entryref (required for "run routine")
 	EntryAction string `json:"entryAction,omitempty"` // #19 field 20 ENTRY ACTION (M code)
 	ExitAction  string `json:"exitAction,omitempty"`  // #19 field 15 EXIT ACTION (M code)
+}
+
+// KeyComp is a #19.1 SECURITY KEY shipped as a KIDS KRN component (B.1). A key is
+// a named token holders are granted; the build files the key by name (its optional
+// word-processing DESCRIPTION is a follow-up).
+type KeyComp struct {
+	Name string `json:"name"` // #19.1 .01 NAME (uppercase, e.g. "ZZKEY MANAGER")
 }
 
 // OptionTypeCode maps a human option-type name to its #19 field 4 (TYPE)
@@ -353,6 +359,9 @@ func (s *Spec) Validate() error {
 	if err := validateOptions(s.Components.Options, maxName); err != nil {
 		return err
 	}
+	if err := validateKeys(s.Components.Keys); err != nil {
+		return err
+	}
 	if err := validateFiles(s.Components.Files); err != nil {
 		return err
 	}
@@ -464,6 +473,21 @@ func validateOptions(opts []OptionComp, maxName int) error {
 			if !ok || !isRoutineName(rtn, maxName) || (tag != "" && !reLabel.MatchString(tag)) {
 				return fmt.Errorf("buildspec: option %s routine %q must be a routine entryref (ROUTINE or TAG^ROUTINE)", o.Name, o.Routine)
 			}
+		}
+	}
+	return nil
+}
+
+// validateKeys checks each SECURITY KEY component: a valid #19.1 NAME (≤30 chars,
+// uppercase). The key record is filed by KRN^XPDIK; only its build-side shape is
+// validated here.
+func validateKeys(keys []KeyComp) error {
+	for _, k := range keys {
+		if k.Name == "" {
+			return fmt.Errorf("buildspec: a key is missing its name")
+		}
+		if len(k.Name) > 30 || !reEntryName.MatchString(k.Name) {
+			return fmt.Errorf("buildspec: key name %q must be uppercase ≤30 chars (#19.1 SECURITY KEY NAME)", k.Name)
 		}
 	}
 	return nil

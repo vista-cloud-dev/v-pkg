@@ -190,7 +190,7 @@ func TestFinalInstallScript_QuesAnswers(t *testing.T) {
 }
 
 func TestVerifyScript(t *testing.T) {
-	got := VerifyScript("ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil, nil)
+	got := VerifyScript("ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil, nil, nil)
 	for _, want := range []string{
 		`S XPDA=$O(^XPD(9.7,"B","ZZSKEL*1.0*1",0))`,
 		ResultMarker + `installed=`,
@@ -207,7 +207,7 @@ func TestVerifyScript(t *testing.T) {
 // VerifyScript also probes each PARAMETER DEFINITION by NAME in #8989.51's "B"
 // index (XPDIK builds it via IX1^DIK on install).
 func TestVerifyScript_ParamDef(t *testing.T) {
-	got := VerifyScript("VSLBASE*1.0*1", []string{"VSLCFG"}, []string{"VSL GREETING"}, nil, nil)
+	got := VerifyScript("VSLBASE*1.0*1", []string{"VSLCFG"}, []string{"VSL GREETING"}, nil, nil, nil)
 	for _, want := range []string{
 		`$D(^XTV(8989.51,"B","VSL GREETING"))`,
 		ResultMarker + `param:VSL GREETING=`,
@@ -221,7 +221,7 @@ func TestVerifyScript_ParamDef(t *testing.T) {
 // VerifyScript also probes each OPTION by NAME in #19's "B" index (KRN^XPDIK
 // builds it when it files the option record).
 func TestVerifyScript_Option(t *testing.T) {
-	got := VerifyScript("ZZOPT*1.0*1", []string{"ZZOPTRT"}, nil, []string{"ZZOPT RUN ROUTINE"}, nil)
+	got := VerifyScript("ZZOPT*1.0*1", []string{"ZZOPTRT"}, nil, []string{"ZZOPT RUN ROUTINE"}, nil, nil)
 	for _, want := range []string{
 		`$D(^DIC(19,"B","ZZOPT RUN ROUTINE"))`,
 		ResultMarker + `option:ZZOPT RUN ROUTINE=`,
@@ -232,10 +232,23 @@ func TestVerifyScript_Option(t *testing.T) {
 	}
 }
 
+// VerifyScript also probes each SECURITY KEY by NAME in #19.1's "B" index.
+func TestVerifyScript_Key(t *testing.T) {
+	got := VerifyScript("ZZKEY*1.0*1", []string{"ZZKEYRT"}, nil, nil, []string{"ZZKEY MANAGER"}, nil)
+	for _, want := range []string{
+		`$D(^DIC(19.1,"B","ZZKEY MANAGER"))`,
+		ResultMarker + `key:ZZKEY MANAGER=`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("VerifyScript (key) missing %q\n---\n%s", want, got)
+		}
+	}
+}
+
 // VerifyScript also probes each installed FileMan FILE by its data dictionary
 // header node (^DD(file,0) present iff the DD installed).
 func TestVerifyScript_File(t *testing.T) {
-	got := VerifyScript("ZZVSLFS*1.0*1", nil, nil, nil, []string{"999000"})
+	got := VerifyScript("ZZVSLFS*1.0*1", nil, nil, nil, nil, []string{"999000"})
 	for _, want := range []string{
 		`$D(^DD(999000,0))`,
 		ResultMarker + `file:999000=`,
@@ -247,7 +260,7 @@ func TestVerifyScript_File(t *testing.T) {
 }
 
 func TestUninstallScript(t *testing.T) {
-	got := UninstallScript("ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil, nil)
+	got := UninstallScript("ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil, nil, nil)
 	for _, want := range []string{
 		`S X="ZZSKEL" X ^%ZOSF("DEL")`,                                        // routine delete
 		`S DA=$O(^XPD(9.7,"B","ZZSKEL*1.0*1",0)),DIK="^XPD(9.7," I DA D ^DIK`, // #9.7
@@ -263,7 +276,7 @@ func TestUninstallScript(t *testing.T) {
 // UninstallScript also backs out each PARAMETER DEFINITION via FileMan DIK on
 // #8989.51 (delete by IEN resolved from the "B" index; DIK clears its xrefs).
 func TestUninstallScript_ParamDef(t *testing.T) {
-	got := UninstallScript("VSLBASE*1.0*1", []string{"VSLCFG"}, []string{"VSL GREETING"}, nil, nil)
+	got := UninstallScript("VSLBASE*1.0*1", []string{"VSLCFG"}, []string{"VSL GREETING"}, nil, nil, nil)
 	want := `S DA=$O(^XTV(8989.51,"B","VSL GREETING",0)),DIK="^XTV(8989.51," I DA D ^DIK`
 	if !strings.Contains(got, want) {
 		t.Errorf("UninstallScript (param) missing %q\n---\n%s", want, got)
@@ -273,10 +286,19 @@ func TestUninstallScript_ParamDef(t *testing.T) {
 // UninstallScript also backs out each OPTION via FileMan DIK on #19 (delete by
 // IEN resolved from the "B" index; DIK clears its xrefs).
 func TestUninstallScript_Option(t *testing.T) {
-	got := UninstallScript("ZZOPT*1.0*1", []string{"ZZOPTRT"}, nil, []string{"ZZOPT RUN ROUTINE"}, nil)
+	got := UninstallScript("ZZOPT*1.0*1", []string{"ZZOPTRT"}, nil, []string{"ZZOPT RUN ROUTINE"}, nil, nil)
 	want := `S DA=$O(^DIC(19,"B","ZZOPT RUN ROUTINE",0)),DIK="^DIC(19," I DA D ^DIK`
 	if !strings.Contains(got, want) {
 		t.Errorf("UninstallScript (option) missing %q\n---\n%s", want, got)
+	}
+}
+
+// UninstallScript also backs out each SECURITY KEY via FileMan DIK on #19.1.
+func TestUninstallScript_Key(t *testing.T) {
+	got := UninstallScript("ZZKEY*1.0*1", []string{"ZZKEYRT"}, nil, nil, []string{"ZZKEY MANAGER"}, nil)
+	want := `S DA=$O(^DIC(19.1,"B","ZZKEY MANAGER",0)),DIK="^DIC(19.1," I DA D ^DIK`
+	if !strings.Contains(got, want) {
+		t.Errorf("UninstallScript (key) missing %q\n---\n%s", want, got)
 	}
 }
 
@@ -284,7 +306,7 @@ func TestUninstallScript_Option(t *testing.T) {
 // + name from ^DIC before killing the DD (^DD/^DIC), the data global, and the
 // dict-of-files "B" pointer — KIDS ships no generic file uninstall.
 func TestUninstallScript_File(t *testing.T) {
-	got := UninstallScript("ZZVSLFS*1.0*1", nil, nil, nil, []string{"999000"})
+	got := UninstallScript("ZZVSLFS*1.0*1", nil, nil, nil, nil, []string{"999000"})
 	for _, want := range []string{
 		`^DIC(999000,0,"GL")`,        // read the data global root first
 		`K ^DD(999000),^DIC(999000)`, // remove the data dictionary

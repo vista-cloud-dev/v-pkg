@@ -60,10 +60,13 @@ type entryGroup struct {
 // types, so the shared "BLD",1,"KRN",0) header and the ORD ordering are computed
 // once across all of them. PARAMETER DEFINITION (#8989.51) and OPTION (#19) ride
 // the same path; new SEND/DELETE types append here.
-func buildEntryGroups(defs []ParamDef, opts []Option) []entryGroup {
+func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey) []entryGroup {
 	var groups []entryGroup
 	if len(opts) > 0 {
 		groups = append(groups, entryGroup{optionEntryType, optionRecords(opts)})
+	}
+	if len(keys) > 0 {
+		groups = append(groups, entryGroup{securityKeyEntryType, securityKeyRecords(keys)})
 	}
 	if len(defs) > 0 {
 		groups = append(groups, entryGroup{paramDefEntryType, paramDefRecords(defs)})
@@ -257,3 +260,42 @@ func paramDefRecords(defs []ParamDef) []entryRec {
 // ParamDefNames returns the #8989.51 PARAMETER DEFINITION component names in build
 // order — what `v pkg verify`/`uninstall` use to probe and back out each definition.
 func (b *Build) ParamDefNames() []string { return b.entryNames(paramDefFile) }
+
+// --- SECURITY KEY (#19.1) — the third type on the generic core ----------------
+
+const (
+	securityKeyFile     = 19.1
+	securityKeyFileName = "SECURITY KEY"
+	// securityKeyOrdTail is the national-constant tail of the #19.1 ORD install
+	// line (pieces after "<file>;<ord>;"): the SEND/DELETE action routines
+	// KRN^XPDIK runs to file/delete a SECURITY KEY. One form across the corpus.
+	securityKeyOrdTail = ";;KEY^XPDTA1;KEYF1^XPDIA1;KEYE1^XPDIA1;KEYF2^XPDIA1;;KEYDEL^XPDIA1"
+)
+
+var securityKeyEntryType = entryType{number: securityKeyFile, name: securityKeyFileName, ordTail: securityKeyOrdTail}
+
+// SecurityKey is one #19.1 SECURITY KEY record to ship as a KIDS KRN component
+// (SEND-TO-SITE). A key is fundamentally just a named token holders are granted;
+// the record image is minimal — the .01 NAME alone (stored in ^DIC(19.1,). The
+// optional DESCRIPTION (word-processing) field is a follow-up.
+type SecurityKey struct {
+	Name string // #19.1 .01 NAME (0;1)
+}
+
+// securityKeyRecords packs each SecurityKey into the generic entry-record shape:
+// the SEND XPDFL flag and a single 0-node carrying the key name.
+func securityKeyRecords(keys []SecurityKey) []entryRec {
+	recs := make([]entryRec, 0, len(keys))
+	for _, k := range keys {
+		recs = append(recs, entryRec{
+			name:  k.Name,
+			xpdfl: "0^1",
+			image: []imageNode{{Subs{intSub(0)}, k.Name}},
+		})
+	}
+	return recs
+}
+
+// KeyNames returns the #19.1 SECURITY KEY component names in build order — what
+// `v pkg verify`/`uninstall` probe and back out.
+func (b *Build) KeyNames() []string { return b.entryNames(securityKeyFile) }

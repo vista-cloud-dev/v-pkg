@@ -69,8 +69,23 @@ floats and would have hidden it. Regression test:
 ## (resolved) Mixing options + param-defs
 The earlier "reject a build mixing options + parameterDefinitions" guard is GONE —
 the unified multi-type header (above) makes mixed KRN builds first-class and
-live-proven. Next types append in `buildEntryGroups` in frequency order
-(SECURITY KEY #19.1 → PROTOCOL #101 → RPC #8994 → templates → …).
+live-proven. Next types append in `buildEntryGroups`.
+
+## SECURITY KEY (#19.1) — third type, live-proven both engines (2026-06-28)
+Adding a SEND/DELETE type is now ~30 lines: an `entryType` (file#, FileMan name,
+national ORD action-routine tail), a `*Records` packer (the record image), the
+`buildEntryGroups` line, a `*Names` reader, and the verify/uninstall threading.
+SECURITY KEY (`testdata/zzkey`) is the proof-of-cheapness — its record image is
+**minimal: `-1`=`0^1` + `0`=the .01 NAME alone** (a key is just a named token;
+stored in `^DIC(19.1,`). ORD tail (52 corpus builds, one form):
+`;;KEY^XPDTA1;KEYF1^XPDIA1;KEYE1^XPDIA1;KEYF2^XPDIA1;;KEYDEL^XPDIA1`. #19.1 is a
+**float** file number so it never hit the int/float subscript gotcha. Shipped
+**name-only** (optional DESCRIPTION word-processing field deferred — avoids the WP
+volatile-date determinism work). Live install→verify→`--force` uninstall→clean on
+vehu (YDB, `^DIC(19.1,797,0)=ZZKEY MANAGER`) + foia-t12 (IRIS). Verify probes
+`^DIC(19.1,"B",<name>)`, uninstall is `DIK` on `^DIC(19.1,`. Remaining B.1 types
+in frequency order: PROTOCOL #101 → RPC #8994 → templates (.4/.402/.401/.403) →
+LIST TEMPLATE #409.61 → MAIL GROUP #3.8 → HL7 family.
 
 ## Proof
 **Live install→verify→uninstall→clean on BOTH engines** via the driver stack
