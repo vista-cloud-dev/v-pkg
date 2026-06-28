@@ -28,6 +28,7 @@ type buildResult struct {
 	Out            string `json:"out"`
 	Routines       int    `json:"routines"`
 	ParamDefs      int    `json:"paramDefs,omitempty"`
+	Options        int    `json:"options,omitempty"`
 	Files          int    `json:"files,omitempty"`
 	RequiredBuilds int    `json:"requiredBuilds,omitempty"`
 }
@@ -54,6 +55,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 		return clikit.Fail(clikit.ExitUsage, "BAD_SPEC", perr.Error(), "fix the parameterDefinitions in the build spec")
 	}
 	files := resolveFiles(spec.Components.Files)
+	options := resolveOptions(spec.Components.Options)
 	reqBuilds := resolveRequiredBuilds(spec.RequiredBuilds)
 
 	pairs := kids.MakeBuildPairs(kids.BuildInput{
@@ -61,6 +63,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 		Namespace:      spec.Package,
 		Routines:       rtns,
 		ParamDefs:      paramDefs,
+		Options:        options,
 		Files:          files,
 		RequiredBuilds: reqBuilds,
 		EnvCheck:       spec.EnvCheck,
@@ -82,11 +85,11 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 
 	return cc.Result(buildResult{
 		InstallName: spec.InstallName(), Out: out, Routines: len(rtns),
-		ParamDefs: len(paramDefs), Files: len(files), RequiredBuilds: len(reqBuilds),
+		ParamDefs: len(paramDefs), Options: len(options), Files: len(files), RequiredBuilds: len(reqBuilds),
 	}, func() {
 		cc.Title("pkg build")
-		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d file(s), %d required build(s)) → %s\n",
-			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(files), len(reqBuilds), cc.Accent(out))
+		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d option(s), %d file(s), %d required build(s)) → %s\n",
+			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(options), len(files), len(reqBuilds), cc.Accent(out))
 	})
 }
 
@@ -166,6 +169,24 @@ func resolveFields(fields []buildspec.FieldSpec) []kids.FileField {
 			ff.Codes = append(ff.Codes, kids.SetCode{Internal: c.Internal, External: c.External})
 		}
 		out = append(out, ff)
+	}
+	return out
+}
+
+// resolveOptions maps the spec's OPTION components onto the kids emit shape —
+// option-type name → #19 field 4 (TYPE) set-of-codes value. The spec is already
+// validated (type known, run-routine has a routine), so the lookup is guaranteed.
+func resolveOptions(opts []buildspec.OptionComp) []kids.Option {
+	out := make([]kids.Option, 0, len(opts))
+	for _, o := range opts {
+		out = append(out, kids.Option{
+			Name:        o.Name,
+			MenuText:    o.MenuText,
+			TypeCode:    buildspec.OptionTypeCode[o.Type],
+			Routine:     o.Routine,
+			EntryAction: o.EntryAction,
+			ExitAction:  o.ExitAction,
+		})
 	}
 	return out
 }

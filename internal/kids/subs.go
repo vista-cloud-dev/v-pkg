@@ -49,6 +49,20 @@ func formatKIDSFloat(f float64) string {
 // strSub builds a string-kind subscript element.
 func strSub(s string) Sub { return Sub{kind: kindStr, str: s} }
 
+// subNum returns a numeric subscript's value as a float64 (0 for a string sub) —
+// so a file number that round-trips as an int (e.g. 19) and one emitted as a float
+// (e.g. 19.0 / 8989.51) compare equal.
+func subNum(s Sub) float64 {
+	switch s.kind {
+	case kindInt:
+		return float64(s.intV)
+	case kindFloat:
+		return s.fltV
+	default:
+		return 0
+	}
+}
+
 // IsStr reports whether the element is a string subscript.
 func (s Sub) IsStr() bool { return s.kind == kindStr }
 

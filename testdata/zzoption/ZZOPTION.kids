@@ -1,0 +1,50 @@
+KIDS Distribution saved by v-pkg
+m-kids reassembled output
+**KIDS**:ZZOPTION*1.0*1^
+
+**INSTALL NAME**
+ZZOPTION*1.0*1
+"BLD",1,0)
+ZZOPTION*1.0*1^ZZOPTION^0^0
+"BLD",1,"KRN",0)
+^9.67PA^19^1
+"BLD",1,"KRN",19,0)
+19
+"BLD",1,"KRN",19,"NM",0)
+^9.68A^1^1
+"BLD",1,"KRN",19,"NM",1,0)
+ZZOPTION RUN ROUTINE^^0
+"BLD",1,"KRN",19,"NM","B","ZZOPTION RUN ROUTINE",1)
+
+"BLD",1,"KRN","B",19,19)
+
+"RTN")
+1
+"RTN","ZZOPTRT")
+0^5^0^0
+"RTN","ZZOPTRT",1,0)
+ZZOPTRT ;VCD/VSL - throwaway test package (KRN option component) ;1.0
+"RTN","ZZOPTRT",2,0)
+ ;;1.0;ZZOPTION;;
+"RTN","ZZOPTRT",3,0)
+ quit
+"RTN","ZZOPTRT",4,0)
+EN ;
+"RTN","ZZOPTRT",5,0)
+ quit
+"ORD",1,19)
+19;1;;;OPT^XPDTA;OPTF1^XPDIA;OPTE1^XPDIA;OPTF2^XPDIA;;OPTDEL^XPDIA
+"ORD",1,19,0)
+OPTION
+"KRN",19,1,-1)
+0^1
+"KRN",19,1,0)
+ZZOPTION RUN ROUTINE^ZZOPTION Run Routine Demo^^R
+"KRN",19,1,25)
+EN^ZZOPTRT
+"KRN",19,1,"U")
+ZZOPTION RUN ROUTINE DEMO
+"VER")
+8.0^22.2
+**END**
+**END**

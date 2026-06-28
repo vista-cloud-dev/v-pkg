@@ -343,13 +343,35 @@ not the populate-and-`EN^XPDIJ` shortcut.
 
 ### Track B — Authoring coverage (build new packages, incl. VSL)
 - **B.1 A generic entry-component emitter.** Generalize the #8989.51 `KRN` path to
-  every SEND-TO-SITE/DELETE-AT-SITE entry type by reading the live entry via the
-  FileMan DBS API and packing its `KRN` record image. One mechanism covers ~20 of
-  the 24 types because they share SEND/DELETE semantics. Land in frequency order:
+  every SEND-TO-SITE/DELETE-AT-SITE entry type and pack its `KRN` record image. One
+  mechanism covers ~20 of the 24 types because they share SEND/DELETE semantics.
+  Land in frequency order:
   **OPTION #19 → SECURITY KEY #19.1 → PROTOCOL #101 → RPC #8994 → templates
   (.4/.402/.401/.403) → LIST TEMPLATE #409.61 → MAIL GROUP #3.8 → HL7 family**.
   OPTION/PROTOCOL also need the extended actions (USE-AS-LINK / MERGE-ITEMS /
   ATTACH / DISABLE).
+  - **B.1-a ✅ DONE + LIVE-INSTALL-PROVEN 2026-06-28 — generic emitter + OPTION
+    (#19), both engines.** Extracted the generic `entryType`/`entryRec`/`imageNode`
+    core (`internal/kids/entrycomp.go`: `emitEntryManifest`/`emitEntryData`/
+    `entryNames`) from the proven #8989.51 path and landed **OPTION** on it (a
+    run-routine option: `.01 NAME^MENU TEXT^^TYPE`, ROUTINE node 25, "U" xref; ORD
+    action-routine line + `-1`=`0^1` ground-truthed as #19 national constants).
+    **Design decision:** the image is **authored from a declarative `options` spec**
+    (not read live via DBS) — keeps `v pkg build` offline + byte-deterministic
+    (consistent with the param-def/file paths); the generic packer can take a
+    read-live image source as a later alternate. TDD; lint/race/contract green;
+    corpus DRIFT=0 (2,404); golden `testdata/zzoption/ZZOPTION.kids`. **Live
+    install→verify→file-check→`--force` uninstall→clean on vehu (YDB) + foia-t12
+    (IRIS)** via the driver stack. **Bug found+fixed by the live-prove:**
+    `entryNames` must compare the file-number subscript **numerically** (int OR
+    float) — integer file numbers (#19/#101/#8994) re-parse from a `.KID` as int, so
+    an `IsFloat`-only probe passed unit tests but silently dropped every option on
+    the live verify/uninstall path (`subNum()`; regression
+    `TestBuild_OptionNames_AfterReparse`). **Open:** the shared `"BLD",1,"KRN",0)`
+    header isn't yet computed across multiple entry types, so a build mixing options
+    + parameterDefinitions is rejected (`buildspec`) — generalizing that header
+    (and migrating param-def onto the generic core) is the next B.1 step, ahead of
+    SECURITY KEY #19.1. ([[option-entry-component]])
 - **B.2 Real FILE DD + DATA (F3; the R3 enabler).** Extend `FileComp` to a
   multi-field DD (see §8 for the grounded node-set) and add **DATA** export with
   the four action codes (ADD-IF-NEW / MERGE / OVERWRITE / REPLACE) and FULL/PARTIAL

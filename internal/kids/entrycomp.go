@@ -1,0 +1,191 @@
+package kids
+
+import (
+	"strconv"
+	"strings"
+)
+
+// This file is the generic SEND-TO-SITE/DELETE-AT-SITE KIDS entry-component
+// emitter (coverage-analysis Track B.1) — the build-side counterpart to
+// KRN^XPDIK for the ~20 FileMan entry types that share SEND/DELETE semantics
+// (#19 OPTION, #19.1 SECURITY KEY, #101 PROTOCOL, #8994 RPC, the template family,
+// …). It generalizes the #8989.51 PARAMETER DEFINITION path (krncomp.go): the
+// transport is the same three parts — a #9.6 BLD KRN manifest, an "ORD" install
+// line carrying the type's national-constant SEND/DELETE action routines, and the
+// top-level "KRN",<file>,<seq> record image that XPDIK MERGEs into the live file
+// (name-matched via $$DIC LAYGO) and re-indexes. The first type landed on it is
+// OPTION (#19, the largest non-routine share of the corpus). Ground-truthed
+// against real WorldVistA KIDS exports + the XPDIK/XPDIA source.
+
+// entryType describes a KIDS KRN entry-component FileMan file: its number, its
+// FileMan name (the ORD ,0) label XPDIK matches the live file by), and the
+// national-constant tail of its ORD install line — the SEND/DELETE action
+// routines (pieces 3+, after "<file>;<ord>;") that XPDIK invokes to file, relink,
+// and delete an entry of this type. The tail is a per-type constant lifted
+// verbatim from real exports, not synthesized.
+type entryType struct {
+	number  float64
+	name    string
+	ordTail string
+}
+
+// imageNode is one node of a record image: the subscripts BELOW the
+// "KRN",<file>,<seq> prefix, and the value.
+type imageNode struct {
+	tail Subs
+	val  string
+}
+
+// entryRec is one record of an entry type to ship: its .01 NAME (the manifest /
+// verify / uninstall key), the -1 XPDFL flag value ("0^1" = send/add-or-update,
+// "1^1" = delete-at-site), and the record image (the data nodes below
+// "KRN",<file>,<seq>, in emit order).
+type entryRec struct {
+	name  string
+	xpdfl string
+	image []imageNode
+}
+
+// emitEntryManifest writes the BLD #9.6 KRN component list (#9.67) naming the
+// shipped entries of one type — the documentation half (the install reads the
+// data + ORD sections, not this). Identical in shape to the #8989.51 manifest,
+// parameterized by file number. NOTE: the shared "BLD",1,"KRN",0)" header carries
+// this type's file number + count of 1 type; a build that ships two distinct KRN
+// entry types (e.g. options AND parameter definitions) is rejected upstream
+// (buildspec) until the header is computed across all types — a follow-up.
+func emitEntryManifest(b *Build, et entryType, recs []entryRec) {
+	bld := Subs{strSub("BLD"), intSub(1)}
+	krn := func(tail ...Sub) Subs { return append(append(Subs{}, bld...), append(Subs{strSub("KRN")}, tail...)...) }
+	// KRN multiple header: ^9.67PA^<last file#>^<count of file types>.
+	b.Set(krn(intSub(0)), "^9.67PA^"+formatKIDSFloat(et.number)+"^1")
+	b.Set(krn(fltSub(et.number), intSub(0)), formatKIDSFloat(et.number))
+	b.Set(krn(fltSub(et.number), strSub("NM"), intSub(0)),
+		"^9.68A^"+strconv.Itoa(len(recs))+"^"+strconv.Itoa(len(recs)))
+	for i, r := range recs {
+		seq := int64(i + 1)
+		// NM node piece 3 = 0 (SEND); delete-at-site would be 1 (a follow-up).
+		b.Set(krn(fltSub(et.number), strSub("NM"), intSub(seq), intSub(0)), r.name+"^^0")
+		b.Set(krn(fltSub(et.number), strSub("NM"), strSub("B"), strSub(r.name), intSub(seq)), "")
+	}
+	b.Set(krn(strSub("B"), fltSub(et.number), fltSub(et.number)), "")
+}
+
+// emitEntryData writes the install-driving ORD section and the top-level KRN
+// record image for each entry of one type — the half KRN^XPDIK actually files,
+// at install order `ord`. The ORD value is <file>;<ord>;<type's action-routine
+// tail>; the record image is the -1 XPDFL flag followed by the record's nodes.
+func emitEntryData(b *Build, et entryType, recs []entryRec, ord int) {
+	if len(recs) == 0 {
+		return
+	}
+	b.Set(Subs{strSub("ORD"), intSub(int64(ord)), fltSub(et.number)},
+		formatKIDSFloat(et.number)+";"+strconv.Itoa(ord)+";"+et.ordTail)
+	b.Set(Subs{strSub("ORD"), intSub(int64(ord)), fltSub(et.number), intSub(0)}, et.name)
+	for i, r := range recs {
+		seq := int64(i + 1)
+		rec := func(tail ...Sub) Subs {
+			return append(Subs{strSub("KRN"), fltSub(et.number), intSub(seq)}, tail...)
+		}
+		// -1 = XPDFL action; killed from the live record after the merge.
+		b.Set(rec(intSub(-1)), r.xpdfl)
+		for _, n := range r.image {
+			b.Set(rec(n.tail...), n.val)
+		}
+	}
+}
+
+// entryNames returns the shipped .01 NAMEs of one entry type in build order, read
+// from the top-level "KRN",<file>,<seq>,0) record 0-nodes (piece 1) — what `v pkg
+// verify`/`uninstall` use to probe and back out each entry.
+func (b *Build) entryNames(file float64) []string {
+	var names []string
+	for _, p := range b.Pairs() {
+		s := p.Subs
+		// The file-number subscript may come back as int OR float depending on the
+		// number: a fresh build emits fltSub (8989.51, 19, …) but re-parsing a .KID
+		// coerces a decimal-free number like 19 to an int. Compare numerically so an
+		// integer-numbered entry file (#19, #101, #8994) is matched on either path.
+		if len(s) == 4 && s[0].IsStr() && s[0].Str() == "KRN" &&
+			s[1].IsNumeric() && subNum(s[1]) == file && s[2].IsInt() && s[3].IsZeroInt() {
+			name := p.Value
+			if i := strings.IndexByte(name, '^'); i >= 0 {
+				name = name[:i]
+			}
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
+// --- OPTION (#19) — the first type on the generic emitter ---------------------
+
+const (
+	optionFile     = 19
+	optionFileName = "OPTION"
+	// optionOrdTail is the national-constant tail of the #19 ORD install line
+	// (pieces after "<file>;<ord>;"): the SEND/DELETE action routines KRN^XPDIK
+	// runs to file/relink/delete an OPTION. One form across the WorldVistA corpus.
+	optionOrdTail = ";;OPT^XPDTA;OPTF1^XPDIA;OPTE1^XPDIA;OPTF2^XPDIA;;OPTDEL^XPDIA"
+)
+
+var optionEntryType = entryType{number: optionFile, name: optionFileName, ordTail: optionOrdTail}
+
+// Option is one #19 OPTION record to ship as a KIDS KRN component (SEND-TO-SITE).
+// The build files the option definition; TypeCode is the #19 field 4 (TYPE)
+// set-of-codes value (e.g. "R" run routine, "A" action). Storage (ground-truthed
+// against the live #19 DD): MENU TEXT 0;2, TYPE 0;4, EXIT ACTION node 15, ENTRY
+// ACTION node 20, ROUTINE node 25, UPPERCASE MENU TEXT node "U".
+type Option struct {
+	Name        string // #19 .01 NAME (0;1)
+	MenuText    string // #19 field 1 MENU TEXT (0;2)
+	TypeCode    string // #19 field 4 TYPE set-of-codes value
+	Routine     string // #19 field 25 ROUTINE entryref (run-routine type); node 25
+	EntryAction string // #19 field 20 ENTRY ACTION (M code); node 20
+	ExitAction  string // #19 field 15 EXIT ACTION (M code); node 15
+}
+
+// optionRecords packs each Option into the generic entry-record shape: the SEND
+// XPDFL flag and the record image (0-node, optional action/routine nodes, and the
+// "U" uppercase-menu xref). Nodes are emitted only when their field is set, so a
+// minimal option stays minimal.
+func optionRecords(opts []Option) []entryRec {
+	recs := make([]entryRec, 0, len(opts))
+	for _, o := range opts {
+		img := []imageNode{
+			// 0-node: .01 NAME ^ MENU TEXT ^ (p3 reserved) ^ TYPE.
+			{Subs{intSub(0)}, o.Name + "^" + o.MenuText + "^^" + o.TypeCode},
+		}
+		if o.ExitAction != "" {
+			img = append(img, imageNode{Subs{intSub(15)}, o.ExitAction})
+		}
+		if o.EntryAction != "" {
+			img = append(img, imageNode{Subs{intSub(20)}, o.EntryAction})
+		}
+		if o.Routine != "" {
+			img = append(img, imageNode{Subs{intSub(25)}, o.Routine})
+		}
+		if o.MenuText != "" {
+			img = append(img, imageNode{Subs{strSub("U")}, strings.ToUpper(o.MenuText)})
+		}
+		recs = append(recs, entryRec{name: o.Name, xpdfl: "0^1", image: img})
+	}
+	return recs
+}
+
+// emitOptionManifest / emitOptionData write the #19 OPTION transport — the BLD
+// manifest and the ORD + record-image halves. Emit nothing when there are no
+// options, so a build without them stays byte-identical.
+func emitOptionManifest(b *Build, opts []Option) {
+	if len(opts) == 0 {
+		return
+	}
+	emitEntryManifest(b, optionEntryType, optionRecords(opts))
+}
+
+func emitOptionData(b *Build, opts []Option) {
+	emitEntryData(b, optionEntryType, optionRecords(opts), 1)
+}
+
+// OptionNames returns the #19 OPTION component names in build order — what `v pkg
+// verify`/`uninstall` probe and back out.
+func (b *Build) OptionNames() []string { return b.entryNames(optionFile) }

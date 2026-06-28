@@ -345,7 +345,6 @@ func TestParse_AllowLongNames_StillGated(t *testing.T) {
 // be a hard error that NAMES the type, not a silent omission.
 func TestParse_UnsupportedComponents_Rejected(t *testing.T) {
 	cases := map[string]string{
-		"options":    `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"options":["ZZSKEL MENU"]}}`,
 		"keys":       `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"keys":["ZZSKEL KEY"]}}`,
 		"protocols":  `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"protocols":["ZZSKEL PROTO"]}}`,
 		"templates":  `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"templates":["ZZSKEL TMPL"]}}`,
@@ -362,6 +361,64 @@ func TestParse_UnsupportedComponents_Rejected(t *testing.T) {
 		if !strings.Contains(err.Error(), name) {
 			t.Errorf("%s: error must name the unsupported component type, got %v", name, err)
 		}
+	}
+}
+
+func TestParse_Options(t *testing.T) {
+	js := `{"package":"ZZOPT","version":"1.0","patch":"1","components":{
+	  "routines":["ZZOPTRT"],
+	  "options":[{"name":"ZZOPT RUN ROUTINE","menuText":"ZZ Run Routine Demo","type":"run routine","routine":"EN^ZZOPTRT"}]
+	}}`
+	s, err := Parse([]byte(js))
+	if err != nil {
+		t.Fatalf("Parse options spec: %v", err)
+	}
+	if len(s.Components.Options) != 1 {
+		t.Fatalf("options = %+v", s.Components.Options)
+	}
+	o := s.Components.Options[0]
+	if o.Name != "ZZOPT RUN ROUTINE" || o.Type != "run routine" || o.Routine != "EN^ZZOPTRT" {
+		t.Errorf("option = %+v", o)
+	}
+	// A spec carrying only an option (no routines) is still non-empty.
+	opt, err := Parse([]byte(`{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"ZZOPT A","menuText":"x","type":"action","entryAction":"W 1"}]}}`))
+	if err != nil {
+		t.Fatalf("Parse option-only spec: %v", err)
+	}
+	if opt.Components.empty() {
+		t.Error("spec with an option must not be empty")
+	}
+}
+
+func TestParse_Options_Invalid(t *testing.T) {
+	cases := map[string]string{
+		"no name":         `{"package":"ZZOPT","version":"1.0","components":{"options":[{"menuText":"x","type":"action"}]}}`,
+		"bad name":        `{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"lower case","type":"action"}]}}`,
+		"bad type":        `{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"ZZOPT A","type":"bogus"}]}}`,
+		"run no routine":  `{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"ZZOPT A","type":"run routine"}]}}`,
+		"bad routine ref": `{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"ZZOPT A","type":"run routine","routine":"EN^123BAD"}]}}`,
+	}
+	for name, js := range cases {
+		if _, err := Parse([]byte(js)); err == nil {
+			t.Errorf("%s: expected an error, got nil", name)
+		}
+	}
+}
+
+// A single build that ships BOTH options and parameter definitions collides on
+// the shared "BLD",1,"KRN",0) manifest header (not yet computed across types) —
+// rejected with a clear message until that header is generalized (a follow-up).
+func TestParse_Options_MixedWithParamDefs_Rejected(t *testing.T) {
+	js := `{"package":"ZZOPT","version":"1.0","components":{
+	  "options":[{"name":"ZZOPT A","menuText":"x","type":"action","entryAction":"W 1"}],
+	  "parameterDefinitions":[{"name":"ZZOPT P","dataType":"free text"}]
+	}}`
+	_, err := Parse([]byte(js))
+	if err == nil {
+		t.Fatal("mixing options + parameterDefinitions should error")
+	}
+	if !strings.Contains(err.Error(), "parameterDefinitions") || !strings.Contains(err.Error(), "options") {
+		t.Errorf("error should name both colliding types, got %v", err)
 	}
 }
 

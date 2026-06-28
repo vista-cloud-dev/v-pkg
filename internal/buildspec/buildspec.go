@@ -59,17 +59,17 @@ type Spec struct {
 // Components is the BUILD component list (#9.6). Each slice is omitempty so a
 // spec lists only what it ships.
 type Components struct {
-	Routines             []string   `json:"routines,omitempty"`
-	Files                []FileComp `json:"files,omitempty"`
-	Options              []string   `json:"options,omitempty"`
-	Keys                 []string   `json:"keys,omitempty"`                 // security keys
-	Parameters           []string   `json:"parameters,omitempty"`           // XPAR parameter names (reference only)
-	ParameterDefinitions []ParamDef `json:"parameterDefinitions,omitempty"` // XPAR #8989.51 PARAMETER DEFINITION components (shipped as data)
-	Protocols            []string   `json:"protocols,omitempty"`
-	Templates            []string   `json:"templates,omitempty"`
-	RPCs                 []string   `json:"rpcs,omitempty"`
-	MailGroups           []string   `json:"mailGroups,omitempty"`
-	HL7                  []string   `json:"hl7,omitempty"`
+	Routines             []string     `json:"routines,omitempty"`
+	Files                []FileComp   `json:"files,omitempty"`
+	Options              []OptionComp `json:"options,omitempty"`              // #19 OPTION KRN components (B.1)
+	Keys                 []string     `json:"keys,omitempty"`                 // security keys
+	Parameters           []string     `json:"parameters,omitempty"`           // XPAR parameter names (reference only)
+	ParameterDefinitions []ParamDef   `json:"parameterDefinitions,omitempty"` // XPAR #8989.51 PARAMETER DEFINITION components (shipped as data)
+	Protocols            []string     `json:"protocols,omitempty"`
+	Templates            []string     `json:"templates,omitempty"`
+	RPCs                 []string     `json:"rpcs,omitempty"`
+	MailGroups           []string     `json:"mailGroups,omitempty"`
+	HL7                  []string     `json:"hl7,omitempty"`
 }
 
 func (c Components) empty() bool {
@@ -93,7 +93,6 @@ func (c Components) unsupported() []string {
 		name string
 		n    int
 	}{
-		{"options", len(c.Options)},
 		{"keys", len(c.Keys)},
 		{"protocols", len(c.Protocols)},
 		{"templates", len(c.Templates)},
@@ -124,6 +123,35 @@ type ParamDef struct {
 type ParamEntity struct {
 	Entity     string `json:"entity"`               // entity abbreviation: SYS, USR, PKG, …
 	Precedence int    `json:"precedence,omitempty"` // #8989.513 .01 PRECEDENCE; default 1
+}
+
+// OptionComp is a #19 OPTION shipped as a KIDS KRN component (B.1). The build
+// files the option definition (never a value); Type is a human option-type name
+// resolved to its #19 field 4 (TYPE) set-of-codes value by OptionTypeCode. A
+// run-routine option requires Routine; an action option typically sets EntryAction.
+type OptionComp struct {
+	Name        string `json:"name"`                  // #19 .01 NAME (uppercase, e.g. "ZZOPT RUN ROUTINE")
+	MenuText    string `json:"menuText,omitempty"`    // #19 field 1 MENU TEXT
+	Type        string `json:"type"`                  // option type: menu | run routine | action | ...
+	Routine     string `json:"routine,omitempty"`     // #19 field 25 ROUTINE entryref (required for "run routine")
+	EntryAction string `json:"entryAction,omitempty"` // #19 field 20 ENTRY ACTION (M code)
+	ExitAction  string `json:"exitAction,omitempty"`  // #19 field 15 EXIT ACTION (M code)
+}
+
+// OptionTypeCode maps a human option-type name to its #19 field 4 (TYPE)
+// set-of-codes value. Grounded in the live ^DD(19,4) set string (Kernel Menu
+// Manager). These codes are national constants — portable across YDB and IRIS.
+var OptionTypeCode = map[string]string{
+	"action":          "A",
+	"edit":            "E",
+	"inquire":         "I",
+	"menu":            "M",
+	"print":           "P",
+	"run routine":     "R",
+	"protocol":        "O",
+	"protocol menu":   "Q",
+	"extended action": "X",
+	"server":          "S",
 }
 
 // ParamDataTypeCode maps a human value-data-type name to the #8989.51 field 1.1
@@ -262,6 +290,7 @@ var (
 	reRoutine   = regexp.MustCompile(`^%?[A-Z][A-Z0-9]*$`)                  // M routine name
 	reReqBuild  = regexp.MustCompile(`^[A-Z%][A-Z0-9]*\*\d+\.\d+(\*\d+)?$`) // NS*VER[*PATCH]
 	reParamName = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // #8989.51 NAME (uppercase, internal spaces)
+	reEntryName = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // #19 OPTION .01 NAME (uppercase, internal spaces)
 	reFileName  = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // FileMan FILE .01 name (uppercase, internal spaces)
 	reGlobalRt  = regexp.MustCompile(`^\^%?[A-Z][A-Z0-9]*\(.*,$`)           // open global root, e.g. ^DIZ(999000,
 	reLabel     = regexp.MustCompile(`^[A-Z][A-Z0-9]*$`)                    // M line label (entryref tag)
@@ -320,6 +349,18 @@ func (s *Spec) Validate() error {
 	}
 	if err := validateParamDefs(s.Components.ParameterDefinitions); err != nil {
 		return err
+	}
+	if err := validateOptions(s.Components.Options, maxName); err != nil {
+		return err
+	}
+	// Options and parameter definitions both ship through the #9.6 "KRN" manifest
+	// whose shared header ("BLD",1,"KRN",0)) is not yet computed across multiple
+	// entry types — reject a build that mixes them rather than emit a wrong header
+	// (the F1 honesty rule; generalizing the header is a Track-B follow-up).
+	if len(s.Components.Options) > 0 && len(s.Components.ParameterDefinitions) > 0 {
+		return fmt.Errorf("buildspec: %s ships both options and parameterDefinitions in one build — "+
+			"the shared KRN manifest header does not yet support multiple entry types; split them into "+
+			"separate builds", s.InstallName())
 	}
 	if err := validateFiles(s.Components.Files); err != nil {
 		return err
@@ -403,6 +444,34 @@ func validateParamDefs(defs []ParamDef) error {
 			}
 			if e.Precedence < 0 {
 				return fmt.Errorf("buildspec: parameter %s entity %s precedence must be ≥ 0", p.Name, e.Entity)
+			}
+		}
+	}
+	return nil
+}
+
+// validateOptions checks each OPTION component: a valid #19 NAME (≤30 chars,
+// uppercase), a known option type, and a well-formed ROUTINE entryref when set
+// (required for a "run routine" type). The option's record is filed by KRN^XPDIK;
+// only its build-side shape is validated here.
+func validateOptions(opts []OptionComp, maxName int) error {
+	for _, o := range opts {
+		if o.Name == "" {
+			return fmt.Errorf("buildspec: an option is missing its name")
+		}
+		if len(o.Name) > 30 || !reEntryName.MatchString(o.Name) {
+			return fmt.Errorf("buildspec: option name %q must be uppercase ≤30 chars (#19 OPTION NAME)", o.Name)
+		}
+		if _, ok := OptionTypeCode[o.Type]; !ok {
+			return fmt.Errorf("buildspec: option %s type %q is not a known option type (menu, run routine, action, …)", o.Name, o.Type)
+		}
+		if o.Type == "run routine" && o.Routine == "" {
+			return fmt.Errorf("buildspec: option %s is a run-routine option but has no routine entryref", o.Name)
+		}
+		if o.Routine != "" {
+			tag, rtn, ok := splitEntryref(o.Routine)
+			if !ok || !isRoutineName(rtn, maxName) || (tag != "" && !reLabel.MatchString(tag)) {
+				return fmt.Errorf("buildspec: option %s routine %q must be a routine entryref (ROUTINE or TAG^ROUTINE)", o.Name, o.Routine)
 			}
 		}
 	}

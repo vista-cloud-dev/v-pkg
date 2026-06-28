@@ -143,6 +143,43 @@ func TestBuild_ZZVSLAU_Deterministic(t *testing.T) {
 	}
 }
 
+// TestBuild_ZZOPTION_Deterministic is the B.1 gate for a package shipping a #19
+// OPTION as a KIDS KRN component (the generic entry-component emitter): two builds
+// are byte-identical and match the committed golden .KID.
+func TestBuild_ZZOPTION_Deterministic(t *testing.T) {
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a.kids")
+	b := filepath.Join(dir, "b.kids")
+	runBuildPkg(t, "zzoption", "ZZOPTION", a)
+	runBuildPkg(t, "zzoption", "ZZOPTION", b)
+
+	gotA, err := os.ReadFile(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotB, err := os.ReadFile(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(gotA, gotB) {
+		t.Fatal("v pkg build (option) is not deterministic — two builds differ")
+	}
+
+	golden := filepath.Join("..", "testdata", "zzoption", "ZZOPTION.kids")
+	if os.Getenv("UPDATE_GOLDEN") == "1" {
+		if err := os.WriteFile(golden, gotA, 0o644); err != nil {
+			t.Fatalf("write golden: %v", err)
+		}
+	}
+	want, err := os.ReadFile(golden)
+	if err != nil {
+		t.Fatalf("read golden (UPDATE_GOLDEN=1 to create): %v", err)
+	}
+	if !bytes.Equal(gotA, want) {
+		t.Errorf("ZZOPTION.kids drift — run UPDATE_GOLDEN=1\n--- got ---\n%s", gotA)
+	}
+}
+
 // TestBuild_ZZSKEL_Deterministic is the T0a.2 gate: `v pkg build` of the ZZSKEL
 // package yields a byte-identical normalized export across runs (deterministic
 // build, coordination plan §7.2 #2), and matches the committed golden.

@@ -1,0 +1,16 @@
+{
+  "package": "ZZOPTION",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "routines": ["ZZOPTRT"],
+    "options": [
+      {
+        "name": "ZZOPTION RUN ROUTINE",
+        "menuText": "ZZOPTION Run Routine Demo",
+        "type": "run routine",
+        "routine": "EN^ZZOPTRT"
+      }
+    ]
+  }
+}
