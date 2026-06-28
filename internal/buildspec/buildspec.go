@@ -77,6 +77,35 @@ func (c Components) empty() bool {
 		len(c.MailGroups) == 0 && len(c.HL7) == 0
 }
 
+// unsupported returns the JSON names of populated component slices the build
+// path has no emitter for. The slices exist in the schema as forward-looking
+// placeholders, but `v pkg build` emits only routines, files, and
+// parameterDefinitions today — so declaring one of these would silently produce
+// an incomplete build that installs "successfully" (coverage-analysis F1).
+// Validate rejects that rather than drop it. `Parameters` is intentionally
+// excluded: it is reference-only metadata (like ICRs), not a shipped component —
+// to actually ship a parameter, use ParameterDefinitions.
+func (c Components) unsupported() []string {
+	var u []string
+	for _, e := range []struct {
+		name string
+		n    int
+	}{
+		{"options", len(c.Options)},
+		{"keys", len(c.Keys)},
+		{"protocols", len(c.Protocols)},
+		{"templates", len(c.Templates)},
+		{"rpcs", len(c.RPCs)},
+		{"mailGroups", len(c.MailGroups)},
+		{"hl7", len(c.HL7)},
+	} {
+		if e.n > 0 {
+			u = append(u, e.name)
+		}
+	}
+	return u
+}
+
 // ParamDef is an XPAR PARAMETER DEFINITION (#8989.51) shipped as a KIDS KRN
 // component — the build creates the definition (not a value) at install time.
 // DataType/Entity are human names resolved to their #8989.51 codes / #8989.518
@@ -222,6 +251,12 @@ func (s *Spec) Validate() error {
 	}
 	if s.Components.empty() {
 		return fmt.Errorf("buildspec: %s has no components — a build must ship at least one", s.InstallName())
+	}
+	if u := s.Components.unsupported(); len(u) > 0 {
+		return fmt.Errorf("buildspec: %s declares component type(s) [%s] that v-pkg's build path "+
+			"cannot emit yet — a build would silently omit them. Remove them, or extend v-pkg "+
+			"(see docs/proposals/v-pkg-kids-coverage-analysis.md, Track B). Emittable today: "+
+			"routines, files, parameterDefinitions, requiredBuilds", s.InstallName(), strings.Join(u, ", "))
 	}
 	maxName := RoutineNameMaxStd
 	if s.AllowLongNames {

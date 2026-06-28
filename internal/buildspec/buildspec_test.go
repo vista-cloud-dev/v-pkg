@@ -242,3 +242,38 @@ func TestParse_AllowLongNames_StillGated(t *testing.T) {
 		}
 	}
 }
+
+// A build path that silently drops a declared component manufactures false
+// confidence: the build "succeeds" but the option/key/protocol/… never ships
+// (coverage-analysis F1). Declaring a component type v-pkg cannot emit yet must
+// be a hard error that NAMES the type, not a silent omission.
+func TestParse_UnsupportedComponents_Rejected(t *testing.T) {
+	cases := map[string]string{
+		"options":    `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"options":["ZZSKEL MENU"]}}`,
+		"keys":       `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"keys":["ZZSKEL KEY"]}}`,
+		"protocols":  `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"protocols":["ZZSKEL PROTO"]}}`,
+		"templates":  `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"templates":["ZZSKEL TMPL"]}}`,
+		"rpcs":       `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"rpcs":["ZZSKEL RPC"]}}`,
+		"mailGroups": `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"mailGroups":["ZZSKEL MG"]}}`,
+		"hl7":        `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"hl7":["ZZSKEL HL7"]}}`,
+	}
+	for name, js := range cases {
+		_, err := Parse([]byte(js))
+		if err == nil {
+			t.Errorf("%s: a declared-but-unemittable component should error, got nil", name)
+			continue
+		}
+		if !strings.Contains(err.Error(), name) {
+			t.Errorf("%s: error must name the unsupported component type, got %v", name, err)
+		}
+	}
+}
+
+// `parameters` is documented as reference-only metadata (like `icrs`), not a
+// shipped component — it must NOT trip the unsupported-component gate.
+func TestParse_ReferenceParametersAccepted(t *testing.T) {
+	js := `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"parameters":["ZZSKEL PARAM"]}}`
+	if _, err := Parse([]byte(js)); err != nil {
+		t.Errorf("reference-only parameters should be accepted, got %v", err)
+	}
+}
