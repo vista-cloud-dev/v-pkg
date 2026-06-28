@@ -60,8 +60,11 @@ type entryGroup struct {
 // types, so the shared "BLD",1,"KRN",0) header and the ORD ordering are computed
 // once across all of them. PARAMETER DEFINITION (#8989.51) and OPTION (#19) ride
 // the same path; new SEND/DELETE types append here.
-func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey, protos []Protocol, rpcs []RPC) []entryGroup {
+func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey, protos []Protocol, rpcs []RPC, mgs []MailGroup) []entryGroup {
 	var groups []entryGroup
+	if len(mgs) > 0 {
+		groups = append(groups, entryGroup{mailGroupEntryType, mailGroupRecords(mgs)})
+	}
 	if len(opts) > 0 {
 		groups = append(groups, entryGroup{optionEntryType, optionRecords(opts)})
 	}
@@ -400,3 +403,59 @@ func rpcRecords(rpcs []RPC) []entryRec {
 // RPCNames returns the #8994 REMOTE PROCEDURE component names in build order —
 // what `v pkg verify`/`uninstall` probe and back out.
 func (b *Build) RPCNames() []string { return b.entryNames(rpcFile) }
+
+// --- MAIL GROUP (#3.8) — the sixth type on the generic core -------------------
+
+const (
+	mailGroupFile     = 3.8
+	mailGroupFileName = "MAIL GROUP"
+	// mailGroupOrdTail is the national-constant tail of the #3.8 ORD install line
+	// (pieces after "<file>;<ord>;"): the SEND/DELETE action routines KRN^XPDIK runs
+	// to file/relink/delete a MAIL GROUP. One form across the corpus; note the
+	// trailing "(%)" on the delete action (its arg list differs from #19's).
+	mailGroupOrdTail = ";;MAILG^XPDTA1;MAILGF1^XPDIA1;MAILGE1^XPDIA1;MAILGF2^XPDIA1;;MAILGDEL^XPDIA1(%)"
+)
+
+var mailGroupEntryType = entryType{number: mailGroupFile, name: mailGroupFileName, ordTail: mailGroupOrdTail}
+
+// MailGroup is one #3.8 MAIL GROUP record to ship as a KIDS KRN component
+// (SEND-TO-SITE). Stored in ^XMB(3.8,; the record is a single 0-node
+// NAME^TYPE^ALLOW-SELF-ENROLLMENT. TypeCode is the #3.8 field 4 (TYPE) set-of-codes
+// value (PU public / PR private) — a DD-REQUIRED field, so it always ships.
+// AllowSelfEnroll is field 7 (y/n), optional. KIDS ships mail groups MEMBER-less
+// (the #3.81 MEMBER multiple points to site-local #200 entries, added on site); the
+// word-processing DESCRIPTION (field 3, node 2) is deferred — its header carries a
+// volatile last-edited date that would defeat the deterministic-build invariant.
+type MailGroup struct {
+	Name            string // #3.8 .01 NAME (0;1)
+	TypeCode        string // #3.8 field 4 TYPE set-of-codes value (0;2): PU / PR
+	AllowSelfEnroll string // #3.8 field 7 ALLOW SELF ENROLLMENT (0;3): y / n / ""
+}
+
+// mailGroupRecords packs each MailGroup into the generic entry-record shape: the
+// SEND XPDFL flag and a single 0-node NAME^TYPE^ALLOW-SELF-ENROLLMENT. TYPE
+// defaults to "PU" (public) since #3.8 field 4 is required; the self-enrollment
+// piece is emitted only when set, so a minimal group stays NAME^TYPE.
+func mailGroupRecords(mgs []MailGroup) []entryRec {
+	recs := make([]entryRec, 0, len(mgs))
+	for _, m := range mgs {
+		typ := m.TypeCode
+		if typ == "" {
+			typ = "PU"
+		}
+		zero := m.Name + "^" + typ
+		if m.AllowSelfEnroll != "" {
+			zero += "^" + m.AllowSelfEnroll
+		}
+		recs = append(recs, entryRec{
+			name:  m.Name,
+			xpdfl: "0^1",
+			image: []imageNode{{Subs{intSub(0)}, zero}},
+		})
+	}
+	return recs
+}
+
+// MailGroupNames returns the #3.8 MAIL GROUP component names in build order — what
+// `v pkg verify`/`uninstall` probe and back out.
+func (b *Build) MailGroupNames() []string { return b.entryNames(mailGroupFile) }

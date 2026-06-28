@@ -116,8 +116,46 @@ fix. Live install→verify→`--force` uninstall→verify-clean on vehu (YDB) + 
 uninstall is `DIK` on `^XWB(8994,`. Fixture `testdata/zzrpc` (ZZRPC ECHO → `ECHO^ZZRPCRT`,
 single value). RPC **input parameters** (#8994.02 multiple) are a follow-up.
 
-Remaining B.1 types in frequency order: templates (.4/.402/.401/.403) → LIST TEMPLATE
-#409.61 → MAIL GROUP #3.8 → HL7 family.
+## MAIL GROUP (#3.8) — sixth type, live-proven both engines (2026-06-28)
+Another simple bespoke-action-routine type (NOT DIFROM — see the template note below).
+Stored in `^XMB(3.8,`. Record: `-1)=0^1` (send), `0)=<NAME>^<TYPE>^<SELF-ENROLL>`.
+**TYPE (#3.8 field 4, 0;2) is DD-REQUIRED** — set of codes `PU:public/PR:private`,
+so it ALWAYS ships (default `PU`); ALLOW SELF ENROLLMENT (field 7, 0;3) is optional
+`y/n`. NM node is the plain `<NAME>^^0` (no file# piece — unlike templates). ORD tail:
+`;;MAILG^XPDTA1;MAILGF1^XPDIA1;MAILGE1^XPDIA1;MAILGF2^XPDIA1;;MAILGDEL^XPDIA1(%)` —
+note the trailing `(%)` on the delete action. **KIDS ships mail groups MEMBER-LESS**:
+the #3.81 MEMBER multiple points to site-local #200 (NEW PERSON) entries, added on
+site — so a portable build never ships members. The word-processing DESCRIPTION
+(field 3, record node `2`, subfile 3.801) is **deferred** — its header carries a
+volatile last-edited date (`^3.801^n^n^<FMdate>`) that would defeat the
+deterministic-build invariant (same reason KEY's DESCRIPTION is deferred). #3.8 is a
+float file number so it never hit the int/float subscript gotcha. Live
+install→verify→`--force` uninstall→verify-clean on vehu (YDB) + foia-t12 (IRIS):
+live `^XMB(3.8,…,0)=ZZMG ALERTS^PU^y` byte-identical on both, B-index gone after
+back-out. Fixture `testdata/zzmg`. Verify probes `^XMB(3.8,"B",<name>)`, uninstall is
+`DIK` on `^XMB(3.8,`.
+
+## DEFERRED: the template/form family (#.4/.401/.402/.403) needs read-live, not author-from-spec
+Ground-truthed 2026-06-28 (user chose to defer + do MAIL GROUP instead). The transport
+MECHANICS generalize fine (the record still ships as `"KRN",<file>,<ien>,…` with a `-1`
+flag + an NM node, and ONE DIFROM ORD-tail covers all four template types plus FUNCTION
+#.5 / DIALOG #.84 / BULLETIN #3.6: `<file>;<ord>;;;EDEOUT^DIFROMSO(<file>,DA,"",XPDA);
+FPRE^DIFROMSI(…);EPRE^DIFROMSI(…);;EPOST^DIFROMSI(…);DEL^DIFROMSK(…)`). The BLOCKER is
+the **record image**: unlike the simple types' few caret-pieces, a template carries
+**compiled FileMan structures** — the `"DR",1,<file>)` edit string with embedded MUMPS
+branching (the DR string IS the template), `"DIAB"` compiled field-action nodes, `"%D"`
+description WP, and for many `.402`/`.403` records full ScreenMan FORM/BLOCK subtrees
+(`.4031I`/`.4032IP`). These are NOT derivable from a declarative spec. The right path is
+a **read-live capture** image source (`--from-engine`: copy a real template's
+`^DIE(file,ien,*)` subtree verbatim) — templates are the forcing function for that
+capability. NM node for templates also gains a piece: `<NAME>^<FILE#>^<sendflag>`
+(file in piece 2). GOTCHA when grepping the corpus: a `"BLD",N,"KRN",<file>,0)` line
+with just the file# and a `"NM",0)=^9.68A^^0` header is an EMPTY "all-components"
+registration (#9.6 lists every possible component class even when the build ships none
+of that type); a REAL shipped entry has `"NM",1,0)` (index ≥1).
+
+Remaining B.1 types in frequency order: LIST TEMPLATE #409.61 → HELP FRAME #9.2 → HL7
+family. Templates revisited once read-live capture exists.
 
 ## Proof
 **Live install→verify→uninstall→clean on BOTH engines** via the driver stack

@@ -59,17 +59,17 @@ type Spec struct {
 // Components is the BUILD component list (#9.6). Each slice is omitempty so a
 // spec lists only what it ships.
 type Components struct {
-	Routines             []string       `json:"routines,omitempty"`
-	Files                []FileComp     `json:"files,omitempty"`
-	Options              []OptionComp   `json:"options,omitempty"`              // #19 OPTION KRN components (B.1)
-	Keys                 []KeyComp      `json:"keys,omitempty"`                 // #19.1 SECURITY KEY KRN components (B.1)
-	Parameters           []string       `json:"parameters,omitempty"`           // XPAR parameter names (reference only)
-	ParameterDefinitions []ParamDef     `json:"parameterDefinitions,omitempty"` // XPAR #8989.51 PARAMETER DEFINITION components (shipped as data)
-	Protocols            []ProtocolComp `json:"protocols,omitempty"`            // #101 PROTOCOL KRN components (B.1)
-	Templates            []string       `json:"templates,omitempty"`
-	RPCs                 []RPCComp      `json:"rpcs,omitempty"` // #8994 REMOTE PROCEDURE KRN components (B.1)
-	MailGroups           []string       `json:"mailGroups,omitempty"`
-	HL7                  []string       `json:"hl7,omitempty"`
+	Routines             []string        `json:"routines,omitempty"`
+	Files                []FileComp      `json:"files,omitempty"`
+	Options              []OptionComp    `json:"options,omitempty"`              // #19 OPTION KRN components (B.1)
+	Keys                 []KeyComp       `json:"keys,omitempty"`                 // #19.1 SECURITY KEY KRN components (B.1)
+	Parameters           []string        `json:"parameters,omitempty"`           // XPAR parameter names (reference only)
+	ParameterDefinitions []ParamDef      `json:"parameterDefinitions,omitempty"` // XPAR #8989.51 PARAMETER DEFINITION components (shipped as data)
+	Protocols            []ProtocolComp  `json:"protocols,omitempty"`            // #101 PROTOCOL KRN components (B.1)
+	Templates            []string        `json:"templates,omitempty"`
+	RPCs                 []RPCComp       `json:"rpcs,omitempty"`       // #8994 REMOTE PROCEDURE KRN components (B.1)
+	MailGroups           []MailGroupComp `json:"mailGroups,omitempty"` // #3.8 MAIL GROUP KRN components (B.1)
+	HL7                  []string        `json:"hl7,omitempty"`
 }
 
 func (c Components) empty() bool {
@@ -94,7 +94,6 @@ func (c Components) unsupported() []string {
 		n    int
 	}{
 		{"templates", len(c.Templates)},
-		{"mailGroups", len(c.MailGroups)},
 		{"hl7", len(c.HL7)},
 	} {
 		if e.n > 0 {
@@ -190,6 +189,25 @@ var ProtocolTypeCode = map[string]string{
 // word-processing DESCRIPTION is a follow-up).
 type KeyComp struct {
 	Name string `json:"name"` // #19.1 .01 NAME (uppercase, e.g. "ZZKEY MANAGER")
+}
+
+// MailGroupComp is a #3.8 MAIL GROUP shipped as a KIDS KRN component (B.1). Type is
+// a human name resolved to the #3.8 field 4 (TYPE) set-of-codes value by
+// MailGroupTypeCode (default "public"). The build files the group definition only —
+// KIDS ships mail groups MEMBER-less (the #200-pointer member list is site-local),
+// and the word-processing DESCRIPTION is deferred (its header carries a volatile
+// last-edited date that would defeat the deterministic-build invariant).
+type MailGroupComp struct {
+	Name                string `json:"name"`                          // #3.8 .01 NAME (uppercase, e.g. "ZZMG ALERTS")
+	Type                string `json:"type,omitempty"`                // mail-group type: public (default) | private
+	AllowSelfEnrollment bool   `json:"allowSelfEnrollment,omitempty"` // #3.8 field 7 ALLOW SELF ENROLLMENT?
+}
+
+// MailGroupTypeCode maps a human mail-group-type name to its #3.8 field 4 (TYPE)
+// set-of-codes value. Grounded in the live ^DD(3.8,4) set string. National constants.
+var MailGroupTypeCode = map[string]string{
+	"public":  "PU",
+	"private": "PR",
 }
 
 // OptionTypeCode maps a human option-type name to its #19 field 4 (TYPE)
@@ -416,6 +434,9 @@ func (s *Spec) Validate() error {
 	if err := validateRPCs(s.Components.RPCs, maxName); err != nil {
 		return err
 	}
+	if err := validateMailGroups(s.Components.MailGroups); err != nil {
+		return err
+	}
 	if err := validateFiles(s.Components.Files); err != nil {
 		return err
 	}
@@ -587,6 +608,26 @@ func validateKeys(keys []KeyComp) error {
 		}
 		if len(k.Name) > 30 || !reEntryName.MatchString(k.Name) {
 			return fmt.Errorf("buildspec: key name %q must be uppercase ≤30 chars (#19.1 SECURITY KEY NAME)", k.Name)
+		}
+	}
+	return nil
+}
+
+// validateMailGroups checks each MAIL GROUP component: a valid #3.8 NAME (≤30
+// chars, uppercase) and, when given, a known type (public/private). The record is
+// filed by KRN^XPDIK; only its build-side shape is validated here.
+func validateMailGroups(mgs []MailGroupComp) error {
+	for _, m := range mgs {
+		if m.Name == "" {
+			return fmt.Errorf("buildspec: a mail group is missing its name")
+		}
+		if len(m.Name) > 30 || !reEntryName.MatchString(m.Name) {
+			return fmt.Errorf("buildspec: mail group name %q must be uppercase ≤30 chars (#3.8 MAIL GROUP NAME)", m.Name)
+		}
+		if m.Type != "" {
+			if _, ok := MailGroupTypeCode[m.Type]; !ok {
+				return fmt.Errorf("buildspec: mail group %s type %q is not a known type (public, private)", m.Name, m.Type)
+			}
 		}
 	}
 	return nil

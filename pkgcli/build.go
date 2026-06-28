@@ -32,6 +32,7 @@ type buildResult struct {
 	Keys           int    `json:"keys,omitempty"`
 	Protocols      int    `json:"protocols,omitempty"`
 	RPCs           int    `json:"rpcs,omitempty"`
+	MailGroups     int    `json:"mailGroups,omitempty"`
 	Files          int    `json:"files,omitempty"`
 	RequiredBuilds int    `json:"requiredBuilds,omitempty"`
 }
@@ -62,6 +63,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 	keys := resolveKeys(spec.Components.Keys)
 	protocols := resolveProtocols(spec.Components.Protocols)
 	rpcs := resolveRPCs(spec.Components.RPCs)
+	mailGroups := resolveMailGroups(spec.Components.MailGroups)
 	reqBuilds := resolveRequiredBuilds(spec.RequiredBuilds)
 
 	pairs := kids.MakeBuildPairs(kids.BuildInput{
@@ -73,6 +75,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 		Keys:           keys,
 		Protocols:      protocols,
 		RPCs:           rpcs,
+		MailGroups:     mailGroups,
 		Files:          files,
 		RequiredBuilds: reqBuilds,
 		EnvCheck:       spec.EnvCheck,
@@ -94,11 +97,11 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 
 	return cc.Result(buildResult{
 		InstallName: spec.InstallName(), Out: out, Routines: len(rtns),
-		ParamDefs: len(paramDefs), Options: len(options), Keys: len(keys), Protocols: len(protocols), RPCs: len(rpcs), Files: len(files), RequiredBuilds: len(reqBuilds),
+		ParamDefs: len(paramDefs), Options: len(options), Keys: len(keys), Protocols: len(protocols), RPCs: len(rpcs), MailGroups: len(mailGroups), Files: len(files), RequiredBuilds: len(reqBuilds),
 	}, func() {
 		cc.Title("pkg build")
-		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d option(s), %d key(s), %d protocol(s), %d rpc(s), %d file(s), %d required build(s)) → %s\n",
-			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(options), len(keys), len(protocols), len(rpcs), len(files), len(reqBuilds), cc.Accent(out))
+		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d option(s), %d key(s), %d protocol(s), %d rpc(s), %d mail group(s), %d file(s), %d required build(s)) → %s\n",
+			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(options), len(keys), len(protocols), len(rpcs), len(mailGroups), len(files), len(reqBuilds), cc.Accent(out))
 	})
 }
 
@@ -241,6 +244,29 @@ func resolveRPCs(rpcs []buildspec.RPCComp) []kids.RPC {
 			Tag:            r.Tag,
 			Routine:        r.Routine,
 			ReturnTypeCode: buildspec.RPCReturnTypeCode[rt],
+		})
+	}
+	return out
+}
+
+// resolveMailGroups maps the spec's MAIL GROUP components onto the kids emit shape
+// — type name → #3.8 field 4 set-of-codes value (default "public" → "PU", since the
+// field is DD-required), and the self-enrollment bool → the field 7 y/n code.
+func resolveMailGroups(mgs []buildspec.MailGroupComp) []kids.MailGroup {
+	out := make([]kids.MailGroup, 0, len(mgs))
+	for _, m := range mgs {
+		typ := m.Type
+		if typ == "" {
+			typ = "public"
+		}
+		self := ""
+		if m.AllowSelfEnrollment {
+			self = "y"
+		}
+		out = append(out, kids.MailGroup{
+			Name:            m.Name,
+			TypeCode:        buildspec.MailGroupTypeCode[typ],
+			AllowSelfEnroll: self,
 		})
 	}
 	return out

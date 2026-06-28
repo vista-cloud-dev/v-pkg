@@ -1,0 +1,15 @@
+{
+  "package": "ZZMG",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "routines": ["ZZMGRT"],
+    "mailGroups": [
+      {
+        "name": "ZZMG ALERTS",
+        "type": "public",
+        "allowSelfEnrollment": true
+      }
+    ]
+  }
+}

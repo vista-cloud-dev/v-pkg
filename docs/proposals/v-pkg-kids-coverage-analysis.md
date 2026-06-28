@@ -419,6 +419,26 @@ not the populate-and-`EN^XPDIJ` shortcut.
     `^XWB(8994,…,0)=ZZRPC ECHO^ECHO^ZZRPCRT^1` **byte-identical on both**, B-index gone
     after back-out. Input-parameter (#8994.02) authoring is a follow-up. Next:
     **template/form family** (#.4/.402/.401/.403). ([[option-entry-component]])
+  - **B.1-f ✅ DONE + LIVE-PROVEN 2026-06-28 — MAIL GROUP (#3.8), both engines.** The
+    sixth type. Bespoke-action-routine family (NOT DIFROM). Stored in `^XMB(3.8,`;
+    record `-1)=0^1`, `0)=NAME^TYPE^SELF-ENROLL`. **TYPE (field 4) is DD-required**
+    (set `PU:public/PR:private`, default `PU`); ALLOW SELF ENROLLMENT (field 7) is
+    optional `y/n`. NM node plain `NAME^^0`. ORD tail
+    `;;MAILG^XPDTA1;MAILGF1^XPDIA1;MAILGE1^XPDIA1;MAILGF2^XPDIA1;;MAILGDEL^XPDIA1(%)`.
+    Shipped **member-less** (the #3.81 member list is site-local #200 pointers) and
+    **description-less** (the field-3 WP header carries a volatile date — deferred,
+    like KEY's). TDD; lint/race/contract green; corpus DRIFT=0; golden
+    `testdata/zzmg/ZZMG.kids`. **Live install→verify→`--force` uninstall→verify-clean**
+    on vehu (YDB) + foia-t12 (IRIS): live `^XMB(3.8,…,0)=ZZMG ALERTS^PU^y`
+    byte-identical on both, B-index gone after back-out. ([[option-entry-component]])
+  - **B.1 templates (#.4/.401/.402/.403) — DEFERRED 2026-06-28** (user decision). The
+    transport mechanics generalize (one DIFROM ORD-tail covers all four + FUNCTION
+    #.5/DIALOG #.84/BULLETIN #3.6), but the record image carries **compiled FileMan
+    structures** (the `"DR"` edit string with embedded MUMPS, `"DIAB"` nodes, ScreenMan
+    FORM/BLOCK subtrees) NOT derivable from a declarative spec. Needs a **read-live
+    capture** image source (`--from-engine`); templates are its forcing function.
+    Remaining spec-derivable types first: **LIST TEMPLATE #409.61 → HELP FRAME #9.2**.
+    Detail: [[option-entry-component]].
 - **B.2 Real FILE DD + DATA (F3; the R3 enabler).** Extend `FileComp` to a
   multi-field DD (see §8 for the grounded node-set) and add **DATA** export with
   the four action codes (ADD-IF-NEW / MERGE / OVERWRITE / REPLACE) and FULL/PARTIAL

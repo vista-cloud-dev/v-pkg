@@ -345,9 +345,8 @@ func TestParse_AllowLongNames_StillGated(t *testing.T) {
 // be a hard error that NAMES the type, not a silent omission.
 func TestParse_UnsupportedComponents_Rejected(t *testing.T) {
 	cases := map[string]string{
-		"templates":  `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"templates":["ZZSKEL TMPL"]}}`,
-		"mailGroups": `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"mailGroups":["ZZSKEL MG"]}}`,
-		"hl7":        `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"hl7":["ZZSKEL HL7"]}}`,
+		"templates": `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"templates":["ZZSKEL TMPL"]}}`,
+		"hl7":       `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL"],"hl7":["ZZSKEL HL7"]}}`,
 	}
 	for name, js := range cases {
 		_, err := Parse([]byte(js))
@@ -435,6 +434,45 @@ func TestParse_RPCs_Invalid(t *testing.T) {
 		"no routine":  `{"package":"ZZR","version":"1.0","components":{"rpcs":[{"name":"ZZR A"}]}}`,
 		"bad routine": `{"package":"ZZR","version":"1.0","components":{"rpcs":[{"name":"ZZR A","routine":"123BAD"}]}}`,
 		"bad rtype":   `{"package":"ZZR","version":"1.0","components":{"rpcs":[{"name":"ZZR A","routine":"ZZRPCRT","returnType":"bogus"}]}}`,
+	}
+	for name, js := range cases {
+		if _, err := Parse([]byte(js)); err == nil {
+			t.Errorf("%s: expected an error, got nil", name)
+		}
+	}
+}
+
+func TestParse_MailGroups(t *testing.T) {
+	js := `{"package":"ZZMG","version":"1.0","patch":"1","components":{
+	  "routines":["ZZMGRT"],
+	  "mailGroups":[{"name":"ZZMG ALERTS","type":"private","allowSelfEnrollment":true}]
+	}}`
+	s, err := Parse([]byte(js))
+	if err != nil {
+		t.Fatalf("Parse mailGroups spec: %v", err)
+	}
+	if len(s.Components.MailGroups) != 1 {
+		t.Fatalf("mailGroups = %+v", s.Components.MailGroups)
+	}
+	m := s.Components.MailGroups[0]
+	if m.Name != "ZZMG ALERTS" || m.Type != "private" || !m.AllowSelfEnrollment {
+		t.Errorf("mailGroup = %+v", m)
+	}
+	// type defaults (to public) when omitted, and a mail-group-only spec is non-empty.
+	d, err := Parse([]byte(`{"package":"ZZMG","version":"1.0","components":{"mailGroups":[{"name":"ZZMG A"}]}}`))
+	if err != nil {
+		t.Fatalf("Parse mail group without type: %v", err)
+	}
+	if d.Components.empty() {
+		t.Error("spec with a mail group must not be empty")
+	}
+}
+
+func TestParse_MailGroups_Invalid(t *testing.T) {
+	cases := map[string]string{
+		"no name":  `{"package":"ZZMG","version":"1.0","components":{"mailGroups":[{"type":"public"}]}}`,
+		"bad name": `{"package":"ZZMG","version":"1.0","components":{"mailGroups":[{"name":"lower case"}]}}`,
+		"bad type": `{"package":"ZZMG","version":"1.0","components":{"mailGroups":[{"name":"ZZMG A","type":"bogus"}]}}`,
 	}
 	for name, js := range cases {
 		if _, err := Parse([]byte(js)); err == nil {

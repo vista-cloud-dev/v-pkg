@@ -205,7 +205,7 @@ func TestRunVerify(t *testing.T) {
 	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
 		installspec.ResultMarker + "status=3\n" +
 		installspec.ResultMarker + "rtn:ZZSKEL=1\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil, nil, nil, nil, nil)
+	res, err := runVerify(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("runVerify: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestRunVerify_ParamDef(t *testing.T) {
 		installspec.ResultMarker + "rtn:VSLCFG=1\n" +
 		installspec.ResultMarker + "param:VSL GREETING=1\n"}
 	res, err := runVerify(context.Background(), fakeClient(f), "VSLBASE*1.0*1",
-		[]string{"VSLCFG"}, []string{"VSL GREETING"}, nil, nil, nil, nil, nil)
+		[]string{"VSLCFG"}, []string{"VSL GREETING"}, nil, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("runVerify: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestRunVerify_Option(t *testing.T) {
 		installspec.ResultMarker + "rtn:ZZOPTRT=1\n" +
 		installspec.ResultMarker + "option:ZZOPT RUN ROUTINE=1\n"}
 	res, err := runVerify(context.Background(), fakeClient(f), "ZZOPT*1.0*1",
-		[]string{"ZZOPTRT"}, nil, []string{"ZZOPT RUN ROUTINE"}, nil, nil, nil, nil)
+		[]string{"ZZOPTRT"}, nil, []string{"ZZOPT RUN ROUTINE"}, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("runVerify: %v", err)
 	}
@@ -265,7 +265,7 @@ func TestRunVerify_Key(t *testing.T) {
 		installspec.ResultMarker + "rtn:ZZKEYRT=1\n" +
 		installspec.ResultMarker + "key:ZZKEY MANAGER=1\n"}
 	res, err := runVerify(context.Background(), fakeClient(f), "ZZKEY*1.0*1",
-		[]string{"ZZKEYRT"}, nil, nil, []string{"ZZKEY MANAGER"}, nil, nil, nil)
+		[]string{"ZZKEYRT"}, nil, nil, []string{"ZZKEY MANAGER"}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("runVerify: %v", err)
 	}
@@ -286,7 +286,7 @@ func TestRunVerify_Protocol(t *testing.T) {
 		installspec.ResultMarker + "rtn:ZZPRORT=1\n" +
 		installspec.ResultMarker + "protocol:ZZPROTO ACTION=1\n"}
 	res, err := runVerify(context.Background(), fakeClient(f), "ZZPROTO*1.0*1",
-		[]string{"ZZPRORT"}, nil, nil, nil, []string{"ZZPROTO ACTION"}, nil, nil)
+		[]string{"ZZPRORT"}, nil, nil, nil, []string{"ZZPROTO ACTION"}, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("runVerify: %v", err)
 	}
@@ -307,7 +307,7 @@ func TestRunVerify_RPC(t *testing.T) {
 		installspec.ResultMarker + "rtn:ZZRPCRT=1\n" +
 		installspec.ResultMarker + "rpc:ZZRPC ECHO=1\n"}
 	res, err := runVerify(context.Background(), fakeClient(f), "ZZRPC*1.0*1",
-		[]string{"ZZRPCRT"}, nil, nil, nil, nil, []string{"ZZRPC ECHO"}, nil)
+		[]string{"ZZRPCRT"}, nil, nil, nil, nil, []string{"ZZRPC ECHO"}, nil, nil)
 	if err != nil {
 		t.Fatalf("runVerify: %v", err)
 	}
@@ -320,13 +320,34 @@ func TestRunVerify_RPC(t *testing.T) {
 	}
 }
 
+// A verify carrying a MAIL GROUP reads its presence marker and folds it into ok()
+// — a missing mail group means the install is not fully verified.
+func TestRunVerify_MailGroup(t *testing.T) {
+	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
+		installspec.ResultMarker + "status=3\n" +
+		installspec.ResultMarker + "rtn:ZZMGRT=1\n" +
+		installspec.ResultMarker + "mailgroup:ZZMG ALERTS=1\n"}
+	res, err := runVerify(context.Background(), fakeClient(f), "ZZMG*1.0*1",
+		[]string{"ZZMGRT"}, nil, nil, nil, nil, nil, []string{"ZZMG ALERTS"}, nil)
+	if err != nil {
+		t.Fatalf("runVerify: %v", err)
+	}
+	if !res.MailGroups["ZZMG ALERTS"] || !res.ok() {
+		t.Errorf("res = %+v, want mail group present and ok()", res)
+	}
+	res.MailGroups["ZZMG ALERTS"] = false
+	if res.ok() {
+		t.Error("ok() must be false when a mail group is missing")
+	}
+}
+
 // A verify carrying a FileMan FILE reads its DD-present marker and folds it into
 // ok() — a missing file dictionary means the install is not fully verified.
 func TestRunVerify_File(t *testing.T) {
 	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
 		installspec.ResultMarker + "status=3\n" +
 		installspec.ResultMarker + "file:999000=1\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZVSLFS*1.0*1", nil, nil, nil, nil, nil, nil, []string{"999000"})
+	res, err := runVerify(context.Background(), fakeClient(f), "ZZVSLFS*1.0*1", nil, nil, nil, nil, nil, nil, nil, []string{"999000"})
 	if err != nil {
 		t.Fatalf("runVerify: %v", err)
 	}
@@ -343,7 +364,7 @@ func TestRunVerify_NotInstalled(t *testing.T) {
 	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=0\n" +
 		installspec.ResultMarker + "status=\n" +
 		installspec.ResultMarker + "rtn:ZZSKEL=0\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil, nil, nil, nil, nil)
+	res, err := runVerify(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("runVerify: %v", err)
 	}
@@ -356,7 +377,7 @@ func TestRunVerify_NotInstalled(t *testing.T) {
 
 func TestRunUninstall(t *testing.T) {
 	f := &fakeDriver{runStdout: installspec.ResultMarker + "uninstalled=1\n"}
-	res, err := runUninstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil, nil, nil, nil, nil)
+	res, err := runUninstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("runUninstall: %v", err)
 	}

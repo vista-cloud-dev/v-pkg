@@ -184,6 +184,59 @@ func TestMakeBuildPairs_RPC_KRN(t *testing.T) {
 	}
 }
 
+func TestMakeBuildPairs_MailGroup_KRN(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZMG*1.0*1",
+		Namespace:   "ZZMG",
+		Routines:    []RoutineSrc{{Name: "ZZMGRT", Lines: []string{"ZZMGRT ;x", " quit"}}},
+		MailGroups:  []MailGroup{{Name: "ZZMG ALERTS", TypeCode: "PR", AllowSelfEnroll: "y"}},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	want := map[string]string{
+		`"KRN",3.8,1,-1)`:                             "0^1",
+		`"KRN",3.8,1,0)`:                              "ZZMG ALERTS^PR^y", // .01 NAME^4 TYPE^7 ALLOW SELF ENROLLMENT
+		`"ORD",1,3.8)`:                                "3.8;1;;;MAILG^XPDTA1;MAILGF1^XPDIA1;MAILGE1^XPDIA1;MAILGF2^XPDIA1;;MAILGDEL^XPDIA1(%)",
+		`"ORD",1,3.8,0)`:                              "MAIL GROUP",
+		`"BLD",1,"KRN",0)`:                            "^9.67PA^3.8^1",
+		`"BLD",1,"KRN",3.8,0)`:                        "3.8",
+		`"BLD",1,"KRN",3.8,"NM",1,0)`:                 "ZZMG ALERTS^^0",
+		`"BLD",1,"KRN",3.8,"NM","B","ZZMG ALERTS",1)`: "",
+		`"BLD",1,"KRN","B",3.8,3.8)`:                  "",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+	b := newBuild()
+	for _, p := range MakeBuildPairs(in) {
+		b.Set(p.Subs, p.Value)
+	}
+	if ms := b.MailGroupNames(); len(ms) != 1 || ms[0] != "ZZMG ALERTS" {
+		t.Errorf("MailGroupNames = %v, want [ZZMG ALERTS]", ms)
+	}
+}
+
+// A mail group with no explicit type defaults to public ("PU"); TYPE (#3.8 field 4)
+// is DD-required so the 0-node must always carry a value there.
+func TestMakeBuildPairs_MailGroup_DefaultType(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZMG*1.0*1",
+		Namespace:   "ZZMG",
+		MailGroups:  []MailGroup{{Name: "ZZMG A"}},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	if v := got[`"KRN",3.8,1,0)`]; v != "ZZMG A^PU" {
+		t.Errorf(`"KRN",3.8,1,0) = %q, want "ZZMG A^PU"`, v)
+	}
+}
+
 // TestMakeBuildPairs_MixedEntryTypes proves the unified KRN manifest header spans
 // multiple entry types in one build (B.1 next step): an OPTION (#19) AND a
 // PARAMETER DEFINITION (#8989.51) share one "BLD",1,"KRN",0) header

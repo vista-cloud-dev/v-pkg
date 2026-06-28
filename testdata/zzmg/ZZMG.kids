@@ -1,0 +1,42 @@
+KIDS Distribution saved by v-pkg
+m-kids reassembled output
+**KIDS**:ZZMG*1.0*1^
+
+**INSTALL NAME**
+ZZMG*1.0*1
+"BLD",1,0)
+ZZMG*1.0*1^ZZMG^0^0
+"BLD",1,"KRN",0)
+^9.67PA^3.8^1
+"BLD",1,"KRN",3.8,0)
+3.8
+"BLD",1,"KRN",3.8,"NM",0)
+^9.68A^1^1
+"BLD",1,"KRN",3.8,"NM",1,0)
+ZZMG ALERTS^^0
+"BLD",1,"KRN",3.8,"NM","B","ZZMG ALERTS",1)
+
+"BLD",1,"KRN","B",3.8,3.8)
+
+"RTN")
+1
+"RTN","ZZMGRT")
+0^3^0^0
+"RTN","ZZMGRT",1,0)
+ZZMGRT ;VCD/VSL - throwaway test package (KRN mail group component) ;1.0
+"RTN","ZZMGRT",2,0)
+ ;;1.0;ZZMG;;
+"RTN","ZZMGRT",3,0)
+ quit
+"ORD",1,3.8)
+3.8;1;;;MAILG^XPDTA1;MAILGF1^XPDIA1;MAILGE1^XPDIA1;MAILGF2^XPDIA1;;MAILGDEL^XPDIA1(%)
+"ORD",1,3.8,0)
+MAIL GROUP
+"KRN",3.8,1,-1)
+0^1
+"KRN",3.8,1,0)
+ZZMG ALERTS^PU^y
+"VER")
+8.0^22.2
+**END**
+**END**
