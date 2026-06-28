@@ -59,24 +59,25 @@ type Spec struct {
 // Components is the BUILD component list (#9.6). Each slice is omitempty so a
 // spec lists only what it ships.
 type Components struct {
-	Routines             []string        `json:"routines,omitempty"`
-	Files                []FileComp      `json:"files,omitempty"`
-	Options              []OptionComp    `json:"options,omitempty"`              // #19 OPTION KRN components (B.1)
-	Keys                 []KeyComp       `json:"keys,omitempty"`                 // #19.1 SECURITY KEY KRN components (B.1)
-	Parameters           []string        `json:"parameters,omitempty"`           // XPAR parameter names (reference only)
-	ParameterDefinitions []ParamDef      `json:"parameterDefinitions,omitempty"` // XPAR #8989.51 PARAMETER DEFINITION components (shipped as data)
-	Protocols            []ProtocolComp  `json:"protocols,omitempty"`            // #101 PROTOCOL KRN components (B.1)
-	Templates            []string        `json:"templates,omitempty"`
-	RPCs                 []RPCComp       `json:"rpcs,omitempty"`       // #8994 REMOTE PROCEDURE KRN components (B.1)
-	MailGroups           []MailGroupComp `json:"mailGroups,omitempty"` // #3.8 MAIL GROUP KRN components (B.1)
-	HL7                  []string        `json:"hl7,omitempty"`
+	Routines             []string           `json:"routines,omitempty"`
+	Files                []FileComp         `json:"files,omitempty"`
+	Options              []OptionComp       `json:"options,omitempty"`              // #19 OPTION KRN components (B.1)
+	Keys                 []KeyComp          `json:"keys,omitempty"`                 // #19.1 SECURITY KEY KRN components (B.1)
+	Parameters           []string           `json:"parameters,omitempty"`           // XPAR parameter names (reference only)
+	ParameterDefinitions []ParamDef         `json:"parameterDefinitions,omitempty"` // XPAR #8989.51 PARAMETER DEFINITION components (shipped as data)
+	Protocols            []ProtocolComp     `json:"protocols,omitempty"`            // #101 PROTOCOL KRN components (B.1)
+	Templates            []string           `json:"templates,omitempty"`
+	RPCs                 []RPCComp          `json:"rpcs,omitempty"`          // #8994 REMOTE PROCEDURE KRN components (B.1)
+	MailGroups           []MailGroupComp    `json:"mailGroups,omitempty"`    // #3.8 MAIL GROUP KRN components (B.1)
+	ListTemplates        []ListTemplateComp `json:"listTemplates,omitempty"` // #409.61 LIST TEMPLATE KRN components (B.1)
+	HL7                  []string           `json:"hl7,omitempty"`
 }
 
 func (c Components) empty() bool {
 	return len(c.Routines) == 0 && len(c.Files) == 0 && len(c.Options) == 0 &&
 		len(c.Keys) == 0 && len(c.Parameters) == 0 && len(c.ParameterDefinitions) == 0 &&
 		len(c.Protocols) == 0 && len(c.Templates) == 0 && len(c.RPCs) == 0 &&
-		len(c.MailGroups) == 0 && len(c.HL7) == 0
+		len(c.MailGroups) == 0 && len(c.ListTemplates) == 0 && len(c.HL7) == 0
 }
 
 // unsupported returns the JSON names of populated component slices the build
@@ -208,6 +209,25 @@ type MailGroupComp struct {
 var MailGroupTypeCode = map[string]string{
 	"public":  "PU",
 	"private": "PR",
+}
+
+// ListTemplateComp is a #409.61 LIST TEMPLATE (List Manager screen) shipped as a
+// KIDS KRN component (B.1). The build files the screen definition: a name, screen
+// geometry (margins, defaulted), the action PROTOCOL MENU (a #101 pointer by name),
+// the screen title, and the List Manager callback codes (header/init/exit/help M
+// code + the display ARRAY global). All plain strings — no compiled structure.
+type ListTemplateComp struct {
+	Name         string `json:"name"`                   // #409.61 .01 NAME (uppercase, e.g. "ZZLM PATIENTS")
+	ScreenTitle  string `json:"screenTitle,omitempty"`  // .11 SCREEN TITLE
+	ProtocolMenu string `json:"protocolMenu,omitempty"` // .1 PROTOCOL MENU — #101 action-menu name
+	RightMargin  int    `json:"rightMargin,omitempty"`  // .04 RIGHT MARGIN (default 80)
+	TopMargin    int    `json:"topMargin,omitempty"`    // .05 TOP MARGIN (default 3)
+	BottomMargin int    `json:"bottomMargin,omitempty"` // .06 BOTTOM MARGIN (default 20)
+	HeaderCode   string `json:"headerCode,omitempty"`   // HEADER CODE (M code, node "HDR")
+	EntryCode    string `json:"entryCode,omitempty"`    // ENTRY CODE (M code, node "INIT")
+	ExitCode     string `json:"exitCode,omitempty"`     // EXIT CODE (M code, node "FNL")
+	HelpCode     string `json:"helpCode,omitempty"`     // HELP CODE (M code, node "HLP")
+	ArrayName    string `json:"arrayName,omitempty"`    // ARRAY NAME (display global ref, node "ARRAY")
 }
 
 // OptionTypeCode maps a human option-type name to its #19 field 4 (TYPE)
@@ -437,6 +457,9 @@ func (s *Spec) Validate() error {
 	if err := validateMailGroups(s.Components.MailGroups); err != nil {
 		return err
 	}
+	if err := validateListTemplates(s.Components.ListTemplates); err != nil {
+		return err
+	}
 	if err := validateFiles(s.Components.Files); err != nil {
 		return err
 	}
@@ -627,6 +650,29 @@ func validateMailGroups(mgs []MailGroupComp) error {
 		if m.Type != "" {
 			if _, ok := MailGroupTypeCode[m.Type]; !ok {
 				return fmt.Errorf("buildspec: mail group %s type %q is not a known type (public, private)", m.Name, m.Type)
+			}
+		}
+	}
+	return nil
+}
+
+// validateListTemplates checks each LIST TEMPLATE component: a valid #409.61 NAME
+// (≤30 chars, uppercase) and screen margins within an 0–255 terminal range. The
+// record is filed by KRN^XPDIK; only its build-side shape is validated here.
+func validateListTemplates(lts []ListTemplateComp) error {
+	for _, lt := range lts {
+		if lt.Name == "" {
+			return fmt.Errorf("buildspec: a list template is missing its name")
+		}
+		if len(lt.Name) > 30 || !reEntryName.MatchString(lt.Name) {
+			return fmt.Errorf("buildspec: list template name %q must be uppercase ≤30 chars (#409.61 LIST TEMPLATE NAME)", lt.Name)
+		}
+		for _, m := range []struct {
+			label string
+			v     int
+		}{{"rightMargin", lt.RightMargin}, {"topMargin", lt.TopMargin}, {"bottomMargin", lt.BottomMargin}} {
+			if m.v < 0 || m.v > 255 {
+				return fmt.Errorf("buildspec: list template %s %s %d out of range (0–255)", lt.Name, m.label, m.v)
 			}
 		}
 	}

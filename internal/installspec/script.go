@@ -183,9 +183,10 @@ func FinalInstallScript(name, header string, nPairs int, runEnvCheck bool, ques 
 // index), per SECURITY KEY whether it is present in #19.1 (the "B" index), per
 // PROTOCOL whether it is present in #101 (the "B" index), per REMOTE PROCEDURE
 // whether it is present in #8994 (the "B" index), per MAIL GROUP whether it is
-// present in #3.8 (the "B" index), and per FileMan FILE whether its data dictionary
+// present in #3.8 (the "B" index), per LIST TEMPLATE whether it is present in
+// #409.61 (the "B" index), and per FileMan FILE whether its data dictionary
 // installed (^DD(file,0) present). Each fact is a ResultMarker line.
-func VerifyScript(name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, files []string) string {
+func VerifyScript(name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, files []string) string {
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
 
@@ -214,6 +215,9 @@ func VerifyScript(name string, routines, paramDefs, options, keys, protocols, rp
 	for _, mg := range mailGroups {
 		w(`W "` + ResultMarker + `mailgroup:` + mg + `=",$S($D(^XMB(3.8,"B",` + kids.MString(mg) + `)):1,1:0),!`)
 	}
+	for _, lt := range listTemplates {
+		w(`W "` + ResultMarker + `listtemplate:` + lt + `=",$S($D(^SD(409.61,"B",` + kids.MString(lt) + `)):1,1:0),!`)
+	}
 	for _, f := range files {
 		w(`W "` + ResultMarker + `file:` + f + `=",$S($D(^DD(` + f + `,0)):1,1:0),!`)
 	}
@@ -226,11 +230,12 @@ func VerifyScript(name string, routines, paramDefs, options, keys, protocols, rp
 // from #19 (FileMan DIK by IEN), each SECURITY KEY from #19.1 (FileMan DIK by
 // IEN), each PROTOCOL from #101 (FileMan DIK by IEN), each REMOTE PROCEDURE from
 // #8994 (FileMan DIK by IEN), each MAIL GROUP from #3.8 (FileMan DIK by IEN), each
-// FileMan FILE (its DD, data global, and dict-of-files pointer — KIDS ships no
-// generic file uninstall), and the #9.7 INSTALL and #9.6 BUILD entries via DIK. The
-// monotonic #9.x / #8989.51 / #19 / #19.1 / #101 / #8994 / #3.8 IEN counters are not
+// LIST TEMPLATE from #409.61 (FileMan DIK by IEN), each FileMan FILE (its DD, data
+// global, and dict-of-files pointer — KIDS ships no generic file uninstall), and the
+// #9.7 INSTALL and #9.6 BUILD entries via DIK. The monotonic
+// #9.x / #8989.51 / #19 / #19.1 / #101 / #8994 / #3.8 / #409.61 IEN counters are not
 // rolled back (inherent to FileMan, not a leak).
-func UninstallScript(name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, files []string) string {
+func UninstallScript(name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, files []string) string {
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
 
@@ -255,6 +260,9 @@ func UninstallScript(name string, routines, paramDefs, options, keys, protocols,
 	}
 	for _, mg := range mailGroups {
 		w(`S DA=$O(^XMB(3.8,"B",` + kids.MString(mg) + `,0)),DIK="^XMB(3.8," I DA D ^DIK`)
+	}
+	for _, lt := range listTemplates {
+		w(`S DA=$O(^SD(409.61,"B",` + kids.MString(lt) + `,0)),DIK="^SD(409.61," I DA D ^DIK`)
 	}
 	// FileMan FILE back-out: read the data global root + name BEFORE killing the
 	// dictionary, then remove the DD (^DD/^DIC), the data global, and the

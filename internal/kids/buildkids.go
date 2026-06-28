@@ -26,21 +26,22 @@ type RoutineSrc struct {
 // carried (install date/user/real checksums) — the export is byte-identical for
 // identical inputs, the deterministic-build invariant (§7.2 #2).
 type BuildInput struct {
-	InstallName    string        // NAMESPACE*VERSION[*PATCH]
-	Namespace      string        // NAMESPACE
-	Routines       []RoutineSrc  // routine components, in build order
-	ParamDefs      []ParamDef    // #8989.51 PARAMETER DEFINITION KRN components
-	Options        []Option      // #19 OPTION KRN components (generic entry emitter, B.1)
-	Keys           []SecurityKey // #19.1 SECURITY KEY KRN components (B.1)
-	Protocols      []Protocol    // #101 PROTOCOL KRN components (B.1)
-	RPCs           []RPC         // #8994 REMOTE PROCEDURE KRN components (B.1)
-	MailGroups     []MailGroup   // #3.8 MAIL GROUP KRN components (B.1)
-	Files          []FileDD      // brand-new FileMan FILE DD components (FIA)
-	RequiredBuilds []ReqBuild    // Required Builds (#9.611) — prerequisites
-	EnvCheck       string        // environment-check routine (bare name) → top-level "PRE"
-	PreInstall     string        // pre-install routine entryref → top-level "INI"
-	PostInstall    string        // post-install routine entryref → top-level "INIT"
-	Platform       string        // VER node (Kernel^FileMan), default "8.0^22.2"
+	InstallName    string         // NAMESPACE*VERSION[*PATCH]
+	Namespace      string         // NAMESPACE
+	Routines       []RoutineSrc   // routine components, in build order
+	ParamDefs      []ParamDef     // #8989.51 PARAMETER DEFINITION KRN components
+	Options        []Option       // #19 OPTION KRN components (generic entry emitter, B.1)
+	Keys           []SecurityKey  // #19.1 SECURITY KEY KRN components (B.1)
+	Protocols      []Protocol     // #101 PROTOCOL KRN components (B.1)
+	RPCs           []RPC          // #8994 REMOTE PROCEDURE KRN components (B.1)
+	MailGroups     []MailGroup    // #3.8 MAIL GROUP KRN components (B.1)
+	ListTemplates  []ListTemplate // #409.61 LIST TEMPLATE KRN components (B.1)
+	Files          []FileDD       // brand-new FileMan FILE DD components (FIA)
+	RequiredBuilds []ReqBuild     // Required Builds (#9.611) — prerequisites
+	EnvCheck       string         // environment-check routine (bare name) → top-level "PRE"
+	PreInstall     string         // pre-install routine entryref → top-level "INI"
+	PostInstall    string         // post-install routine entryref → top-level "INIT"
+	Platform       string         // VER node (Kernel^FileMan), default "8.0^22.2"
 }
 
 // MakeBuildPairs constructs the ^XPD BUILD pairs for a routine-only KIDS package
@@ -59,7 +60,7 @@ func MakeBuildPairs(in BuildInput) []Pair {
 	// so a routine-only build stays byte-identical to the live-proven ZZSKEL form).
 	// All KRN entry types (PARAMETER DEFINITION, OPTION, …) share one manifest +
 	// ORD numbering, computed once over the ordered group list.
-	groups := buildEntryGroups(in.ParamDefs, in.Options, in.Keys, in.Protocols, in.RPCs, in.MailGroups)
+	groups := buildEntryGroups(in.ParamDefs, in.Options, in.Keys, in.Protocols, in.RPCs, in.MailGroups, in.ListTemplates)
 	emitEntryManifest(b, groups)
 	emitFileManifest(b, in.Files)
 	emitRequiredBuildManifest(b, in.RequiredBuilds)

@@ -60,10 +60,13 @@ type entryGroup struct {
 // types, so the shared "BLD",1,"KRN",0) header and the ORD ordering are computed
 // once across all of them. PARAMETER DEFINITION (#8989.51) and OPTION (#19) ride
 // the same path; new SEND/DELETE types append here.
-func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey, protos []Protocol, rpcs []RPC, mgs []MailGroup) []entryGroup {
+func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey, protos []Protocol, rpcs []RPC, mgs []MailGroup, lts []ListTemplate) []entryGroup {
 	var groups []entryGroup
 	if len(mgs) > 0 {
 		groups = append(groups, entryGroup{mailGroupEntryType, mailGroupRecords(mgs)})
+	}
+	if len(lts) > 0 {
+		groups = append(groups, entryGroup{listTemplateEntryType, listTemplateRecords(lts)})
 	}
 	if len(opts) > 0 {
 		groups = append(groups, entryGroup{optionEntryType, optionRecords(opts)})
@@ -459,3 +462,85 @@ func mailGroupRecords(mgs []MailGroup) []entryRec {
 // MailGroupNames returns the #3.8 MAIL GROUP component names in build order — what
 // `v pkg verify`/`uninstall` probe and back out.
 func (b *Build) MailGroupNames() []string { return b.entryNames(mailGroupFile) }
+
+// --- LIST TEMPLATE (#409.61) — the seventh type on the generic core -----------
+
+const (
+	listTemplateFile     = 409.61
+	listTemplateFileName = "LIST TEMPLATE"
+	// listTemplateOrdTail is the national-constant tail of the #409.61 ORD install
+	// line (pieces after "<file>;<ord>;"): piece 1 = 1 (rebuild the "B" xref), then
+	// only an edit + delete action (LME1^XPDIA1 / LMDEL^XPDIA1) — a List Manager
+	// template needs no menu/file relink. One form across the corpus.
+	listTemplateOrdTail = "1;;;;LME1^XPDIA1;;;LMDEL^XPDIA1"
+)
+
+var listTemplateEntryType = entryType{number: listTemplateFile, name: listTemplateFileName, ordTail: listTemplateOrdTail}
+
+// ListTemplate is one #409.61 LIST TEMPLATE (List Manager screen) record to ship as
+// a KIDS KRN component (SEND-TO-SITE). Stored in ^SD(409.61,. The record is a fixed
+// 14-piece 0-node (screen geometry + a PROTOCOL MENU pointer + the title) plus the
+// List Manager callback nodes (HDR/INIT/FNL/HLP M code + the ARRAY global). Unlike
+// the FileMan TEMPLATE family (#.4/.402/…), a list template carries NO compiled
+// structure — every node is a plain string — so it authors cleanly from a spec.
+// Margins/codes are pre-resolved strings (build.go applies the geometry defaults).
+type ListTemplate struct {
+	Name         string // #409.61 .01 NAME (0;1)
+	ScreenTitle  string // .11 SCREEN TITLE (0;11)
+	ProtocolMenu string // .1 PROTOCOL MENU (0;10) — #101 action-menu pointer by name
+	RightMargin  string // .04 RIGHT MARGIN (0;4)
+	TopMargin    string // .05 TOP MARGIN (0;5)
+	BottomMargin string // .06 BOTTOM MARGIN (0;6)
+	HeaderCode   string // field 100 HEADER CODE — node "HDR" (M code)
+	EntryCode    string // field 106 ENTRY CODE — node "INIT" (M code)
+	ExitCode     string // field 105 EXIT CODE — node "FNL" (M code)
+	HelpCode     string // field 103 HELP CODE — node "HLP" (M code)
+	ArrayName    string // field 107 ARRAY NAME — node "ARRAY" (the display global ref)
+}
+
+// listTemplateRecords packs each ListTemplate into the generic entry-record shape:
+// the SEND XPDFL flag, the fixed 14-piece 0-node, and the callback nodes (emitted
+// only when set). The 0-node's set-of-codes pieces are pinned to the dominant corpus
+// values: TYPE OF LIST = 1 (PROTOCOL), OK TO TRANSPORT = 1, USE CURSOR CONTROL = 1,
+// ALLOWABLE NUMBER OF ACTIONS = 1, AUTOMATIC DEFAULTS = 1.
+func listTemplateRecords(lts []ListTemplate) []entryRec {
+	recs := make([]entryRec, 0, len(lts))
+	for _, lt := range lts {
+		zero := strings.Join([]string{
+			lt.Name,         // .01 NAME
+			"1",             // .02 TYPE OF LIST = PROTOCOL
+			"",              // .03 LEFT MARGIN
+			lt.RightMargin,  // .04 RIGHT MARGIN
+			lt.TopMargin,    // .05 TOP MARGIN
+			lt.BottomMargin, // .06 BOTTOM MARGIN
+			"1",             // .07 OK TO TRANSPORT?
+			"1",             // .08 USE CURSOR CONTROL
+			"",              // .09 ENTITY NAME
+			lt.ProtocolMenu, // .1 PROTOCOL MENU
+			lt.ScreenTitle,  // .11 SCREEN TITLE
+			"1",             // .12 ALLOWABLE NUMBER OF ACTIONS
+			"",              // .13 DATE RANGE LIMIT
+			"1",             // .14 AUTOMATIC DEFAULTS
+		}, "^")
+		img := []imageNode{{Subs{intSub(0)}, zero}}
+		for _, n := range []struct {
+			sub, val string
+		}{
+			{"HDR", lt.HeaderCode},
+			{"INIT", lt.EntryCode},
+			{"FNL", lt.ExitCode},
+			{"HLP", lt.HelpCode},
+			{"ARRAY", lt.ArrayName},
+		} {
+			if n.val != "" {
+				img = append(img, imageNode{Subs{strSub(n.sub)}, n.val})
+			}
+		}
+		recs = append(recs, entryRec{name: lt.Name, xpdfl: "0^1", image: img})
+	}
+	return recs
+}
+
+// ListTemplateNames returns the #409.61 LIST TEMPLATE component names in build order
+// — what `v pkg verify`/`uninstall` probe and back out.
+func (b *Build) ListTemplateNames() []string { return b.entryNames(listTemplateFile) }

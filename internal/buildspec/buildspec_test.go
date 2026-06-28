@@ -481,6 +481,46 @@ func TestParse_MailGroups_Invalid(t *testing.T) {
 	}
 }
 
+func TestParse_ListTemplates(t *testing.T) {
+	js := `{"package":"ZZLM","version":"1.0","patch":"1","components":{
+	  "routines":["ZZLMRT"],
+	  "listTemplates":[{"name":"ZZLM PATIENTS","screenTitle":"ZZ Patient List","rightMargin":80,"topMargin":3,"bottomMargin":20,"headerCode":"D HDR^ZZLMRT","entryCode":"D INIT^ZZLMRT","exitCode":"D EXIT^ZZLMRT","arrayName":"^TMP(\"ZZLM\",$J)"}]
+	}}`
+	s, err := Parse([]byte(js))
+	if err != nil {
+		t.Fatalf("Parse listTemplates spec: %v", err)
+	}
+	if len(s.Components.ListTemplates) != 1 {
+		t.Fatalf("listTemplates = %+v", s.Components.ListTemplates)
+	}
+	lt := s.Components.ListTemplates[0]
+	if lt.Name != "ZZLM PATIENTS" || lt.ScreenTitle != "ZZ Patient List" || lt.RightMargin != 80 || lt.EntryCode != "D INIT^ZZLMRT" {
+		t.Errorf("listTemplate = %+v", lt)
+	}
+	// A list-template-only spec (just a name) is non-empty.
+	d, err := Parse([]byte(`{"package":"ZZLM","version":"1.0","components":{"listTemplates":[{"name":"ZZLM A"}]}}`))
+	if err != nil {
+		t.Fatalf("Parse minimal list template: %v", err)
+	}
+	if d.Components.empty() {
+		t.Error("spec with a list template must not be empty")
+	}
+}
+
+func TestParse_ListTemplates_Invalid(t *testing.T) {
+	cases := map[string]string{
+		"no name":     `{"package":"ZZLM","version":"1.0","components":{"listTemplates":[{"screenTitle":"x"}]}}`,
+		"bad name":    `{"package":"ZZLM","version":"1.0","components":{"listTemplates":[{"name":"lower case"}]}}`,
+		"bad margin":  `{"package":"ZZLM","version":"1.0","components":{"listTemplates":[{"name":"ZZLM A","rightMargin":-5}]}}`,
+		"huge margin": `{"package":"ZZLM","version":"1.0","components":{"listTemplates":[{"name":"ZZLM A","rightMargin":999}]}}`,
+	}
+	for name, js := range cases {
+		if _, err := Parse([]byte(js)); err == nil {
+			t.Errorf("%s: expected an error, got nil", name)
+		}
+	}
+}
+
 func TestParse_Protocols(t *testing.T) {
 	js := `{"package":"ZZPROTO","version":"1.0","patch":"1","components":{
 	  "routines":["ZZPRORT"],

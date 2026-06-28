@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/vista-cloud-dev/clikit"
@@ -33,6 +34,7 @@ type buildResult struct {
 	Protocols      int    `json:"protocols,omitempty"`
 	RPCs           int    `json:"rpcs,omitempty"`
 	MailGroups     int    `json:"mailGroups,omitempty"`
+	ListTemplates  int    `json:"listTemplates,omitempty"`
 	Files          int    `json:"files,omitempty"`
 	RequiredBuilds int    `json:"requiredBuilds,omitempty"`
 }
@@ -64,6 +66,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 	protocols := resolveProtocols(spec.Components.Protocols)
 	rpcs := resolveRPCs(spec.Components.RPCs)
 	mailGroups := resolveMailGroups(spec.Components.MailGroups)
+	listTemplates := resolveListTemplates(spec.Components.ListTemplates)
 	reqBuilds := resolveRequiredBuilds(spec.RequiredBuilds)
 
 	pairs := kids.MakeBuildPairs(kids.BuildInput{
@@ -76,6 +79,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 		Protocols:      protocols,
 		RPCs:           rpcs,
 		MailGroups:     mailGroups,
+		ListTemplates:  listTemplates,
 		Files:          files,
 		RequiredBuilds: reqBuilds,
 		EnvCheck:       spec.EnvCheck,
@@ -97,11 +101,11 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 
 	return cc.Result(buildResult{
 		InstallName: spec.InstallName(), Out: out, Routines: len(rtns),
-		ParamDefs: len(paramDefs), Options: len(options), Keys: len(keys), Protocols: len(protocols), RPCs: len(rpcs), MailGroups: len(mailGroups), Files: len(files), RequiredBuilds: len(reqBuilds),
+		ParamDefs: len(paramDefs), Options: len(options), Keys: len(keys), Protocols: len(protocols), RPCs: len(rpcs), MailGroups: len(mailGroups), ListTemplates: len(listTemplates), Files: len(files), RequiredBuilds: len(reqBuilds),
 	}, func() {
 		cc.Title("pkg build")
-		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d option(s), %d key(s), %d protocol(s), %d rpc(s), %d mail group(s), %d file(s), %d required build(s)) → %s\n",
-			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(options), len(keys), len(protocols), len(rpcs), len(mailGroups), len(files), len(reqBuilds), cc.Accent(out))
+		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d option(s), %d key(s), %d protocol(s), %d rpc(s), %d mail group(s), %d list template(s), %d file(s), %d required build(s)) → %s\n",
+			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(options), len(keys), len(protocols), len(rpcs), len(mailGroups), len(listTemplates), len(files), len(reqBuilds), cc.Accent(out))
 	})
 }
 
@@ -267,6 +271,35 @@ func resolveMailGroups(mgs []buildspec.MailGroupComp) []kids.MailGroup {
 			Name:            m.Name,
 			TypeCode:        buildspec.MailGroupTypeCode[typ],
 			AllowSelfEnroll: self,
+		})
+	}
+	return out
+}
+
+// resolveListTemplates maps the spec's LIST TEMPLATE components onto the kids emit
+// shape, applying the screen-geometry defaults (right 80, top 3, bottom 20) when a
+// margin is omitted — a List Manager screen needs a bounded region to render in.
+func resolveListTemplates(lts []buildspec.ListTemplateComp) []kids.ListTemplate {
+	dflt := func(v, d int) string {
+		if v == 0 {
+			v = d
+		}
+		return strconv.Itoa(v)
+	}
+	out := make([]kids.ListTemplate, 0, len(lts))
+	for _, lt := range lts {
+		out = append(out, kids.ListTemplate{
+			Name:         lt.Name,
+			ScreenTitle:  lt.ScreenTitle,
+			ProtocolMenu: lt.ProtocolMenu,
+			RightMargin:  dflt(lt.RightMargin, 80),
+			TopMargin:    dflt(lt.TopMargin, 3),
+			BottomMargin: dflt(lt.BottomMargin, 20),
+			HeaderCode:   lt.HeaderCode,
+			EntryCode:    lt.EntryCode,
+			ExitCode:     lt.ExitCode,
+			HelpCode:     lt.HelpCode,
+			ArrayName:    lt.ArrayName,
 		})
 	}
 	return out

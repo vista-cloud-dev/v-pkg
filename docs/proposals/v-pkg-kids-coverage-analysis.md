@@ -431,13 +431,27 @@ not the populate-and-`EN^XPDIJ` shortcut.
     `testdata/zzmg/ZZMG.kids`. **Live install→verify→`--force` uninstall→verify-clean**
     on vehu (YDB) + foia-t12 (IRIS): live `^XMB(3.8,…,0)=ZZMG ALERTS^PU^y`
     byte-identical on both, B-index gone after back-out. ([[option-entry-component]])
+  - **B.1-g ✅ DONE + LIVE-PROVEN 2026-06-28 — LIST TEMPLATE (#409.61), both engines.**
+    The seventh type and the richest record yet — but all plain strings (no compiled
+    structure), so it authors from a spec (unlike the FileMan templates). **Stored in
+    `^SD(409.61,`, NOT `^ORD(`** (ground-truthed the GL node). Record: `-1)=0^1`, a
+    fixed 14-piece 0-node (List Manager screen geometry + PROTOCOL MENU pointer +
+    title) plus the callback nodes at string subscripts `HDR`/`INIT`/`FNL`/`HLP` (M
+    code) + `ARRAY` (display global). Set-of-codes pieces pinned to the corpus dominant
+    (TYPE OF LIST=1 PROTOCOL, etc.); margins default 80/3/20. ORD tail
+    `1;;;;LME1^XPDIA1;;;LMDEL^XPDIA1`. The generic core already supported string-subscript
+    image nodes — no core change. TDD; lint/race/contract green; corpus DRIFT=0; golden
+    `testdata/zzlm/ZZLM.kids`. **Live install→verify→`--force` uninstall→verify-clean**
+    on vehu (YDB) + foia-t12 (IRIS): live `^SD(409.61,…,0)=ZZLM PATIENTS^1^^80^3^20^1^1^^^ZZ
+    Patient List^1^^1` + `…,"HDR")` byte-identical on both, B-index gone after back-out.
+    ([[option-entry-component]])
   - **B.1 templates (#.4/.401/.402/.403) — DEFERRED 2026-06-28** (user decision). The
     transport mechanics generalize (one DIFROM ORD-tail covers all four + FUNCTION
     #.5/DIALOG #.84/BULLETIN #3.6), but the record image carries **compiled FileMan
     structures** (the `"DR"` edit string with embedded MUMPS, `"DIAB"` nodes, ScreenMan
     FORM/BLOCK subtrees) NOT derivable from a declarative spec. Needs a **read-live
     capture** image source (`--from-engine`); templates are its forcing function.
-    Remaining spec-derivable types first: **LIST TEMPLATE #409.61 → HELP FRAME #9.2**.
+    Remaining spec-derivable types: **HELP FRAME #9.2 → HL7 family**.
     Detail: [[option-entry-component]].
 - **B.2 Real FILE DD + DATA (F3; the R3 enabler).** Extend `FileComp` to a
   multi-field DD (see §8 for the grounded node-set) and add **DATA** export with

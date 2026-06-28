@@ -237,6 +237,54 @@ func TestMakeBuildPairs_MailGroup_DefaultType(t *testing.T) {
 	}
 }
 
+func TestMakeBuildPairs_ListTemplate_KRN(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZLM*1.0*1",
+		Namespace:   "ZZLM",
+		Routines:    []RoutineSrc{{Name: "ZZLMRT", Lines: []string{"ZZLMRT ;x", " quit"}}},
+		ListTemplates: []ListTemplate{{
+			Name: "ZZLM PATIENTS", ScreenTitle: "ZZ Patient List",
+			RightMargin: "80", TopMargin: "3", BottomMargin: "20",
+			HeaderCode: "D HDR^ZZLMRT", EntryCode: "D INIT^ZZLMRT", ExitCode: "D EXIT^ZZLMRT",
+			ArrayName: `^TMP("ZZLM",$J)`,
+		}},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	want := map[string]string{
+		`"KRN",409.61,1,-1)`: "0^1",
+		// 0-node pieces: .01 NAME^.02 TYPE(1=PROTOCOL)^.03 LMARGIN^.04 RMARGIN^.05 TOP^
+		// .06 BOT^.07 OK-TRANSPORT^.08 CURSOR^.09 ENTITY^.1 PROTO MENU^.11 TITLE^
+		// .12 #ACTIONS^.13 DATE-RANGE^.14 AUTO-DEFAULTS.
+		`"KRN",409.61,1,0)`:                                "ZZLM PATIENTS^1^^80^3^20^1^1^^^ZZ Patient List^1^^1",
+		`"KRN",409.61,1,"HDR")`:                            "D HDR^ZZLMRT",
+		`"KRN",409.61,1,"INIT")`:                           "D INIT^ZZLMRT",
+		`"KRN",409.61,1,"FNL")`:                            "D EXIT^ZZLMRT",
+		`"KRN",409.61,1,"ARRAY")`:                          `^TMP("ZZLM",$J)`,
+		`"ORD",1,409.61)`:                                  "409.61;1;1;;;;LME1^XPDIA1;;;LMDEL^XPDIA1",
+		`"ORD",1,409.61,0)`:                                "LIST TEMPLATE",
+		`"BLD",1,"KRN",0)`:                                 "^9.67PA^409.61^1",
+		`"BLD",1,"KRN",409.61,0)`:                          "409.61",
+		`"BLD",1,"KRN",409.61,"NM",1,0)`:                   "ZZLM PATIENTS^^0",
+		`"BLD",1,"KRN",409.61,"NM","B","ZZLM PATIENTS",1)`: "",
+		`"BLD",1,"KRN","B",409.61,409.61)`:                 "",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+	b := newBuild()
+	for _, p := range MakeBuildPairs(in) {
+		b.Set(p.Subs, p.Value)
+	}
+	if ls := b.ListTemplateNames(); len(ls) != 1 || ls[0] != "ZZLM PATIENTS" {
+		t.Errorf("ListTemplateNames = %v, want [ZZLM PATIENTS]", ls)
+	}
+}
+
 // TestMakeBuildPairs_MixedEntryTypes proves the unified KRN manifest header spans
 // multiple entry types in one build (B.1 next step): an OPTION (#19) AND a
 // PARAMETER DEFINITION (#8989.51) share one "BLD",1,"KRN",0) header

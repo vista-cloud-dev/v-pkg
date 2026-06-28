@@ -328,6 +328,43 @@ func TestBuild_ZZMG_Deterministic(t *testing.T) {
 	}
 }
 
+// TestBuild_ZZLM_Deterministic is the B.1 gate for a package shipping a LIST
+// TEMPLATE (#409.61) as a KIDS KRN component (the seventh type on the generic
+// emitter): two builds are byte-identical and match the committed golden .KID.
+func TestBuild_ZZLM_Deterministic(t *testing.T) {
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a.kids")
+	b := filepath.Join(dir, "b.kids")
+	runBuildPkg(t, "zzlm", "ZZLM", a)
+	runBuildPkg(t, "zzlm", "ZZLM", b)
+
+	gotA, err := os.ReadFile(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotB, err := os.ReadFile(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(gotA, gotB) {
+		t.Fatal("v pkg build (list template) is not deterministic — two builds differ")
+	}
+
+	golden := filepath.Join("..", "testdata", "zzlm", "ZZLM.kids")
+	if os.Getenv("UPDATE_GOLDEN") == "1" {
+		if err := os.WriteFile(golden, gotA, 0o644); err != nil {
+			t.Fatalf("write golden: %v", err)
+		}
+	}
+	want, err := os.ReadFile(golden)
+	if err != nil {
+		t.Fatalf("read golden (UPDATE_GOLDEN=1 to create): %v", err)
+	}
+	if !bytes.Equal(gotA, want) {
+		t.Errorf("ZZLM.kids drift — run UPDATE_GOLDEN=1\n--- got ---\n%s", gotA)
+	}
+}
+
 // TestBuild_ZZMIX_Deterministic is the B.1 multi-type gate: one build shipping
 // BOTH an OPTION (#19) and a PARAMETER DEFINITION (#8989.51) — they share a single
 // computed "BLD",1,"KRN",0) manifest header and take distinct ORD orders. Two

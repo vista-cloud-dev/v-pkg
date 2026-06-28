@@ -1,0 +1,21 @@
+{
+  "package": "ZZLM",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "routines": ["ZZLMRT"],
+    "listTemplates": [
+      {
+        "name": "ZZLM PATIENTS",
+        "screenTitle": "ZZ Patient List",
+        "rightMargin": 80,
+        "topMargin": 3,
+        "bottomMargin": 20,
+        "headerCode": "D HDR^ZZLMRT",
+        "entryCode": "D INIT^ZZLMRT",
+        "exitCode": "D EXIT^ZZLMRT",
+        "arrayName": "^TMP(\"ZZLM\",$J)"
+      }
+    ]
+  }
+}

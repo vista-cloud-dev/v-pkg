@@ -135,6 +135,33 @@ live `^XMB(3.8,…,0)=ZZMG ALERTS^PU^y` byte-identical on both, B-index gone aft
 back-out. Fixture `testdata/zzmg`. Verify probes `^XMB(3.8,"B",<name>)`, uninstall is
 `DIK` on `^XMB(3.8,`.
 
+## LIST TEMPLATE (#409.61) — seventh type, live-proven both engines (2026-06-28)
+The richest record so far, but still **all plain strings (no compiled structure)** —
+so unlike the FileMan template family it DOES author from a spec. **Stored in
+`^SD(409.61,` — NOT `^ORD(` (ground-truth the GL node: `^DIC(409.61,0,"GL")`; #409.61
+is a List Manager file under the SD namespace, easy to assume wrong).** Record:
+`-1)=0^1`, a fixed **14-piece 0-node** (`.01 NAME^.02 TYPE OF LIST^.03 LEFT MARGIN^
+.04 RIGHT^.05 TOP^.06 BOTTOM^.07 OK-TO-TRANSPORT^.08 USE-CURSOR-CONTROL^.09 ENTITY^
+.1 PROTOCOL MENU^.11 SCREEN TITLE^.12 #ACTIONS^.13 DATE-RANGE^.14 AUTO-DEFAULTS`),
+plus the List Manager **callback nodes** at STRING subscripts `HDR`/`INIT`/`FNL`/`HLP`
+(M code) + `ARRAY` (the display global ref). The set-of-codes pieces are pinned to the
+dominant-corpus values: TYPE OF LIST=1 (PROTOCOL), OK-TO-TRANSPORT=1, USE-CURSOR=1,
+#ACTIONS=1, AUTO-DEFAULTS=1. Screen geometry (right/top/bottom margins) defaults to
+80/3/20 in `resolveListTemplates`. ORD tail: `1;;;;LME1^XPDIA1;;;LMDEL^XPDIA1` (piece
+1 = xref-rebuild flag, then edit `LME1` + delete `LMDEL`). NM node plain `NAME^^0`.
+The named-node subscripts come from the DD storage locs (`^DD(409.61,100,0)` HEADER
+CODE @`HDR;E1,245`, 106 ENTRY=`INIT`, 105 EXIT=`FNL`, 103 HELP=`HLP`, 107 ARRAY=
+`ARRAY`). PROTOCOL MENU (.1) + HIDDEN ACTION MENU (1;2) are #101 pointers — left
+optional. Live install→verify→`--force` uninstall→verify-clean on vehu (YDB) +
+foia-t12 (IRIS): live `^SD(409.61,…,0)=ZZLM PATIENTS^1^^80^3^20^1^1^^^ZZ Patient
+List^1^^1` + `…,"HDR")=D HDR^ZZLMRT` byte-identical on both, B-index gone after
+back-out. Fixture `testdata/zzlm`. Verify probes `^SD(409.61,"B",<name>)`, uninstall
+is `DIK` on `^SD(409.61,`. The generic core's `imageNode.tail Subs` already supports
+string-subscript nodes, so no core change was needed for the callback nodes.
+
+Remaining B.1 types in frequency order: HELP FRAME #9.2 → HL7 family. Templates
+(#.4/.402/…) still parked on read-live capture (below).
+
 ## DEFERRED: the template/form family (#.4/.401/.402/.403) needs read-live, not author-from-spec
 Ground-truthed 2026-06-28 (user chose to defer + do MAIL GROUP instead). The transport
 MECHANICS generalize fine (the record still ships as `"KRN",<file>,<ien>,…` with a `-1`

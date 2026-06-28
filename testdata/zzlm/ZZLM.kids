@@ -1,0 +1,62 @@
+KIDS Distribution saved by v-pkg
+m-kids reassembled output
+**KIDS**:ZZLM*1.0*1^
+
+**INSTALL NAME**
+ZZLM*1.0*1
+"BLD",1,0)
+ZZLM*1.0*1^ZZLM^0^0
+"BLD",1,"KRN",0)
+^9.67PA^409.61^1
+"BLD",1,"KRN",409.61,0)
+409.61
+"BLD",1,"KRN",409.61,"NM",0)
+^9.68A^1^1
+"BLD",1,"KRN",409.61,"NM",1,0)
+ZZLM PATIENTS^^0
+"BLD",1,"KRN",409.61,"NM","B","ZZLM PATIENTS",1)
+
+"BLD",1,"KRN","B",409.61,409.61)
+
+"RTN")
+1
+"RTN","ZZLMRT")
+0^9^0^0
+"RTN","ZZLMRT",1,0)
+ZZLMRT ;VCD/VSL - throwaway test package (KRN list template component) ;1.0
+"RTN","ZZLMRT",2,0)
+ ;;1.0;ZZLM;;
+"RTN","ZZLMRT",3,0)
+ quit
+"RTN","ZZLMRT",4,0)
+HDR ;
+"RTN","ZZLMRT",5,0)
+ quit
+"RTN","ZZLMRT",6,0)
+INIT ;
+"RTN","ZZLMRT",7,0)
+ quit
+"RTN","ZZLMRT",8,0)
+EXIT ;
+"RTN","ZZLMRT",9,0)
+ quit
+"ORD",1,409.61)
+409.61;1;1;;;;LME1^XPDIA1;;;LMDEL^XPDIA1
+"ORD",1,409.61,0)
+LIST TEMPLATE
+"KRN",409.61,1,-1)
+0^1
+"KRN",409.61,1,0)
+ZZLM PATIENTS^1^^80^3^20^1^1^^^ZZ Patient List^1^^1
+"KRN",409.61,1,"HDR")
+D HDR^ZZLMRT
+"KRN",409.61,1,"INIT")
+D INIT^ZZLMRT
+"KRN",409.61,1,"FNL")
+D EXIT^ZZLMRT
+"KRN",409.61,1,"ARRAY")
+^TMP("ZZLM",$J)
+"VER")
+8.0^22.2
+**END**
+**END**
