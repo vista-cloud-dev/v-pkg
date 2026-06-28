@@ -1,6 +1,7 @@
 package buildspec
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -144,6 +145,73 @@ func TestParse_Files_Invalid(t *testing.T) {
 		"bad global root": `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":999000,"name":"ZZVSLFS","globalRoot":"DIZ999000"}]}}`,
 	}
 	for name, js := range cases {
+		if _, err := Parse([]byte(js)); err == nil {
+			t.Errorf("%s: expected an error, got nil", name)
+		}
+	}
+}
+
+const zzvslAudit = `{
+  "package": "ZZVSLAU",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "files": [
+      {
+        "number": 999001, "name": "ZZVSL AUDIT", "globalRoot": "^DIZ(999001,",
+        "fields": [
+          { "number": 1, "label": "USER NUMBER", "type": "numeric", "node": 0, "piece": 2, "width": 12, "decimals": 0, "min": 1 },
+          { "number": 2, "label": "EVENT TYPE", "type": "set of codes", "node": 0, "piece": 3,
+            "codes": [ { "internal": "I", "external": "INFO" }, { "internal": "W", "external": "WARN" } ] },
+          { "number": 3, "label": "TIMESTAMP", "type": "date", "node": 0, "piece": 4, "time": true },
+          { "number": 4, "label": "USER", "type": "pointer", "node": 0, "piece": 5, "required": true, "pointTo": 200, "pointRoot": "^VA(200," },
+          { "number": 5, "label": "DETAIL", "type": "free text", "node": 0, "piece": 6, "maxLen": 245 }
+        ]
+      }
+    ]
+  }
+}`
+
+func TestParse_MultiFieldFile(t *testing.T) {
+	s, err := Parse([]byte(zzvslAudit))
+	if err != nil {
+		t.Fatalf("Parse multi-field file spec: %v", err)
+	}
+	f := s.Components.Files[0]
+	if len(f.Fields) != 5 {
+		t.Fatalf("fields = %+v", f.Fields)
+	}
+	if f.Fields[0].Type != "numeric" || f.Fields[0].Width != 12 || f.Fields[0].Min == nil || *f.Fields[0].Min != 1 {
+		t.Errorf("numeric field = %+v", f.Fields[0])
+	}
+	if f.Fields[1].Type != "set of codes" || len(f.Fields[1].Codes) != 2 || f.Fields[1].Codes[0].Internal != "I" {
+		t.Errorf("set field = %+v", f.Fields[1])
+	}
+	if f.Fields[3].Type != "pointer" || !f.Fields[3].Required || f.Fields[3].PointTo != 200 {
+		t.Errorf("pointer field = %+v", f.Fields[3])
+	}
+}
+
+func TestParse_Fields_Invalid(t *testing.T) {
+	base := `{"package":"ZZVSLAU","version":"1.0","components":{"files":[{"number":999001,"name":"ZZVSLAU","fields":[%s]}]}}`
+	cases := map[string]string{
+		"number not above .01": `{"number":0.01,"label":"X","type":"free text","piece":2}`,
+		"duplicate number":     `{"number":1,"label":"A","type":"free text","piece":2},{"number":1,"label":"B","type":"free text","piece":3}`,
+		"piece collides .01":   `{"number":1,"label":"A","type":"free text","node":0,"piece":1}`,
+		"duplicate storage":    `{"number":1,"label":"A","type":"free text","piece":2},{"number":2,"label":"B","type":"free text","piece":2}`,
+		"no piece":             `{"number":1,"label":"A","type":"free text"}`,
+		"lower-case label":     `{"number":1,"label":"lower","type":"free text","piece":2}`,
+		"unknown type":         `{"number":1,"label":"A","type":"blob","piece":2}`,
+		"numeric no width":     `{"number":1,"label":"A","type":"numeric","piece":2}`,
+		"min above max":        `{"number":1,"label":"A","type":"numeric","width":5,"piece":2,"min":9,"max":1}`,
+		"set no codes":         `{"number":1,"label":"A","type":"set of codes","piece":2}`,
+		"set bad code":         `{"number":1,"label":"A","type":"set of codes","piece":2,"codes":[{"internal":"I;","external":"INFO"}]}`,
+		"pointer no file":      `{"number":1,"label":"A","type":"pointer","piece":2,"pointRoot":"^VA(200,"}`,
+		"pointer bad root":     `{"number":1,"label":"A","type":"pointer","piece":2,"pointTo":200,"pointRoot":"VA200"}`,
+		"free text too long":   `{"number":1,"label":"A","type":"free text","piece":2,"maxLen":300}`,
+	}
+	for name, fld := range cases {
+		js := fmt.Sprintf(base, fld)
 		if _, err := Parse([]byte(js)); err == nil {
 			t.Errorf("%s: expected an error, got nil", name)
 		}

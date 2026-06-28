@@ -157,10 +157,60 @@ var ParamEntityIEN = map[string]string{
 // local/test file number (999000-999999) and GlobalRoot is its data global
 // (defaulting to ^DIZ(<file>,).
 type FileComp struct {
-	Number     float64 `json:"number"`
-	Name       string  `json:"name,omitempty"`
-	GlobalRoot string  `json:"globalRoot,omitempty"` // data global, e.g. "^DIZ(999000,"; default derived from Number
+	Number     float64     `json:"number"`
+	Name       string      `json:"name,omitempty"`
+	GlobalRoot string      `json:"globalRoot,omitempty"` // data global, e.g. "^DIZ(999000,"; default derived from Number
+	Fields     []FieldSpec `json:"fields,omitempty"`     // fields beyond the implicit .01 NAME (empty = single-.01 file)
 }
+
+// FieldSpec is one FileMan field beyond the implicit free-text .01 NAME, declared
+// in a FILE component. Type selects the DD grammar; Node/Piece are the storage
+// location ("<Node>;<Piece>"). Type-specific knobs (Width/Decimals/Min/Max for
+// numeric, Codes for set-of-codes, PointTo/PointRoot for pointer, MaxLen for free
+// text, Time for date) are validated against the declared Type.
+type FieldSpec struct {
+	Number   float64 `json:"number"`             // field number (> .01)
+	Label    string  `json:"label"`              // field LABEL (uppercase)
+	Type     string  `json:"type"`               // free text | numeric | date | set of codes | pointer
+	Node     int     `json:"node,omitempty"`     // storage node (default 0)
+	Piece    int     `json:"piece"`              // storage piece (≥1; (0;1) is reserved for the .01)
+	Required bool    `json:"required,omitempty"` // R attribute
+	Help     string  `json:"help,omitempty"`     // reader help prompt
+
+	MaxLen int `json:"maxLen,omitempty"` // free text: max length (0 → default 30)
+
+	Width    int      `json:"width,omitempty"`    // numeric: print width (NJ<width>,<decimals>)
+	Decimals int      `json:"decimals,omitempty"` // numeric: decimal places
+	Min      *float64 `json:"min,omitempty"`      // numeric: lower bound
+	Max      *float64 `json:"max,omitempty"`      // numeric: upper bound
+
+	Time bool `json:"time,omitempty"` // date: allow a time component
+
+	Codes []SetCodeSpec `json:"codes,omitempty"` // set of codes: value list
+
+	PointTo   float64 `json:"pointTo,omitempty"`   // pointer: pointed-to file number
+	PointRoot string  `json:"pointRoot,omitempty"` // pointer: pointed-to global root
+}
+
+// SetCodeSpec is one internal:external value of a set-of-codes field.
+type SetCodeSpec struct {
+	Internal string `json:"internal"`
+	External string `json:"external"`
+}
+
+// validFieldTypes is the set of FileMan field types the multi-field DD emitter
+// supports today (the five grounded scalar shapes).
+var validFieldTypes = map[string]bool{
+	"free text":    true,
+	"numeric":      true,
+	"date":         true,
+	"set of codes": true,
+	"pointer":      true,
+}
+
+// freeTextMaxLen caps a free-text field's declared max length (FileMan stores a
+// field value on a single global node piece; 245 is the practical ceiling).
+const freeTextMaxLen = 245
 
 // Local/test FileMan file-number range (VA-reserved 999000-999999). A v-pkg
 // DD-install ships only throwaway files in this band — never a national file.
@@ -340,6 +390,88 @@ func validateFiles(files []FileComp) error {
 		}
 		if !reGlobalRt.MatchString(f.GlobalRoot) {
 			return fmt.Errorf("buildspec: file %s global root %q must be an open global ref ending in a comma, e.g. ^DIZ(%d,", f.Name, f.GlobalRoot, n)
+		}
+		if err := validateFields(n, f.Fields); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateFields checks each field beyond the .01 NAME: a field number above .01
+// (unique within the file), a valid uppercase label, a known type, a non-colliding
+// storage location ((0;1) is reserved for the .01), and type-specific knobs.
+func validateFields(fileNum int64, fields []FieldSpec) error {
+	usedLoc := map[string]bool{"0;1": true} // the .01 occupies node 0, piece 1
+	usedNum := map[float64]bool{0.01: true}
+	for i := range fields {
+		f := &fields[i]
+		if f.Number <= 0.01 {
+			return fmt.Errorf("buildspec: file #%d field number %v must be greater than .01 (the NAME field)", fileNum, f.Number)
+		}
+		if usedNum[f.Number] {
+			return fmt.Errorf("buildspec: file #%d has a duplicate field number %v", fileNum, f.Number)
+		}
+		usedNum[f.Number] = true
+		if f.Label == "" || len(f.Label) > 30 || !reFileName.MatchString(f.Label) {
+			return fmt.Errorf("buildspec: file #%d field %v label %q must be uppercase ≤30 chars", fileNum, f.Number, f.Label)
+		}
+		if !validFieldTypes[f.Type] {
+			return fmt.Errorf("buildspec: file #%d field %s type %q is not a known field type (free text, numeric, date, set of codes, pointer)", fileNum, f.Label, f.Type)
+		}
+		if f.Node < 0 {
+			return fmt.Errorf("buildspec: file #%d field %s storage node %d must be ≥ 0", fileNum, f.Label, f.Node)
+		}
+		if f.Piece < 1 {
+			return fmt.Errorf("buildspec: file #%d field %s must specify a storage piece ≥ 1", fileNum, f.Label)
+		}
+		loc := fmt.Sprintf("%d;%d", f.Node, f.Piece)
+		if usedLoc[loc] {
+			return fmt.Errorf("buildspec: file #%d field %s storage %s collides with another field or the .01 NAME", fileNum, f.Label, loc)
+		}
+		usedLoc[loc] = true
+		if err := validateFieldType(fileNum, f); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateFieldType checks the type-specific knobs of one field.
+func validateFieldType(fileNum int64, f *FieldSpec) error {
+	switch f.Type {
+	case "numeric":
+		if f.Width < 1 {
+			return fmt.Errorf("buildspec: file #%d numeric field %s needs a positive width", fileNum, f.Label)
+		}
+		if f.Decimals < 0 {
+			return fmt.Errorf("buildspec: file #%d numeric field %s decimals %d must be ≥ 0", fileNum, f.Label, f.Decimals)
+		}
+		if f.Min != nil && f.Max != nil && *f.Min > *f.Max {
+			return fmt.Errorf("buildspec: file #%d numeric field %s min %v is above max %v", fileNum, f.Label, *f.Min, *f.Max)
+		}
+	case "set of codes":
+		if len(f.Codes) == 0 {
+			return fmt.Errorf("buildspec: file #%d set-of-codes field %s needs at least one code", fileNum, f.Label)
+		}
+		for _, c := range f.Codes {
+			if c.Internal == "" || c.External == "" {
+				return fmt.Errorf("buildspec: file #%d field %s has a code with an empty internal or external value", fileNum, f.Label)
+			}
+			if strings.ContainsAny(c.Internal+c.External, ":;^") {
+				return fmt.Errorf("buildspec: file #%d field %s code %q/%q must not contain ':', ';' or '^'", fileNum, f.Label, c.Internal, c.External)
+			}
+		}
+	case "pointer":
+		if f.PointTo <= 0 {
+			return fmt.Errorf("buildspec: file #%d pointer field %s needs a positive pointTo file number", fileNum, f.Label)
+		}
+		if !reGlobalRt.MatchString(f.PointRoot) {
+			return fmt.Errorf("buildspec: file #%d pointer field %s pointRoot %q must be an open global ref ending in a comma", fileNum, f.Label, f.PointRoot)
+		}
+	case "free text":
+		if f.MaxLen < 0 || f.MaxLen > freeTextMaxLen {
+			return fmt.Errorf("buildspec: file #%d free-text field %s maxLen %d must be 0-%d", fileNum, f.Label, f.MaxLen, freeTextMaxLen)
 		}
 	}
 	return nil

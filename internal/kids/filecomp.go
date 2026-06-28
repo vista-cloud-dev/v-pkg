@@ -1,6 +1,7 @@
 package kids
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -21,12 +22,61 @@ import (
 const fileMaxNameLen = 30
 
 // FileDD is one brand-new FileMan FILE to ship as a data dictionary: its number,
-// name, and data global root (e.g. "^DIZ(999000,"). Only the DD is created — never
-// data (the consumer files its own records through the FileMan DBS API).
+// name, data global root (e.g. "^DIZ(999000,"), and zero or more fields beyond the
+// implicit free-text .01 NAME. Only the DD is created — never data (the consumer
+// files its own records through the FileMan DBS API).
 type FileDD struct {
 	Number     int64
 	Name       string
-	GlobalRoot string // data global root, e.g. "^DIZ(999000,"
+	GlobalRoot string      // data global root, e.g. "^DIZ(999000,"
+	Fields     []FileField // additional fields beyond the .01 NAME (empty = single-.01 file)
+}
+
+// Field type names — the five scalar shapes a multi-field DD emitter grounds
+// against real KIDS exports (see filecomp_test / coverage-analysis §8). They map
+// to the ^DD definition node's piece-2 type spec.
+const (
+	FieldFreeText = "free text"
+	FieldNumeric  = "numeric"
+	FieldDate     = "date"
+	FieldSet      = "set of codes"
+	FieldPointer  = "pointer"
+)
+
+// SetCode is one internal:external pair of a set-of-codes field (^DD piece 3 is
+// the ";"-terminated list of these).
+type SetCode struct {
+	Internal string
+	External string
+}
+
+// FileField is one FileMan field beyond the implicit .01 NAME, shipped in a
+// brand-new file's DD. Node/Piece are the storage location ("<Node>;<Piece>", the
+// ^DD definition node's piece 4); Type selects the piece-2 grammar and the input
+// transform. The .01 is always a free-text NAME emitted separately; FileField
+// covers fields numbered above it.
+type FileField struct {
+	Number   float64 // field number (> .01)
+	Label    string  // field LABEL (^DD piece 1)
+	Type     string  // one of the Field* constants
+	Node     int     // storage node (the N in "N;piece")
+	Piece    int     // storage piece (the P in "node;P")
+	Required bool    // R attribute (RF / RS / RP… prefix)
+	Help     string  // optional reader help → ,<field#>,3) node
+
+	MaxLen int // free text: input-transform length cap
+
+	Width    int      // numeric: NJ<width>,<decimals> print spec
+	Decimals int      // numeric: decimal places (0 = integer)
+	Min      *float64 // numeric: lower bound (nil = unbounded)
+	Max      *float64 // numeric: upper bound (nil = unbounded)
+
+	HasTime bool // date: allow a time component (%DT "ET" vs "E")
+
+	Codes []SetCode // set of codes: the value list, in order
+
+	PointTo   float64 // pointer: pointed-to file number → P<file>'
+	PointRoot string  // pointer: pointed-to global root (^DD piece 3)
 }
 
 // emitFileManifest writes the BLD #9.6 FILE component list (#9.64) naming the
@@ -86,7 +136,15 @@ func emitFileData(b *Build, files []FileDD, version, namespace string) {
 		// land DIFRD=0 and Q:DIFRD'>0 skip the whole DD). For a top file the inner
 		// dd-file number equals the file number.
 		dd := func(tail ...Sub) Subs { return append(Subs{strSub("^DD"), fnum, fnum}, tail...) }
-		b.Set(dd(intSub(0)), "FIELD^^.01^1") // FIELD^^<highest field#>^<field count>
+		// Header: FIELD^^<highest field#>^<field count>. The .01 NAME is always
+		// present, plus any declared fields (a single-.01 file → "FIELD^^.01^1").
+		hi := 0.01
+		for _, fld := range f.Fields {
+			if fld.Number > hi {
+				hi = fld.Number
+			}
+		}
+		b.Set(dd(intSub(0)), "FIELD^^"+mNum(hi)+"^"+strconv.Itoa(1+len(f.Fields)))
 		// Register the "B" index so the FileMan DBS filer (UPDATE^DIE) fires it.
 		b.Set(dd(intSub(0), strSub("IX"), strSub("B"), fnum, fltSub(0.01)), "")
 		b.Set(dd(intSub(0), strSub("NM"), strSub(f.Name)), "")
@@ -99,6 +157,20 @@ func emitFileData(b *Build, files []FileDD, version, namespace string) {
 		b.Set(dd(strSub("B"), strSub("NAME"), fltSub(0.01)), "")
 		b.Set(dd(strSub("GL"), strSub("0;1"), intSub(1), fltSub(0.01)), "")
 
+		// --- additional fields (beyond .01), in field-number order for a
+		// deterministic export. Each emits its ,<field#>,0) definition node and an
+		// optional ,<field#>,3) help node — matching real exports, which carry the
+		// storage location inline in the definition (no separate "GL" map node).
+		fields := append([]FileField(nil), f.Fields...)
+		sort.Slice(fields, func(i, j int) bool { return fields[i].Number < fields[j].Number })
+		for _, fld := range fields {
+			fsub := fltSub(fld.Number)
+			b.Set(dd(fsub, intSub(0)), fieldDef(fld))
+			if fld.Help != "" {
+				b.Set(dd(fsub, intSub(3)), fld.Help)
+			}
+		}
+
 		// --- ^DIC image: the dictionary-of-files registration. DDIN merges the whole
 		// ("^DIC",<file>) subtree onto ^DIC, so the file level is a prefix and the
 		// file's own node carries it twice (^DIC(<file>,0) ← "^DIC",file,file,0).
@@ -106,6 +178,73 @@ func emitFileData(b *Build, files []FileDD, version, namespace string) {
 		b.Set(Subs{strSub("^DIC"), fnum, fnum, intSub(0), strSub("GL")}, gl)
 		b.Set(Subs{strSub("^DIC"), fnum, strSub("B"), strSub(f.Name), fnum}, "")
 	}
+}
+
+// fieldDef builds the 5-piece ^DD definition node value for one field:
+// LABEL ^ TYPE-spec ^ (set-list|pointer-root) ^ node;piece ^ input-transform.
+// Type-spec and transform follow the grounded grammar (coverage-analysis §8);
+// a Required field prefixes the type letter with "R" (RF / RS / RP…).
+func fieldDef(f FileField) string {
+	storage := strconv.Itoa(f.Node) + ";" + strconv.Itoa(f.Piece)
+	var typ, p3, xform string
+	switch f.Type {
+	case FieldNumeric:
+		typ = "N"
+		if f.Width > 0 {
+			typ += "J" + strconv.Itoa(f.Width) + "," + strconv.Itoa(f.Decimals)
+		}
+		xform = "K:+X'=X"
+		if f.Max != nil {
+			xform += "!(X>" + mNum(*f.Max) + ")"
+		}
+		if f.Min != nil {
+			xform += "!(X<" + mNum(*f.Min) + ")"
+		}
+		xform += `!(X?.E1"."` + strconv.Itoa(f.Decimals+1) + `.N) X`
+	case FieldDate:
+		typ = "D"
+		flags := "E"
+		if f.HasTime {
+			flags = "ET"
+		}
+		xform = `S %DT="` + flags + `" D ^%DT S X=Y K:Y<1 X`
+	case FieldSet:
+		typ = "S"
+		var b strings.Builder
+		for _, c := range f.Codes {
+			b.WriteString(c.Internal + ":" + c.External + ";")
+		}
+		p3 = b.String()
+		xform = "Q"
+	case FieldPointer:
+		typ = "P" + mNum(f.PointTo) + "'"
+		p3 = f.PointRoot
+		xform = "Q"
+	default: // FieldFreeText
+		typ = "F"
+		maxLen := f.MaxLen
+		if maxLen <= 0 {
+			maxLen = fileMaxNameLen
+		}
+		xform = "K:$L(X)>" + strconv.Itoa(maxLen) + "!($L(X)<1) X"
+	}
+	if f.Required {
+		typ = "R" + typ
+	}
+	return f.Label + "^" + typ + "^" + p3 + "^" + storage + "^" + xform
+}
+
+// mNum renders a FileMan field/file number the way M canonicalizes a numeric
+// literal inside a value string: whole numbers plain ("5"), fractions with the
+// leading zero stripped (".01"). Subscripts keep their "0.01" rendering via
+// formatKIDSFloat — this is only for value strings (the ^DD header, pointer type
+// spec, numeric range).
+func mNum(f float64) string {
+	s := formatKIDSFloat(f)
+	if strings.HasPrefix(s, "0.") {
+		s = s[1:]
+	}
+	return s
 }
 
 // FileNumbers returns the FileMan file numbers shipped by the build, read from the

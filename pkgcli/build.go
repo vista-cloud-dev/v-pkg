@@ -127,7 +127,42 @@ func resolveFiles(files []buildspec.FileComp) []kids.FileDD {
 			Number:     int64(f.Number),
 			Name:       f.Name,
 			GlobalRoot: f.GlobalRoot,
+			Fields:     resolveFields(f.Fields),
 		})
+	}
+	return out
+}
+
+// resolveFields maps a spec's field declarations onto the kids emit shape. The
+// spec is already validated (type known, storage non-colliding, type-specific
+// knobs present), so the values carry straight through.
+func resolveFields(fields []buildspec.FieldSpec) []kids.FileField {
+	if len(fields) == 0 {
+		return nil
+	}
+	out := make([]kids.FileField, 0, len(fields))
+	for _, f := range fields {
+		ff := kids.FileField{
+			Number:    f.Number,
+			Label:     f.Label,
+			Type:      f.Type,
+			Node:      f.Node,
+			Piece:     f.Piece,
+			Required:  f.Required,
+			Help:      f.Help,
+			MaxLen:    f.MaxLen,
+			Width:     f.Width,
+			Decimals:  f.Decimals,
+			Min:       f.Min,
+			Max:       f.Max,
+			HasTime:   f.Time,
+			PointTo:   f.PointTo,
+			PointRoot: f.PointRoot,
+		}
+		for _, c := range f.Codes {
+			ff.Codes = append(ff.Codes, kids.SetCode{Internal: c.Internal, External: c.External})
+		}
+		out = append(out, ff)
 	}
 	return out
 }

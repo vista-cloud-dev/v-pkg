@@ -348,6 +348,22 @@ not the populate-and-`EN^XPDIJ` shortcut.
   multi-field DD (see §8 for the grounded node-set) and add **DATA** export with
   the four action codes (ADD-IF-NEW / MERGE / OVERWRITE / REPLACE) and FULL/PARTIAL
   DD. Allow permanent (non-test-range) file numbers in a package's namespace.
+  - **B.2-a ✅ DONE 2026-06-28 — multi-field DD authoring (the R3 unblock).**
+    `FileDD.Fields`/`FileComp.Fields` emit the `.01` NAME plus N typed fields —
+    the five grounded scalar types **free text / numeric / date / set of codes /
+    pointer**, each with `required` + optional help. Grammar re-grounded against a
+    real new-file full DD (#8992.7 LOG4M CONFIG): header piece 1 is the literal
+    `FIELD` (not the file name — §8's `<NAME>^^…` was a simplification), and a
+    field's storage is carried inline in piece 4 of its `,<fld#>,0)` def node — real
+    exports ship **no per-field `"GL"` map node**. TDD; lint/race/contract green;
+    **corpus round-trip DRIFT=0 over 2,404 dists**; deterministic golden
+    `testdata/zzvslaudit/ZZVSLAU.kids` (#999001, all 5 types). `internal/kids/filecomp.go`,
+    `internal/buildspec/buildspec.go`, `pkgcli/build.go`. ([[multi-field-dd-emitter]])
+  - **B.2-b (remaining) — file DATA + the 4 action codes, and relaxing the
+    test-range file-number restriction** (permanent-number namespace policy needs
+    org coordination). B.2-a is **build-side only — not yet live-install-proven**;
+    a multi-field DD install→verify→uninstall→file-a-record on vehu+foia-t12 (via
+    the driver stack) is the next engine step.
 - **B.3 Install-time code authoring.** Let a build declare and ship Environment
   Check / Pre / Post-Install routines (the spec already has `envCheck`; wire it to
   emit + register), so authored packages can gate and migrate.
@@ -395,11 +411,15 @@ post-install **re-indexes** to build the `^G("B",…)` entries — the emitter s
 the *definitions*, not the index data. (Grounded in KIDS exports of #1.008
 full-DD-with-xref/help/WP, #8992.7 free-text+set+multiple, #.114 numeric.)
 
-**Until B.2 lands**, R3's options are: (i) the interim single-`.01` delimited
-record v-stdlib can ship today via the existing toy-FILE (positional pieces, a
-stopgap), or (ii) hold R3 for B.2. Recommend stating the dependency in the
-v-stdlib tracker and prioritizing B.2 in Track B (it is also the highest-value
-authoring feature for any clinical package, since 24% ship a file).
+**B.2-a (multi-field DD authoring) landed 2026-06-28**, so R3 is **unblocked**: an
+audit file ships no seed data (records are filed at runtime via the DBS API), so
+the multi-field DD alone is sufficient — v-stdlib R3 can now declare a `VSL AUDIT`
+file with `.01` plus typed fields (timestamp = date, DUZ = numeric/pointer, host =
+free text, category = set of codes, detail = free text). The remaining B.2 work
+(file DATA + the 4 action codes, permanent file numbers) is not on R3's path. One
+caveat: B.2-a is build-side proven (unit/golden/corpus) but **not yet
+live-install-proven** — a multi-field DD has not been installed on a live engine,
+unlike the single-`.01` lifecycle.
 
 ---
 

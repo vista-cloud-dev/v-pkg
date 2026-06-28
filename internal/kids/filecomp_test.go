@@ -68,6 +68,87 @@ func TestMakeBuildPairs_File_FIAandDD(t *testing.T) {
 	}
 }
 
+// multiFieldInput is a build that ships a new file with a free-text .01 plus the
+// five grounded field types (numeric, set-of-codes, date, pointer, free-text) —
+// the shape v-stdlib R3's VSL AUDIT file needs.
+func multiFieldInput() BuildInput {
+	min1 := 1.0
+	return BuildInput{
+		InstallName: "ZZVSLAU*1.0*1",
+		Namespace:   "ZZVSLAU",
+		Files: []FileDD{{
+			Number:     999001,
+			Name:       "ZZVSLAUDIT",
+			GlobalRoot: "^DIZ(999001,",
+			Fields: []FileField{
+				{Number: 1, Label: "USER NUMBER", Type: FieldNumeric, Node: 0, Piece: 2, Width: 12, Decimals: 0, Min: &min1},
+				{Number: 2, Label: "EVENT TYPE", Type: FieldSet, Node: 0, Piece: 3, Codes: []SetCode{{"I", "INFO"}, {"W", "WARN"}, {"E", "ERROR"}}},
+				{Number: 3, Label: "TIMESTAMP", Type: FieldDate, Node: 0, Piece: 4, HasTime: true},
+				{Number: 4, Label: "USER", Type: FieldPointer, Node: 0, Piece: 5, Required: true, PointTo: 200, PointRoot: "^VA(200,"},
+				{Number: 5, Label: "DETAIL", Type: FieldFreeText, Node: 0, Piece: 6, MaxLen: 245, Help: "Free-text detail, up to 245 characters."},
+			},
+		}},
+	}
+}
+
+func TestMakeBuildPairs_File_MultiField(t *testing.T) {
+	got := map[string]string{}
+	seen := map[string]bool{}
+	for _, p := range MakeBuildPairs(multiFieldInput()) {
+		k := formatSubscript(p.Subs)
+		if seen[k] {
+			t.Errorf("duplicate subscript emitted: %s", k)
+		}
+		seen[k] = true
+		got[k] = p.Value
+	}
+
+	want := map[string]string{
+		// Header generalizes: highest field# = 5, field count = 6 (.01 + 5).
+		`"^DD",999001,999001,0)`: "FIELD^^5^6",
+		// Numeric: NJ<width>,<decimals>; transform carries the range + decimal guard.
+		`"^DD",999001,999001,1,0)`: `USER NUMBER^NJ12,0^^0;2^K:+X'=X!(X<1)!(X?.E1"."1.N) X`,
+		// Set-of-codes: piece 3 is the int:ext;… list (trailing ";"); transform "Q".
+		`"^DD",999001,999001,2,0)`: "EVENT TYPE^S^I:INFO;W:WARN;E:ERROR;^0;3^Q",
+		// Date with time: %DT flags "ET".
+		`"^DD",999001,999001,3,0)`: `TIMESTAMP^D^^0;4^S %DT="ET" D ^%DT S X=Y K:Y<1 X`,
+		// Required pointer: RP<file>'; piece 3 is the pointed-to global root.
+		`"^DD",999001,999001,4,0)`: "USER^RP200'^^VA(200,^0;5^Q",
+		// Free-text with an explicit help string.
+		`"^DD",999001,999001,5,0)`: `DETAIL^F^^0;6^K:$L(X)>245!($L(X)<1) X`,
+		`"^DD",999001,999001,5,3)`: "Free-text detail, up to 245 characters.",
+		// The .01 NAME field is still emitted (unchanged shape).
+		`"^DD",999001,999001,0.01,0)`: "NAME^RF^^0;1^K:$L(X)>30!($L(X)<1) X",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+
+	// Additional fields carry their storage location inline (^DD piece 4), like
+	// real exports — they emit no separate "GL" map node. The only ^DD GL node is
+	// the pre-existing .01 one; no field>.01 GL node leaks in.
+	for k := range got {
+		if strings.Contains(k, `"^DD"`) && strings.Contains(k, `,"GL",`) && !strings.Contains(k, `,1,0.01)`) {
+			t.Errorf("unexpected per-field ^DD GL node emitted: %s", k)
+		}
+	}
+}
+
+func TestMakeBuildPairs_File_MultiField_Deterministic(t *testing.T) {
+	a := MakeBuildPairs(multiFieldInput())
+	b := MakeBuildPairs(multiFieldInput())
+	if len(a) != len(b) {
+		t.Fatalf("length differs: %d vs %d", len(a), len(b))
+	}
+	for i := range a {
+		if formatSubscript(a[i].Subs) != formatSubscript(b[i].Subs) || a[i].Value != b[i].Value {
+			t.Fatalf("non-deterministic at %d", i)
+		}
+	}
+}
+
 func TestMakeBuildPairs_File_Deterministic(t *testing.T) {
 	a := MakeBuildPairs(fileInput())
 	b := MakeBuildPairs(fileInput())

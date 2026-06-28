@@ -44,7 +44,12 @@ SEND/DELETE `KRN` emitter (generalizing the #8989.51 path) covers ~20 of 24 type
 
 **R3 = Track B item B.2** (multi-field DD + DATA with the 4 action codes). The
 proposal carries the grounded minimum `^DD`/`^DIC` node-set for a 4-field new file.
-Until B.2 lands, R3's stopgap is the interim single-`.01` delimited record.
+**B.2-a DONE 2026-06-28** ([[multi-field-dd-emitter]]): the multi-field DD emitter
+(5 grounded scalar types beyond `.01`) — the R3 unblock, since an audit file ships
+no seed data. **Remaining B.2:** file DATA + the 4 action codes, and relaxing the
+test-range file-number restriction (permanent-number namespace policy, org
+coordination). B.2-a is **build-side only — not yet live-install-proven** on an
+engine (single-`.01` lifecycle was; multi-field is the next engine step).
 
 Reorders/extends the existing `implementation-plan.md` + `kids-installation-automation.md`
 threads, not a fork. Waterline + [[bespoke-installer-forbidden]] preserved
