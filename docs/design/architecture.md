@@ -1,13 +1,16 @@
-# m-kids — Architecture & the Assembly / Disassembly Process
+# v pkg — Architecture & the Assembly / Disassembly Process
 
-`m-kids` is the VistA **KIDS** (Kernel Installation and Distribution System)
-round-trip tool for the `vista-cloud-dev` Go toolchain. It **disassembles**
-(decomposes) a monolithic `.KID` distribution file into a per-component tree
-that diffs and merges cleanly in git, and **reassembles** that tree back into an
-installable `.KID`. This document explains how it works and why the round-trip
-is safe.
+`v pkg` is the modern front end for the VistA **KIDS** (Kernel Installation and
+Distribution System) — the `pkg` domain of the `v` CLI, built on the
+`vista-cloud-dev` Go toolchain. This document covers its **format** half: the
+round-trip codec that **disassembles** (decomposes) a monolithic `.KID`
+distribution file into a per-component tree that diffs and merges cleanly in
+git, and **reassembles** that tree back into an installable `.KID`. It explains
+how that works and why the round-trip is safe. (The live-engine half —
+`build`/`install`/`verify`/`uninstall` — is in
+[`kids-installation-automation.md`](kids-installation-automation.md).)
 
-> Scope: this document describes `m-kids` *itself* — the file format it reads,
+> Scope: this document describes the `v pkg` **codec** *itself* — the file format it reads,
 > the data model it builds, and the codec that disassembles and reassembles it.
 > For installing a `.KID` into a live VistA instance, see
 > [`kids-installation-automation.md`](kids-installation-automation.md); for
@@ -18,7 +21,7 @@ is safe.
 
 ## Table of Contents
 
-- [1. What problem m-kids solves](#1-what-problem-m-kids-solves)
+- [1. What problem v pkg solves](#1-what-problem-v-pkg-solves)
 - [2. Background: the KIDS distribution format](#2-background-the-kids-distribution-format)
 - [3. High-level architecture](#3-high-level-architecture)
 - [4. The data model](#4-the-data-model)
@@ -27,12 +30,12 @@ is safe.
 - [7. The round-trip guarantee](#7-the-round-trip-guarantee)
 - [8. Canonicalization and the PIKS gate](#8-canonicalization-and-the-piks-gate)
 - [9. The clikit contract](#9-the-clikit-contract)
-- [10. Where m-kids fits in the pipeline](#10-where-m-kids-fits-in-the-pipeline)
+- [10. Where v pkg fits in the pipeline](#10-where-v-pkg-fits-in-the-pipeline)
 - [References](#references)
 
 ---
 
-## 1. What problem m-kids solves
+## 1. What problem v pkg solves
 
 A `.KID` file is the unit VistA developers ship: KIDS bundles routines, FileMan
 file/data-dictionary changes, options, protocols, remote procedures (RPCs),
@@ -43,7 +46,7 @@ That single-file packaging is hostile to version control. Adjacent entries in a
 `.KID` are semantically independent (two unrelated options, a routine and a
 data-dictionary node), but git's line-based diff/merge treats the file as one
 stream — so a merge can silently interleave unrelated components and corrupt the
-distribution. `m-kids` makes the contents *addressable*: every routine becomes
+distribution. `v pkg` makes the contents *addressable*: every routine becomes
 its own `.m` file, every Kernel component its own `.zwr`, every FileMan file its
 own directory. Git then diffs and merges at the granularity of a real change.
 
@@ -51,7 +54,7 @@ The complementary direction — turning that reviewed tree back into a byte-for-
 byte equivalent `.KID` that KIDS will install — is what makes the workflow
 closed-loop rather than one-way.
 
-`m-kids` is a faithful Go port of `py-kids-vc` (itself a port of Sam Habiel's
+`v pkg` is a faithful Go port of `py-kids-vc` (itself a port of Sam Habiel's
 `XPDK2VC`); the `decompose`/`assemble`/`roundtrip` contract and the
 `KIDComponents/` layout are unchanged from the Python tool. [6][7]
 
@@ -111,7 +114,7 @@ install, so they are volatile and must be handled carefully on round-trip
 
 ## 3. High-level architecture
 
-`m-kids` is a single static (`CGO_ENABLED=0`) binary with two layers:
+`v pkg` is a single static (`CGO_ENABLED=0`) binary with two layers:
 
 - **`clikit/`** — the shared convention layer (vendored from `go-cli-template`,
   identical across `m-cli`, `m-ydb`, `irissync`/`m-iris`, …): Kong grammar,
@@ -291,7 +294,7 @@ sequenceDiagram
 ```
 
 `WriteKID` emits the KIDS framing: a saved-by header (`KIDS Distribution saved
-by m-kids`), the `**KIDS**:<names>^` line, then for each build an
+by v-pkg`), the `**KIDS**:<names>^` line, then for each build an
 `**INSTALL NAME**` block followed by the alternating subscript / value lines.
 Routine line-2 is written in its canonical form (§7) — KIDS itself re-stamps the
 patch list / date / build number at install time. [1]
@@ -377,16 +380,16 @@ agent-discoverable:
 - `schema` emits the full command/flag/enum tree as JSON for agent discovery.
 - `version` reports version/commit/date/go (stamped via `-ldflags` at build).
 
-`m-kids` uses the same library set as every sibling tool in the org —
+`v pkg` uses the same library set as every sibling tool in the org —
 `alecthomas/kong` (grammar), `charmbracelet/lipgloss` (styling),
 `willabides/kongplete` (completions), `golang.org/x/term` — pinned to identical
 versions, built static and `-trimpath`'d.
 
 ---
 
-## 10. Where m-kids fits in the pipeline
+## 10. Where v pkg fits in the pipeline
 
-`m-kids` owns the **format** half of the lifecycle. The runtime halves —
+`v pkg` owns the **format** half of the lifecycle. The runtime halves —
 extracting installed packages from a live system, and installing a `.KID` into
 one — are separate, engine-facing concerns:
 
@@ -443,4 +446,4 @@ Technical Manual.
    (`decompose`/`assemble`/`roundtrip` contract, line-2 canonicalization).
    <https://github.com/rafael5/py-kids-vc>
 7. Sam Habiel, `XPDK2VC` — the original KIDS-to-version-control tool that
-   `py-kids-vc` and `m-kids` descend from (Apache-2.0).
+   `py-kids-vc` and `v pkg` descend from (Apache-2.0).

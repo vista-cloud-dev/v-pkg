@@ -28,7 +28,7 @@ maps that behavior onto a scriptable automation contract.
 
 ## 1. Goal & non-goals
 
-**Goal.** Given a `.KID` file (e.g. produced by `m-kids assemble`) and
+**Goal.** Given a `.KID` file (e.g. produced by `v pkg assemble`) and
 credentials for a target VistA instance, install the build with **no human at a
 terminal**: load the distribution, answer the standard KIDS questions from a
 declarative spec, run the install on a chosen device, and report a structured
@@ -38,7 +38,8 @@ result.
 
 - Building/exporting distributions (developer side — that is the
   `Edits and Distribution` menu and the KIDS Developer Tools guide). [4]
-- Editing the `.KID` content — that is [`m-kids`](architecture.md).
+- Editing the `.KID` content — that is the `v pkg` codec
+  ([`architecture.md`](architecture.md)).
 - GUI/client-side installs (the `.exe`/`.msi` halves of dual builds) — those are
   workstation deployment, out of scope here.
 
@@ -153,7 +154,7 @@ per environment:
 
 ```mermaid
 flowchart LR
-    KID[".KID (from m-kids assemble)"] --> SPEC
+    KID[".KID (from v pkg assemble)"] --> SPEC
 
     subgraph plan["Plan layer"]
         SPEC["install-spec.yaml<br/>(answers, device, queue?, backup?)"]
@@ -383,7 +384,7 @@ without staging routines at all — cleaner, but it is not on the reference
   human-facing version of this query. [1]
 - **Is it intact?** Re-verify routine checksums (Kernel `XINDEX` / the
   *Verify Checksums in Transport Global* path) against the build's expected
-  checksums. `m-kids parse` over the source `.KID` gives the expected component
+  checksums. `v pkg parse` over the source `.KID` gives the expected component
   inventory to check against.
 - **Idempotency.** Before installing, check `#9.4` patch history for the patch
   name + sequence; if already present at the right sequence, skip (or fail the

@@ -4,7 +4,7 @@ A proposal for **pulling the installed software of a running VistA/M instance ou
 to a git-friendly filesystem tree**, for analysis, diffing, drift detection, and
 archival. This is the *inbound* (system → filesystem) counterpart to
 [`kids-installation-automation.md`](../design/kids-installation-automation.md) (filesystem
-→ system) and feeds directly into [`m-kids`](../design/architecture.md) `decompose`.
+→ system) and feeds directly into [`v pkg`](../design/architecture.md) `decompose`.
 
 Status: **design proposal.** It specifies the approach, the authoritative
 mechanisms it builds on, and the open questions — it is not yet implemented.
@@ -29,7 +29,7 @@ mechanisms it builds on, and the open questions — it is not yet implemented.
 
 ## 1. Motivation
 
-The toolchain can already take a `.KID` apart (`m-kids decompose`) and put it
+The toolchain can already take a `.KID` apart (`v pkg decompose`) and put it
 back together (`assemble`). But a *live* VistA instance is not a `.KID` — it is
 years of accumulated installs, local modifications, and patches whose original
 distributions may be long gone. To analyze what is *actually running* (for
@@ -42,7 +42,7 @@ Goals:
 - Enumerate installed packages and their patch levels.
 - For a selected package, extract its components (routines, files/DDs, options,
   protocols, RPCs, keys, templates) to a filesystem tree.
-- Normalize to a form that diffs cleanly and feeds `m-kids decompose` (ideally:
+- Normalize to a form that diffs cleanly and feeds `v pkg decompose` (ideally:
   reconstruct a `.KID`, then decompose it, so extraction and authoring share one
   representation).
 - Never let Patient/Institution-class operational data leak to disk.
@@ -89,7 +89,7 @@ flowchart TD
     Q -->|"S1"| S1["Re-export via KIDS<br/>Convert Loaded Package for Redistribution<br/>+ Transport a Distribution → .KID"]
     Q -->|"S2"| S2["Direct global/routine dump<br/>%RO routines + ZWR globals,<br/>scoped by build entry"]
     Q -->|"S3"| S3["FileMan-API walk<br/>read #9.6 entry, pull each<br/>component via FileMan calls"]
-    S1 --> M["m-kids decompose → tree"]
+    S1 --> M["v pkg decompose → tree"]
     S2 --> N["normalize → tree"]
     S3 --> N
 ```
@@ -101,7 +101,7 @@ KIDS itself can repackage installed software. The
 `Transport a Distribution [XPD TRANSPORT PACKAGE]` option then writes a `.KID`
 to a Host File. [1] If a current build entry (`#9.6`) exists for the package, a
 developer can re-transport it directly. The output is a real `.KID`, so we get
-extraction *and* `m-kids` decompose for free, sharing one representation.
+extraction *and* `v pkg` decompose for free, sharing one representation.
 
 > Caveat: `XPD CONVERT PACKAGE` operates on *loaded* distributions; transporting
 > an *already-installed* package generally relies on a present/rebuilt `#9.6`
@@ -109,7 +109,7 @@ extraction *and* `m-kids` decompose for free, sharing one representation.
 
 **S2 — Direct dump.** Export routines with the standard routine utility (`^%RO`
 / Kernel routine tools) and dump the relevant globals in **ZWR** (the same
-`label,sub) = value` form `m-kids` already reads/writes for KRN components). Scope
+`label,sub) = value` form `v pkg` already reads/writes for KRN components). Scope
 the dump using the build entry's component list. Fast and engine-portable, but we
 re-implement the "which nodes belong to this component" logic KIDS owns.
 
@@ -131,7 +131,7 @@ flowchart LR
     INV --> SEL["2. select package(s)"]
     SEL --> EXT["3. extract components<br/>(S1 re-export | S2 dump | S3 walk)"]
     EXT --> AIR["4. PHI/PII airlock<br/>(PIKS class gate)"]
-    AIR -->|"as .KID"| MK["m-kids decompose"]
+    AIR -->|"as .KID"| MK["v pkg decompose"]
     AIR -->|"as raw"| NORM["normalizer"]
     MK & NORM --> TREE["filesystem tree (git)"]
     TREE --> AN["analysis · diff · drift detection"]
@@ -140,7 +140,7 @@ flowchart LR
 The extractor is a thin orchestrator over the **`m-driver-sdk` Transport seam**
 (`Health · Load · Exec · ReadGlobal · SetGlobal`), so it runs unchanged against
 YottaDB (`m-ydb`) or IRIS (`m-iris`). Wherever possible it produces a `.KID` and
-hands off to `m-kids decompose`, so there is exactly one filesystem
+hands off to `v pkg decompose`, so there is exactly one filesystem
 representation across authored-and-extracted code.
 
 ---
@@ -200,14 +200,14 @@ extraction method:
 (The component-type list is exactly KIDS's own: Template, Form, Function,
 Bulletin, Help Frame, Routine, Option, Security Key, Protocol — plus FileMan
 files. [1]) Producing `KRN/<TYPE>/<name>.zwr` and `Routines/<NAME>.m` files makes
-the extractor output **byte-compatible with `m-kids decompose`'s tree**, so the
+the extractor output **byte-compatible with `v pkg decompose`'s tree**, so the
 two pipelines converge.
 
 ---
 
 ## 7. The on-disk layout
 
-Reuse the `m-kids` `KIDComponents/` layout so extracted and authored trees are
+Reuse the `v pkg` `KIDComponents/` layout so extracted and authored trees are
 indistinguishable to downstream tooling:
 
 ```
@@ -227,8 +227,8 @@ extracted/
                 └── SECURITY-KEY/XUKAAJEE_SAMPLE.zwr
 ```
 
-Then `m-kids canonicalize` can stabilize install-time IENs for cross-instance
-diffing, and `m-kids assemble` can turn an extracted tree back into a `.KID` if
+Then `v pkg canonicalize` can stabilize install-time IENs for cross-instance
+diffing, and `v pkg assemble` can turn an extracted tree back into a `.KID` if
 needed.
 
 ---
@@ -250,7 +250,7 @@ flowchart TD
 
 - Extract **definitions** (DDs, options, routines) freely; **operational data**
   (`DATA`/`FRV*` populating Patient- or Institution-class files) is refused by
-  default. This is the same **PIKS data-class gate** `m-kids lint` enforces (gate
+  default. This is the same **PIKS data-class gate** `v pkg lint` enforces (gate
   K2), with the authoritative classification consumed *by reference* from
   `vista-meta` — never vendored.
 - Run the gate **before** writing to disk, not after, so PHI never lands on the
@@ -286,7 +286,7 @@ is one codebase that targets both YottaDB and IRIS — consistent with the
 2. **Phase 2: definition extraction (S2/S3)** for a selected package, gated by
    the PIKS airlock, emitting a `KIDComponents/` tree.
 3. **Phase 3: S1 re-export** where build entries support it, producing real
-   `.KID`s for `m-kids` round-trip.
+   `.KID`s for `v pkg` round-trip.
 4. **Open: build-entry completeness.** How much of a long-lived system's running
    code is *not* covered by any retained `#9.6` build entry (local mods, ancient
    patches)? Drives how much S2/S3 fallback is needed.
@@ -294,7 +294,7 @@ is one codebase that targets both YottaDB and IRIS — consistent with the
    driven non-interactively** — needs the *KIDS Developer Tools User Guide*
    (gap, §References [4]).
 6. **Open: IEN normalization policy** for cross-instance comparison vs.
-   reinstall fidelity (`m-kids canonicalize` is lossy by design).
+   reinstall fidelity (`v pkg canonicalize` is lossy by design).
 
 ---
 

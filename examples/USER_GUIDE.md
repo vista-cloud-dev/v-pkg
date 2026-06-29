@@ -1,8 +1,9 @@
-# m-kids — End-to-End User Guide
+# v pkg — End-to-End User Guide
 
 A hands-on walkthrough of assembling and disassembling a real VistA KIDS build
-with `m-kids`. Everything here is runnable from a clone of the repo; the sample
-artifacts in this directory were produced by the exact commands shown.
+with `v pkg` (this repo's standalone binary, `v-pkg`). Everything here is
+runnable from a clone of the repo; the sample artifacts in this directory were
+produced by the exact commands shown.
 
 ---
 
@@ -44,7 +45,7 @@ flowchart LR
     VERDICT -->|yes| BAD["exit 3 ✗"]
 ```
 
-For the full design, see [`../docs/architecture.md`](../docs/architecture.md).
+For the full design, see [`../docs/design/architecture.md`](../docs/design/architecture.md).
 
 ---
 
@@ -54,11 +55,11 @@ For the full design, see [`../docs/architecture.md`](../docs/architecture.md).
 - From the repo root, build the binary:
 
 ```sh
-make build          # produces dist/m-kids
+make build          # produces dist/v-pkg
 ```
 
-All commands below assume `dist/m-kids` is on your path or invoked as
-`./dist/m-kids`.
+All commands below assume `dist/v-pkg` is on your path or invoked as
+`./dist/v-pkg`.
 
 ---
 
@@ -98,7 +99,7 @@ Summarize a `.KID` without unpacking it — install names plus a per-section
 subscript count:
 
 ```sh
-m-kids parse examples/XU_8.0_504.KID
+v-pkg parse examples/XU_8.0_504.KID
 ```
 
 ```json
@@ -122,7 +123,7 @@ m-kids parse examples/XU_8.0_504.KID
 Explode the `.KID` into a per-component tree:
 
 ```sh
-m-kids decompose examples/XU_8.0_504.KID ./out
+v-pkg decompose examples/XU_8.0_504.KID ./out
 ```
 
 This writes `./out/XU_8.0_504/KIDComponents/…`. A pre-generated copy of that
@@ -154,7 +155,7 @@ Rebuild an installable `.KID` from the tree. Point `assemble` at the directory
 build dir itself):
 
 ```sh
-m-kids assemble ./out ./rebuilt.KID
+v-pkg assemble ./out ./rebuilt.KID
 ```
 
 ```json
@@ -167,13 +168,13 @@ The oracle: decompose → assemble → re-parse, then compare. Exit `3` on any
 drift.
 
 ```sh
-m-kids roundtrip examples/XU_8.0_504.KID    # exit 0 — build reproduced
+v-pkg roundtrip examples/XU_8.0_504.KID    # exit 0 — build reproduced
 ```
 
 > Round-trip means **semantic equality after routine line-2 canonicalization**,
 > not byte-identity: the volatile `;;…;;patches;date;Build N` pieces are blanked
 > because KIDS rewrites them on every install. See
-> [architecture §7](../docs/architecture.md#7-the-round-trip-guarantee).
+> [architecture §7](../docs/design/architecture.md#7-the-round-trip-guarantee).
 
 ### 5.6 lint
 
@@ -182,9 +183,9 @@ for a Patient- or Institution-class FileMan file. `XU*8.0*504` ships no such
 data, so it passes:
 
 ```sh
-m-kids lint examples/XU_8.0_504.KID          # exit 0
-m-kids lint patch.KID --piks piks.tsv        # authoritative vista-meta table
-m-kids lint patch.KID --strict               # fail-closed on unclassified files
+v-pkg lint examples/XU_8.0_504.KID          # exit 0
+v-pkg lint patch.KID --piks piks.tsv        # authoritative vista-meta table
+v-pkg lint patch.KID --strict               # fail-closed on unclassified files
 ```
 
 ### 5.7 canonicalize
@@ -194,7 +195,7 @@ the same component diffs identically across instances. Never feed a canonicalize
 tree to `assemble` for a real install:
 
 ```sh
-m-kids canonicalize ./out/XU_8.0_504/KIDComponents
+v-pkg canonicalize ./out/XU_8.0_504/KIDComponents
 ```
 
 ---
@@ -215,7 +216,7 @@ flowchart LR
 2. Edit components on a branch; review diffs per routine/option.
 3. `assemble` back to a `.KID`; `roundtrip` to confirm no drift.
 4. Install the `.KID` (see
-   [`../docs/kids-installation-automation.md`](../docs/kids-installation-automation.md)).
+   [`../docs/design/kids-installation-automation.md`](../docs/design/kids-installation-automation.md)).
 
 ---
 
@@ -235,8 +236,8 @@ Add `--output json` for machine-readable output (the default when stdout is not
 a TTY), `--output text` to force styled text, or pipe to `jq`:
 
 ```sh
-m-kids parse examples/XU_8.0_504.KID --output json | jq '.data.builds[0].sections'
-m-kids schema | jq .          # full command/flag tree for agents
+v-pkg parse examples/XU_8.0_504.KID --output json | jq '.data.builds[0].sections'
+v-pkg schema | jq .          # full command/flag tree for agents
 ```
 
 ---
@@ -260,6 +261,6 @@ m-kids schema | jq .          # full command/flag tree for agents
    authoritative description of builds, transport globals, and the `.KID` format.
    VDL, Infrastructure → Kernel.
    <https://www.va.gov/vdl/documents/Infrastructure/Kernel/krn_8_0_sm_kids_ug.pdf>
-2. `m-kids` architecture — [`../docs/architecture.md`](../docs/architecture.md).
-3. `py-kids-vc` / `XPDK2VC` — the predecessors `m-kids` ports.
+2. `v pkg` architecture — [`../docs/design/architecture.md`](../docs/design/architecture.md).
+3. `py-kids-vc` / `XPDK2VC` — the predecessors `v pkg` ports.
    <https://github.com/rafael5/py-kids-vc>

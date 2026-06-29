@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# roundtrip-demo.sh — end-to-end assembly / disassembly walkthrough for m-kids.
+# roundtrip-demo.sh — end-to-end assembly / disassembly walkthrough for v-pkg.
 #
-# Drives every m-kids verb against a real Kernel patch (XU*8.0*504, the KAAJEE
+# Drives every v-pkg verb against a real Kernel patch (XU*8.0*504, the KAAJEE
 # proxy-logon build) and proves the round-trip guarantee:
 #
 #     parse → decompose → (inspect tree) → assemble → re-parse → roundtrip → lint
@@ -18,11 +18,11 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 KID="$HERE/XU_8.0_504.KID"
-BIN="$ROOT/dist/m-kids"
+BIN="$ROOT/dist/v-pkg"
 
 # --- build the binary if needed -------------------------------------------
 if [[ ! -x "$BIN" ]]; then
-  echo "==> building m-kids"
+  echo "==> building v-pkg"
   ( cd "$ROOT" && make build >/dev/null )
 fi
 

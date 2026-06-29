@@ -5,16 +5,10 @@ by `v pkg` (decompose / assemble / build / install / verify / uninstall /
 snapshot / restore / classify). Layout follows the org standard folder set
 (`~/vista-cloud-dev/CLAUDE.md`).
 
-## Live tracker (Tier D)
-
-- [`implementation-plan.md`](implementation-plan.md) — single source of truth for
-  status (P0–P7 tracking table + implementation notes). Updated in the same change
-  that lands work.
-
 ## Folders
 
 - **`design/`** — this repo's own design + reference notes:
-  - [`architecture.md`](design/architecture.md) — how m-kids assembles /
+  - [`architecture.md`](design/architecture.md) — how `v pkg` assembles /
     disassembles a `.KID`, the data model, and the round-trip guarantee.
   - [`kids-installation-automation.md`](design/kids-installation-automation.md) —
     non-interactive KIDS install design + driver contract (P5).
