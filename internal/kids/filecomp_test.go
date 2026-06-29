@@ -91,6 +91,33 @@ func multiFieldInput() BuildInput {
 	}
 }
 
+// TestFileContents proves the build exposes, per shipped FileMan FILE field, the
+// ^DD(file,fld,0) definition node a content-asserting verify reads back and
+// compares — covering the .01 plus every typed field, keyed by field number.
+func TestFileContents(t *testing.T) {
+	b := newBuild()
+	for _, p := range MakeBuildPairs(multiFieldInput()) {
+		b.Set(parseSubscriptLine(formatSubscript(p.Subs)), p.Value)
+	}
+	byField := map[string]FileContent{}
+	for _, fc := range b.FileContents() {
+		byField[fc.Field] = fc
+	}
+	if len(byField) != 6 { // .01 + 5 typed fields
+		t.Fatalf("FileContents: got %d field defs, want 6: %v", len(byField), byField)
+	}
+	one, ok := byField["1"]
+	if !ok || one.File != 999001 || one.FileStr != "999001" {
+		t.Errorf("field 1 = %+v", one)
+	}
+	if one.Zero != `USER NUMBER^NJ12,0^^0;2^K:+X'=X!(X<1)!(X?.E1"."1.N) X` {
+		t.Errorf("field 1 Zero = %q", one.Zero)
+	}
+	if _, ok := byField["0.01"]; !ok {
+		t.Errorf("missing the .01 field def; have %v", byField)
+	}
+}
+
 func TestMakeBuildPairs_File_MultiField(t *testing.T) {
 	got := map[string]string{}
 	seen := map[string]bool{}

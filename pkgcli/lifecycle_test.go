@@ -529,26 +529,35 @@ func TestVerifyContent(t *testing.T) {
 		{File: 19.1, FileStr: "19.1", Name: "ZZKEY", DataRoot: "^DIC(19.1,", Zero: "ZZKEY"},
 		{File: 771, FileStr: "771", Name: "ZZHL", DataRoot: "^HL(771,", Zero: "ZZHL^a^500^^^^USA", Volatile: []int{7}},
 	}
+	files := []kids.FileContent{
+		{File: 999001, FileStr: "999001", Field: "1", Zero: `USER NUMBER^NJ12,0^^0;2^K:+X'=X X`},
+		{File: 999001, FileStr: "999001", Field: "2", Zero: "EVENT^S^I:INFO;^0;3^Q"},
+	}
 	f := &fakeDriver{runStdout: installspec.ResultMarker + "z:19:ZZOPT=ZZOPT^Demo^^R\n" + // exact match
 		installspec.ResultMarker + "z:19.1:ZZKEY=ZZKEY WRONG\n" + // record exists but differs
-		installspec.ResultMarker + "z:771:ZZHL=ZZHL^a^500^^^^1\n"} // country USA resolved to pointer 1 (volatile)
-	got, err := verifyContent(context.Background(), fakeClient(f), contents)
+		installspec.ResultMarker + "z:771:ZZHL=ZZHL^a^500^^^^1\n" + // country USA resolved to pointer 1 (volatile)
+		installspec.ResultMarker + `dd:999001#1=USER NUMBER^NJ12,0^^0;2^K:+X'=X X` + "\n" + // DD field matches
+		installspec.ResultMarker + "dd:999001#2=EVENT^S^I:DIFFERENT;^0;3^Q\n"} // DD field differs
+	got, err := verifyContent(context.Background(), fakeClient(f), contents, files)
 	if err != nil {
 		t.Fatalf("verifyContent: %v", err)
 	}
-	want := map[string]string{"19:ZZOPT": "ok", "19.1:ZZKEY": "mismatch", "771:ZZHL": "ok"}
+	want := map[string]string{
+		"19:ZZOPT": "ok", "19.1:ZZKEY": "mismatch", "771:ZZHL": "ok",
+		"999001#1": "ok", "999001#2": "mismatch",
+	}
 	for k, v := range want {
 		if got[k] != v {
 			t.Errorf("content %s = %q, want %q", k, got[k], v)
 		}
 	}
-	// A record with no marker (the engine returned nothing) grades as absent.
-	g2, err := verifyContent(context.Background(), fakeClient(&fakeDriver{runStdout: ""}), contents[:1])
+	// A field with no marker (the DD field never filed) grades as absent.
+	g2, err := verifyContent(context.Background(), fakeClient(&fakeDriver{runStdout: ""}), contents[:1], files[:1])
 	if err != nil {
 		t.Fatalf("verifyContent (absent): %v", err)
 	}
-	if g2["19:ZZOPT"] != "absent" {
-		t.Errorf("absent case = %q, want absent", g2["19:ZZOPT"])
+	if g2["19:ZZOPT"] != "absent" || g2["999001#1"] != "absent" {
+		t.Errorf("absent case = %v, want both absent", g2)
 	}
 }
 

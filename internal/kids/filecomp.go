@@ -332,6 +332,41 @@ func (b *Build) FileNumbers() []int64 {
 	return nums
 }
 
+// FileContent is what a content-asserting `v pkg verify` needs per shipped FILE
+// field: the file number, the field number (as a canonical M numeric string), and
+// the expected ^DD(file,fld,0) definition node. FileMan files the DD verbatim
+// (DDIN^DIFROMS moves the image in), so the live node matches Zero exactly —
+// turning the FILE check from "the DD exists" into "the fields we shipped are
+// defined as shipped."
+type FileContent struct {
+	File    int64
+	FileStr string
+	Field   string
+	Zero    string
+}
+
+// FileContents returns one FileContent per shipped FILE field-definition node —
+// the top-level ("^DD",<file>,<file>,<fld>,0) image nodes (the file number is
+// DOUBLED in the transport image), with .01 and every typed field. The presence
+// probe answers "does ^DD(file,0) exist"; this is what lets verify assert the DD
+// content matches the build.
+func (b *Build) FileContents() []FileContent {
+	var out []FileContent
+	for _, p := range b.Pairs() {
+		s := p.Subs
+		if len(s) == 5 && s[0].IsStr() && s[0].Str() == "^DD" &&
+			s[1].IsNumeric() && s[2].IsNumeric() && subNum(s[1]) == subNum(s[2]) &&
+			s[3].IsNumeric() && s[4].IsZeroInt() {
+			file := int64(subNum(s[1]))
+			out = append(out, FileContent{
+				File: file, FileStr: strconv.FormatInt(file, 10),
+				Field: formatKIDSFloat(subNum(s[3])), Zero: p.Value,
+			})
+		}
+	}
+	return out
+}
+
 // fileVersion extracts the VERSION piece of an install name (NS*VER[*PATCH]) for
 // the FIA VR node; it defaults to "1.0" when the name is malformed.
 func fileVersion(installName string) string {

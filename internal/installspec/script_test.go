@@ -402,7 +402,7 @@ func TestVerifyScript_LogicalLink(t *testing.T) {
 func TestVerifyContentScript(t *testing.T) {
 	got := VerifyContentScript([]kids.EntryContent{
 		{File: 19, FileStr: "19", Name: "ZZOPT RUN ROUTINE", DataRoot: "^DIC(19,", Zero: "ZZOPT RUN ROUTINE^x^^R"},
-	})
+	}, nil)
 	for _, want := range []string{
 		`$O(^DIC(19,"B","ZZOPT RUN ROUTINE",0))`, // resolve site IEN by name
 		`S VR="^DIC(19,"_VIEN_",0)"`,             // build the 0-node ref by indirection
@@ -410,6 +410,25 @@ func TestVerifyContentScript(t *testing.T) {
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("VerifyContentScript missing %q\n---\n%s", want, got)
+		}
+	}
+}
+
+// VerifyContentScript also reads each shipped FILE field's ^DD(file,fld,0)
+// definition node back so verify can assert DD content, not just file presence.
+func TestVerifyContentScript_File(t *testing.T) {
+	got := VerifyContentScript(nil, []kids.FileContent{
+		{File: 999001, FileStr: "999001", Field: "1", Zero: `USER NUMBER^NJ12,0^^0;2^K:+X'=X X`},
+		{File: 999001, FileStr: "999001", Field: "0.01", Zero: "NAME^RF^^0;1^K:$L(X)>30 X"},
+	})
+	for _, want := range []string{
+		`$G(^DD(999001,1,0))`,         // read the live field-def node
+		`$G(^DD(999001,0.01,0))`,      // .01 renders as a canonical M numeric literal
+		ResultMarker + `dd:999001#1=`, // emit per field
+		ResultMarker + `dd:999001#0.01=`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("VerifyContentScript (file) missing %q\n---\n%s", want, got)
 		}
 	}
 }

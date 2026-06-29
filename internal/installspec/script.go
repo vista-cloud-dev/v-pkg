@@ -309,7 +309,7 @@ func DeregisterScript(reg *PkgReg) string {
 // FileMan-transformed pieces. Reading the literal stored node (not the DBS API) is
 // deliberate: it is the same image the KRN transport shipped, so a byte difference
 // is a real filing fault.
-func VerifyContentScript(contents []kids.EntryContent) string {
+func VerifyContentScript(contents []kids.EntryContent, files []kids.FileContent) string {
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
 	for _, c := range contents {
@@ -319,6 +319,13 @@ func VerifyContentScript(contents []kids.EntryContent) string {
 		w(`S VIEN=+$O(` + c.DataRoot + `"B",` + nameLit + `,0))`)
 		w(`S VR="` + c.DataRoot + `"_VIEN_",0)"`)
 		w(`W "` + ResultMarker + `z:` + c.FileStr + `:` + c.Name + `=",$S(VIEN:$G(@VR),1:""),!`)
+	}
+	// FILE DD content: read each shipped field's ^DD(file,fld,0) definition node
+	// back (filed verbatim by DDIN^DIFROMS, so it matches the shipped fieldDef). The
+	// field number is a canonical M numeric literal, so it addresses the live node
+	// directly — no indirection needed.
+	for _, f := range files {
+		w(`W "` + ResultMarker + `dd:` + f.FileStr + `#` + f.Field + `=",$G(^DD(` + f.FileStr + `,` + f.Field + `,0)),!`)
 	}
 	return b.String()
 }

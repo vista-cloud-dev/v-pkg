@@ -773,26 +773,33 @@ func checkDrift(ctx context.Context, cl *mdriver.Client, b *kids.Build) (map[str
 // pieces aside), "mismatch" (a record by that name exists but differs), or
 // "absent" (no record by that name). This is the content half of verify, run as a
 // second staged script so the presence path is untouched.
-func verifyContent(ctx context.Context, cl *mdriver.Client, contents []kids.EntryContent) (map[string]string, error) {
-	if len(contents) == 0 {
+func verifyContent(ctx context.Context, cl *mdriver.Client, contents []kids.EntryContent, files []kids.FileContent) (map[string]string, error) {
+	if len(contents) == 0 && len(files) == 0 {
 		return nil, nil
 	}
-	markers, _, err := runMScript(ctx, cl, rtnVerify, installspec.VerifyContentScript(contents))
+	markers, _, err := runMScript(ctx, cl, rtnVerify, installspec.VerifyContentScript(contents, files))
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[string]string, len(contents))
-	for _, c := range contents {
-		key := c.FileStr + ":" + c.Name
-		live := strings.TrimSpace(markers["z:"+key])
+	out := make(map[string]string, len(contents)+len(files))
+	grade := func(key, expected, live string, volatile []int) {
 		switch {
 		case live == "":
 			out[key] = "absent"
-		case kids.ZeroMatch(c.Zero, live, c.Volatile):
+		case kids.ZeroMatch(expected, live, volatile):
 			out[key] = "ok"
 		default:
 			out[key] = "mismatch"
 		}
+	}
+	for _, c := range contents {
+		key := c.FileStr + ":" + c.Name
+		grade(key, c.Zero, strings.TrimSpace(markers["z:"+key]), c.Volatile)
+	}
+	// FILE DD fields: the live ^DD(file,fld,0) must match the shipped fieldDef.
+	for _, f := range files {
+		key := f.FileStr + "#" + f.Field
+		grade(key, f.Zero, strings.TrimSpace(markers["dd:"+key]), nil)
 	}
 	return out, nil
 }
@@ -873,7 +880,7 @@ func (c *verifyCmd) Run(cc *clikit.Context) error {
 			return clikit.Fail(clikit.ExitRuntime, "VERIFY_FAILED", err.Error(), "")
 		}
 	}
-	res.Content, err = verifyContent(ctx, cl, b.EntryContents())
+	res.Content, err = verifyContent(ctx, cl, b.EntryContents(), b.FileContents())
 	if err != nil {
 		return clikit.Fail(clikit.ExitRuntime, "VERIFY_FAILED", err.Error(), "")
 	}

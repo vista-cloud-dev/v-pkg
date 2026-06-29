@@ -37,11 +37,24 @@ verbatim (RPC #8994 is a verbatim MERGE; OPTION/KEY/PROTOCOL/MAILGROUP/etc. re-f
 but their 0-node identity pieces are stable — pointer re-pointing lives in higher
 nodes like menu items #101.01/#19.01, NOT the 0-node, so 0-node compare sidesteps it).
 
-**Scope:** entry-type 0-nodes only (covers all ~15 KRN types + PARAMETER
-DEFINITION uniformly). **Next slice:** FILE DD content-verify (field defs) — still
-presence-only (`$D(^DD(file,0))`); and multi-node entry verify (e.g. param-def
-1-node data type). Build-side unit/fake-driver proven; **not yet live-run** — that
-lands with the MSL/VSL end-to-end install gate (the adversarial rec #1).
+**Scope:** entry-type 0-nodes (all ~15 KRN types + PARAMETER DEFINITION) **plus
+FILE DD field defs** (2026-06-29): `Build.FileContents()` yields each shipped
+`("^DD",file,file,fld,0)` def node; `VerifyContentScript` reads the live
+`^DD(file,fld,0)` back and `ZeroMatch` compares it. FileMan files the DD **verbatim**
+(DDIN^DIFROMS moves the image in) — live-proven the live def node is byte-identical
+to `fieldDef`, so no volatile mask is needed (unlike the #771/#870 0-nodes). Marker
+key `dd:<file>#<field>` (e.g. `999001#0.01`); the field number is a canonical M
+numeric literal so it addresses the live node directly (no indirection). **Both
+content checks live-proven on vehu** via the [[live-package-gate]]: VSL's param-def
++ all 5 `#999001` field defs (`.01`/`1`/`2`/`3`/`4`) graded `ok`. **Remaining:** the
+file's `^DIC(file,0)` name/GL and multi-node entry verify (e.g. param-def 1-node
+data type) are still presence-only — a minor follow-up.
+
+**Gotcha found live:** re-installing a file-bearing build with `--allow-overwrite`
+over a half-cleaned state (file data global gone but #9.7 stale) can reach status 3
+WITHOUT re-filing `^DD` — the file content-verify catches it (fields graded
+`absent`). A clean greenfield install files the DD correctly. So FILE content-verify
+also guards against a silently-incomplete DD install.
 
 **Why/how to apply:** `v pkg verify` now means "the records I shipped are the
 records that got filed," not just "names exist" — the gate worth depending on for
