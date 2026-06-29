@@ -1,2 +1,4 @@
 { "package": "ZZA1", "version": "1.0", "patch": "1",
-  "components": { "routines": ["ZZA1P"] } }
+  "components": { "routines": ["ZZA1P"] },
+  "preInstall": "PRE^ZZA1P",
+  "postInstall": "POST^ZZA1P" }

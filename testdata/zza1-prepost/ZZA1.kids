@@ -6,6 +6,14 @@ v-pkg reassembled output
 ZZA1*1.0*1
 "BLD",1,0)
 ZZA1*1.0*1^ZZA1^0^0
+"INI")
+PRE^ZZA1P
+"BLD",1,"INI")
+PRE^ZZA1P
+"INIT")
+POST^ZZA1P
+"BLD",1,"INIT")
+POST^ZZA1P
 "RTN")
 1
 "RTN","ZZA1P")
@@ -20,10 +28,6 @@ ZZA1P ;VCD - A.1.1 live-prove pre/post fixture ;1.0
 PRE S ^ZZA1OUT("PRE")=1 Q
 "RTN","ZZA1P",5,0)
 POST S ^ZZA1OUT("POST")=1 Q
-"INI")
-PRE^ZZA1P
-"INIT")
-POST^ZZA1P
 "VER")
 8.0^22.2
 **END**

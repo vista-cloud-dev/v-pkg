@@ -627,3 +627,53 @@ func TestBuild_ZZSKEL_Deterministic(t *testing.T) {
 		t.Errorf("ZZSKEL.kids drift — run UPDATE_GOLDEN=1\n--- got ---\n%s", gotA)
 	}
 }
+
+// TestBuild_ZZA1_PrePost_Deterministic gates the pre/post-install fixture
+// (Track B.3): the spec declares preInstall/postInstall, and the build must emit
+// the top-level "INI")/"INIT") transport nodes plus their "BLD",1,"INI")/"INIT")
+// #9.6 manifest mirrors — deterministically and byte-identical to the golden.
+// (Without this gate the fixture silently drifted from its spec; see the dir's
+// README.)
+func TestBuild_ZZA1_PrePost_Deterministic(t *testing.T) {
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a.kids")
+	b := filepath.Join(dir, "b.kids")
+	runBuildPkg(t, "zza1-prepost", "ZZA1", a)
+	runBuildPkg(t, "zza1-prepost", "ZZA1", b)
+
+	gotA, err := os.ReadFile(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotB, err := os.ReadFile(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(gotA, gotB) {
+		t.Fatal("v pkg build (pre/post) is not deterministic — two builds differ")
+	}
+
+	// The fixture exists to carry the pre/post-install hooks — assert they land.
+	for _, node := range []string{
+		"\"INI\")\nPRE^ZZA1P\n", "\"BLD\",1,\"INI\")\nPRE^ZZA1P\n",
+		"\"INIT\")\nPOST^ZZA1P\n", "\"BLD\",1,\"INIT\")\nPOST^ZZA1P\n",
+	} {
+		if !bytes.Contains(gotA, []byte(node)) {
+			t.Errorf("ZZA1 build missing pre/post node %q", node)
+		}
+	}
+
+	golden := filepath.Join("..", "testdata", "zza1-prepost", "ZZA1.kids")
+	if os.Getenv("UPDATE_GOLDEN") == "1" {
+		if err := os.WriteFile(golden, gotA, 0o644); err != nil {
+			t.Fatalf("write golden: %v", err)
+		}
+	}
+	want, err := os.ReadFile(golden)
+	if err != nil {
+		t.Fatalf("read golden (UPDATE_GOLDEN=1 to create): %v", err)
+	}
+	if !bytes.Equal(gotA, want) {
+		t.Errorf("ZZA1.kids drift — run UPDATE_GOLDEN=1\n--- got ---\n%s", gotA)
+	}
+}

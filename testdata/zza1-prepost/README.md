@@ -10,10 +10,16 @@ that `v pkg install` now creates the `#9.7` `INI`/`INIT` checkpoints (via the re
 `$$NEWCP^XPDUTL`) so `EN^XPDIJ`'s `PRE^/POST^XPDIJ1` loops actually run the build's
 pre/post-install routines.
 
-`ZZA1.kids` was built with `v pkg build` and then had the two top-level
-`"INI")`/`"INIT")` nodes hand-injected, because authoring pre/post-install
-routines is not yet supported (coverage-analysis Track **B.3**). Once B.3 lands,
-this fixture should be regenerated end-to-end from the build spec.
+`ZZA1.kids` is generated end-to-end from the build spec: `ZZA1.build.json`
+declares `"preInstall": "PRE^ZZA1P"` and `"postInstall": "POST^ZZA1P"`, and
+`v pkg build` emits the top-level `"INI")`/`"INIT")` transport nodes plus their
+`"BLD",1,"INI")`/`"BLD",1,"INIT")` #9.6 manifest mirrors (coverage-analysis Track
+**B.3**, now landed). Regenerate with:
+
+```sh
+v pkg build testdata/zza1-prepost/kids/ZZA1.build.json \
+  --src testdata/zza1-prepost/src --out testdata/zza1-prepost/ZZA1.kids
+```
 
 ## Re-running the live-prove (driver stack only)
 
