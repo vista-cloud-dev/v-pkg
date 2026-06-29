@@ -71,6 +71,17 @@ plus documented minor gaps (pointer *data values* in B.2-b; `^DD(200,"PT")`
 back-ref in B.2-a). R3 (v-stdlib's `VSL AUDIT` multi-field file) is **unblocked**
 by B.2-a.
 
+**Adversarial stress gate (2026-06-29):** `scripts/adversarial-stress.sh` /
+`make stress` — the live-gate's harder sibling: full MSL+VSL lifecycle (offline
+assembly→disassembly→tamper-faithfulness; live install→verify+drift→back-out with
+adversarial refusal probes). **36/36 on BOTH engines.** Surfaced a real defect:
+**`verify --drift` false-positives on TAB-indented routines** — all 6 v-stdlib (VSL)
+routines report drift after a *clean* install because v-stdlib is authored with
+leading TABs and the engine flattens leading TAB→SPACE on install, while RoutineDriftMatch
+compares line bytes; m-stdlib (spaces) is clean, and content `verify` is unaffected.
+Fix direction (drift-normalize whitespace / detab in `build` / detab v-stdlib source)
+**pending a decision**. See `docs/memory/adversarial-stress-gate.md`.
+
 ---
 
 ## 2. Introduction — where this project came from

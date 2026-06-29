@@ -51,6 +51,17 @@ corpus:
 live-gate: build
 	ENGINE=$(or $(ENGINE),ydb) NEG=$(or $(NEG),0) ./scripts/live-package-gate.sh
 
+# Adversarial stress test — the live-gate's harder sibling. Exercises the FULL
+# lifecycle over MSL+VSL: assembly/packaging, DISASSEMBLY (decompose/assemble
+# round-trip + tamper-faithfulness), install, verify+drift, uninstall+back-out,
+# with adversarial REFUSAL probes (no-clobber, idempotency guard, side-effecting
+# back-out safety, double-uninstall, negative dependency). OFFLINE=1 = phase 1 only.
+#   make stress                    # ydb / vehu
+#   make stress ENGINE=iris TRANSPORT=remote   # needs M_IRIS_* exported
+#   make stress OFFLINE=1          # assembly+disassembly only, no engine
+stress: build
+	ENGINE=$(or $(ENGINE),ydb) TRANSPORT=$(or $(TRANSPORT),docker) OFFLINE=$(or $(OFFLINE),0) ./scripts/adversarial-stress.sh
+
 tidy:
 	go mod tidy
 
