@@ -394,22 +394,54 @@ var rpcEntryType = entryType{number: rpcFile, name: rpcFileName, ordTail: rpcOrd
 // (.02, functionally required for the RPC to run). ReturnTypeCode is the #8994
 // field .04 set-of-codes value (1 single value, 2 array, 3 word processing, …).
 type RPC struct {
-	Name           string // #8994 .01 NAME (0;1)
-	Tag            string // #8994 .02 TAG — the M entry tag (0;2)
-	Routine        string // #8994 .03 ROUTINE — the M routine (0;3)
-	ReturnTypeCode string // #8994 .04 RETURN VALUE TYPE set-of-codes value (0;4)
+	Name           string     // #8994 .01 NAME (0;1)
+	Tag            string     // #8994 .02 TAG — the M entry tag (0;2)
+	Routine        string     // #8994 .03 ROUTINE — the M routine (0;3)
+	ReturnTypeCode string     // #8994 .04 RETURN VALUE TYPE set-of-codes value (0;4)
+	InputParams    []RPCParam // #8994.02 INPUT PARAMETER multiple (node 2), optional
+}
+
+// RPCParam is one INPUT PARAMETER (#8994.02 subfile) of an RPC: its name, type,
+// max length, required flag, sequence, and an optional DESCRIPTION word-processing
+// field (subfile 8994.021).
+type RPCParam struct {
+	Name        string   // #8994.02 .01 INPUT PARAMETER (0;1)
+	TypeCode    string   // #8994.02 .02 PARAMETER TYPE set value (0;2): 1 literal/2 list/3 WP/4 reference
+	MaxLength   string   // #8994.02 .03 MAXIMUM DATA LENGTH (0;3)
+	RequiredVal string   // #8994.02 .04 REQUIRED set value (0;4): 1 yes/0 no
+	Sequence    string   // #8994.02 .05 SEQUENCE NUMBER (0;5)
+	Description []string // #8994.02 field 1 DESCRIPTION (subfile 8994.021), optional
 }
 
 // rpcRecords packs each RPC into the generic entry-record shape: the SEND XPDFL
-// flag and a single 0-node NAME^TAG^ROUTINE^RETURN VALUE TYPE.
+// flag, a 0-node NAME^TAG^ROUTINE^RETURN VALUE TYPE, and (optionally) the #8994.02
+// INPUT PARAMETER multiple at node 2 — a header (^8994.02A^<n>^<n>), one data node
+// per param, the param's optional DESCRIPTION WP, and the "B" (param name) and
+// "PARAMSEQ" (sequence number) cross-references. The #8994 install is a verbatim
+// KRN merge (no re-file routines), so the emitter ships these xrefs itself.
 func rpcRecords(rpcs []RPC) []entryRec {
 	recs := make([]entryRec, 0, len(rpcs))
 	for _, r := range rpcs {
-		recs = append(recs, entryRec{
-			name:  r.Name,
-			xpdfl: "0^1",
-			image: []imageNode{{Subs{intSub(0)}, r.Name + "^" + r.Tag + "^" + r.Routine + "^" + r.ReturnTypeCode}},
-		})
+		img := []imageNode{{Subs{intSub(0)}, r.Name + "^" + r.Tag + "^" + r.Routine + "^" + r.ReturnTypeCode}}
+		if n := len(r.InputParams); n > 0 {
+			ns := strconv.Itoa(n)
+			img = append(img, imageNode{Subs{intSub(2), intSub(0)}, "^8994.02A^" + ns + "^" + ns})
+			for i, p := range r.InputParams {
+				seq := int64(i + 1)
+				seqNum := p.Sequence
+				if seqNum == "" {
+					seqNum = strconv.FormatInt(seq, 10)
+				}
+				img = append(img,
+					imageNode{Subs{intSub(2), intSub(seq), intSub(0)},
+						caretJoin(map[int]string{1: p.Name, 2: p.TypeCode, 3: p.MaxLength, 4: p.RequiredVal, 5: seqNum})},
+					imageNode{Subs{intSub(2), strSub("B"), strSub(p.Name), intSub(seq)}, ""},
+					imageNode{Subs{intSub(2), strSub("PARAMSEQ"), versionSub(seqNum), intSub(seq)}, ""},
+				)
+				img = append(img, wpNodesAt(Subs{intSub(2), intSub(seq), intSub(1)}, "", p.Description)...)
+			}
+		}
+		recs = append(recs, entryRec{name: r.Name, xpdfl: "0^1", image: img})
 	}
 	return recs
 }
@@ -799,14 +831,22 @@ func versionSub(v string) Sub {
 // WP-determinism playbook first proven with HELP FRAME. subfile may be "" (the bare
 // ^^<last>^<count> form some WP fields ship). Returns nil for no lines.
 func wpNodes(node int64, subfile string, lines []string) []imageNode {
+	return wpNodesAt(Subs{intSub(node)}, subfile, lines)
+}
+
+// wpNodesAt is wpNodes for a WP field hanging off an arbitrary subscript prefix —
+// e.g. a per-row WP inside a multiple (RPC #8994.02 param DESCRIPTION at
+// 2,<seq>,1,*). The header sits at <prefix>,0) and each line at <prefix>,<i>,0).
+func wpNodesAt(prefix Subs, subfile string, lines []string) []imageNode {
 	if len(lines) == 0 {
 		return nil
 	}
+	at := func(tail ...Sub) Subs { return append(append(Subs{}, prefix...), tail...) }
 	ns := strconv.Itoa(len(lines))
 	out := make([]imageNode, 0, len(lines)+1)
-	out = append(out, imageNode{Subs{intSub(node), intSub(0)}, "^" + subfile + "^" + ns + "^" + ns})
+	out = append(out, imageNode{at(intSub(0)), "^" + subfile + "^" + ns + "^" + ns})
 	for i, line := range lines {
-		out = append(out, imageNode{Subs{intSub(node), intSub(int64(i + 1)), intSub(0)}, line})
+		out = append(out, imageNode{at(intSub(int64(i+1)), intSub(0)), line})
 	}
 	return out
 }

@@ -187,6 +187,48 @@ func TestMakeBuildPairs_RPC_KRN(t *testing.T) {
 	}
 }
 
+// An RPC with INPUT PARAMETERs (#8994.02) ships the parameter multiple at node 2: a
+// header (^8994.02A^n^n), one data node per param (NAME^TYPE^MAXLEN^REQ^SEQ), the
+// param's optional DESCRIPTION WP (subfile empty → ^^n^n), and the two
+// cross-references the verbatim KRN merge needs — "B" (param name) and "PARAMSEQ"
+// (sequence number).
+func TestMakeBuildPairs_RPC_InputParams(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZRPC*1.0*1", Namespace: "ZZRPC",
+		RPCs: []RPC{{
+			Name: "ZZRPC ECHO", Tag: "ECHO", Routine: "ZZRPCRT", ReturnTypeCode: "1",
+			InputParams: []RPCParam{
+				{Name: "INPUT", TypeCode: "1", MaxLength: "80", RequiredVal: "1", Sequence: "1", Description: []string{"The echo input."}},
+				{Name: "FLAGS", TypeCode: "2", RequiredVal: "0", Sequence: "2"},
+			},
+		}},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	want := map[string]string{
+		`"KRN",8994,1,2,0)`:              "^8994.02A^2^2",
+		`"KRN",8994,1,2,1,0)`:            "INPUT^1^80^1^1",
+		`"KRN",8994,1,2,1,1,0)`:          "^^1^1", // param DESCRIPTION WP header (date-less)
+		`"KRN",8994,1,2,1,1,1,0)`:        "The echo input.",
+		`"KRN",8994,1,2,"B","INPUT",1)`:  "",
+		`"KRN",8994,1,2,"PARAMSEQ",1,1)`: "",
+		`"KRN",8994,1,2,2,0)`:            "FLAGS^2^^0^2", // no maxlen → empty piece 3
+		`"KRN",8994,1,2,"B","FLAGS",2)`:  "",
+		`"KRN",8994,1,2,"PARAMSEQ",2,2)`: "",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+	// The versionless param FLAGS ships no description WP.
+	if _, ok := got[`"KRN",8994,1,2,2,1,0)`]; ok {
+		t.Error("param FLAGS has no description, must ship no WP header")
+	}
+}
+
 func TestMakeBuildPairs_MailGroup_KRN(t *testing.T) {
 	in := BuildInput{
 		InstallName: "ZZMG*1.0*1",

@@ -417,7 +417,7 @@ not the populate-and-`EN^XPDIJ` shortcut.
     DRIFT=0; golden `testdata/zzrpc/ZZRPC.kids`. **Live install→verify→`--force`
     uninstall→verify-clean** on vehu (YDB) + foia-t12 (IRIS): live
     `^XWB(8994,…,0)=ZZRPC ECHO^ECHO^ZZRPCRT^1` **byte-identical on both**, B-index gone
-    after back-out. Input-parameter (#8994.02) authoring is a follow-up. Next:
+    after back-out. (Input-parameter #8994.02 authoring landed in B.1-m.) Next:
     **template/form family** (#.4/.402/.401/.403). ([[option-entry-component]])
   - **B.1-f ✅ DONE + LIVE-PROVEN 2026-06-28 — MAIL GROUP (#3.8), both engines.** The
     sixth type. Bespoke-action-routine family (NOT DIFROM). Stored in `^XMB(3.8,`;
@@ -528,6 +528,20 @@ not the populate-and-`EN^XPDIJ` shortcut.
     DRIFT=0; goldens `testdata/zzkey|zzmg|zzll` regenerated. Live install→verify→`--force`
     uninstall→clean on vehu + foia-t12, headers + text byte-identical on both.
     ([[option-entry-component]])
+  - **B.1-m ✅ DONE + LIVE-PROVEN 2026-06-28 — RPC INPUT PARAMETERS (#8994.02), both
+    engines.** Closed the deferred RPC input-parameter authoring (from B.1-e). Added the
+    optional #8994.02 multiple (field 2, subfile 8994.02A @ node 2): per-param
+    `2,<seq>,0)=NAME^TYPE^MAXLEN^REQ^SEQNUM` + an optional nested DESCRIPTION WP
+    (empty-subfile `^^n^n`) + the **"B" and "PARAMSEQ" cross-references the emitter
+    ships itself**. **Key reason:** the #8994 install is a VERBATIM KRN MERGE (ORD tail
+    has no re-file routines), so FileMan does NOT rebuild xrefs — the image must carry
+    them. Generalized `wpNodes`→`wpNodesAt(prefix Subs, …)` for the nested per-param WP.
+    `RPCParamComp{Name,Type,MaxLength,Required,Sequence,Description}` + `RPCParamTypeCode`
+    map; type/seq default to literal/position. TDD; lint/race/contract green; corpus
+    DRIFT=0; golden `testdata/zzrpc/ZZRPC.kids` regenerated (2 params). Live
+    install→verify→`--force` uninstall→clean on vehu + foia-t12: the full param subtree
+    (header, data nodes, date-less description WP, B + PARAMSEQ xrefs) **byte-identical**
+    to the shipped image on both, B-index gone after back-out. ([[option-entry-component]])
 - **B.2 Real FILE DD + DATA (F3; the R3 enabler).** Extend `FileComp` to a
   multi-field DD (see §8 for the grounded node-set) and add **DATA** export with
   the four action codes (ADD-IF-NEW / MERGE / OVERWRITE / REPLACE) and FULL/PARTIAL

@@ -260,6 +260,42 @@ func resolveRPCs(rpcs []buildspec.RPCComp) []kids.RPC {
 			Tag:            r.Tag,
 			Routine:        r.Routine,
 			ReturnTypeCode: buildspec.RPCReturnTypeCode[rt],
+			InputParams:    resolveRPCParams(r.InputParameters),
+		})
+	}
+	return out
+}
+
+// resolveRPCParams maps the spec's RPC INPUT PARAMETER components onto the kids emit
+// shape: type name → #8994.02 .02 set code (default "literal" → "1"), the required
+// flag → 1/0, and numeric fields rendered as strings (empty when zero so the 0-node
+// trims them). Sequence defaults to the param's position (handled at emit).
+func resolveRPCParams(params []buildspec.RPCParamComp) []kids.RPCParam {
+	out := make([]kids.RPCParam, 0, len(params))
+	for _, p := range params {
+		typ := p.Type
+		if typ == "" {
+			typ = "literal"
+		}
+		maxLen := ""
+		if p.MaxLength > 0 {
+			maxLen = strconv.Itoa(p.MaxLength)
+		}
+		seq := ""
+		if p.Sequence > 0 {
+			seq = strconv.Itoa(p.Sequence)
+		}
+		req := "0"
+		if p.Required {
+			req = "1"
+		}
+		out = append(out, kids.RPCParam{
+			Name:        p.Name,
+			TypeCode:    buildspec.RPCParamTypeCode[typ],
+			MaxLength:   maxLen,
+			RequiredVal: req,
+			Sequence:    seq,
+			Description: p.Description,
 		})
 	}
 	return out

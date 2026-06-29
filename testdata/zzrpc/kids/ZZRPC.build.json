@@ -9,7 +9,11 @@
         "name": "ZZRPC ECHO",
         "tag": "ECHO",
         "routine": "ZZRPCRT",
-        "returnType": "single value"
+        "returnType": "single value",
+        "inputParameters": [
+          {"name": "INPUT", "type": "literal", "maxLength": 80, "required": true, "sequence": 1, "description": ["The string to echo back."]},
+          {"name": "FLAGS", "type": "list", "sequence": 2}
+        ]
       }
     ]
   }

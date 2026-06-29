@@ -433,11 +433,29 @@ func TestParse_RPCs_Invalid(t *testing.T) {
 		"no routine":  `{"package":"ZZR","version":"1.0","components":{"rpcs":[{"name":"ZZR A"}]}}`,
 		"bad routine": `{"package":"ZZR","version":"1.0","components":{"rpcs":[{"name":"ZZR A","routine":"123BAD"}]}}`,
 		"bad rtype":   `{"package":"ZZR","version":"1.0","components":{"rpcs":[{"name":"ZZR A","routine":"ZZRPCRT","returnType":"bogus"}]}}`,
+		"bad param":   `{"package":"ZZR","version":"1.0","components":{"rpcs":[{"name":"ZZR A","routine":"ZZRPCRT","inputParameters":[{"name":"lower"}]}]}}`,
+		"bad ptype":   `{"package":"ZZR","version":"1.0","components":{"rpcs":[{"name":"ZZR A","routine":"ZZRPCRT","inputParameters":[{"name":"INPUT","type":"bogus"}]}]}}`,
 	}
 	for name, js := range cases {
 		if _, err := Parse([]byte(js)); err == nil {
 			t.Errorf("%s: expected an error, got nil", name)
 		}
+	}
+}
+
+// An RPC's INPUT PARAMETERs parse with their fields and survive validation.
+func TestParse_RPCs_InputParameters(t *testing.T) {
+	js := `{"package":"ZZRPC","version":"1.0","components":{"rpcs":[
+	  {"name":"ZZRPC ECHO","routine":"ZZRPCRT","inputParameters":[
+	    {"name":"INPUT","type":"literal","maxLength":80,"required":true,"sequence":1,"description":["d"]},
+	    {"name":"FLAGS","type":"list","sequence":2}]}]}}`
+	s, err := Parse([]byte(js))
+	if err != nil {
+		t.Fatalf("Parse rpc input params: %v", err)
+	}
+	ps := s.Components.RPCs[0].InputParameters
+	if len(ps) != 2 || ps[0].Name != "INPUT" || ps[0].Type != "literal" || ps[0].MaxLength != 80 || !ps[0].Required || ps[1].Name != "FLAGS" {
+		t.Errorf("input parameters = %+v", ps)
 	}
 }
 

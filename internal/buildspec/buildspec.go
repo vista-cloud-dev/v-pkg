@@ -144,10 +144,32 @@ type OptionComp struct {
 // to its #8994 field .04 set-of-codes value by RPCReturnTypeCode (default "single
 // value").
 type RPCComp struct {
-	Name       string `json:"name"`                 // #8994 .01 NAME (uppercase, e.g. "ZZRPC ECHO")
-	Tag        string `json:"tag,omitempty"`        // #8994 .02 TAG — the M entry tag
-	Routine    string `json:"routine"`              // #8994 .03 ROUTINE — the M routine
-	ReturnType string `json:"returnType,omitempty"` // value type; default "single value"
+	Name            string         `json:"name"`                      // #8994 .01 NAME (uppercase, e.g. "ZZRPC ECHO")
+	Tag             string         `json:"tag,omitempty"`             // #8994 .02 TAG — the M entry tag
+	Routine         string         `json:"routine"`                   // #8994 .03 ROUTINE — the M routine
+	ReturnType      string         `json:"returnType,omitempty"`      // value type; default "single value"
+	InputParameters []RPCParamComp `json:"inputParameters,omitempty"` // #8994.02 INPUT PARAMETER multiple
+}
+
+// RPCParamComp is one #8994.02 INPUT PARAMETER of an RPC: its name, type, max data
+// length, required flag, sequence, and an optional DESCRIPTION. Type defaults to
+// "literal"; sequence defaults to the parameter's 1-based position.
+type RPCParamComp struct {
+	Name        string   `json:"name"`                  // #8994.02 .01 INPUT PARAMETER
+	Type        string   `json:"type,omitempty"`        // literal (default) | list | word processing | reference
+	MaxLength   int      `json:"maxLength,omitempty"`   // #8994.02 .03 MAXIMUM DATA LENGTH
+	Required    bool     `json:"required,omitempty"`    // #8994.02 .04 REQUIRED?
+	Sequence    int      `json:"sequence,omitempty"`    // #8994.02 .05 SEQUENCE NUMBER (default = position)
+	Description []string `json:"description,omitempty"` // #8994.02 DESCRIPTION word-processing lines
+}
+
+// RPCParamTypeCode maps a human RPC-parameter-type name to its #8994.02 field .02
+// (PARAMETER TYPE) set-of-codes value. National constants.
+var RPCParamTypeCode = map[string]string{
+	"literal":         "1",
+	"list":            "2",
+	"word processing": "3",
+	"reference":       "4",
 }
 
 // RPCReturnTypeCode maps a human return-value-type name to its #8994 field .04
@@ -679,6 +701,19 @@ func validateRPCs(rpcs []RPCComp, maxName int) error {
 		if r.ReturnType != "" {
 			if _, ok := RPCReturnTypeCode[r.ReturnType]; !ok {
 				return fmt.Errorf("buildspec: rpc %s returnType %q is not a known #8994 return-value type", r.Name, r.ReturnType)
+			}
+		}
+		for _, p := range r.InputParameters {
+			if !reEntryName.MatchString(p.Name) || len(p.Name) > 30 {
+				return fmt.Errorf("buildspec: rpc %s input parameter %q must be uppercase ≤30 chars (#8994.02 INPUT PARAMETER)", r.Name, p.Name)
+			}
+			if p.Type != "" {
+				if _, ok := RPCParamTypeCode[p.Type]; !ok {
+					return fmt.Errorf("buildspec: rpc %s parameter %s type %q is not a known #8994.02 PARAMETER TYPE", r.Name, p.Name, p.Type)
+				}
+			}
+			if p.MaxLength < 0 || p.Sequence < 0 {
+				return fmt.Errorf("buildspec: rpc %s parameter %s maxLength/sequence must be non-negative", r.Name, p.Name)
 			}
 		}
 	}

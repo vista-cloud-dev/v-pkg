@@ -192,6 +192,23 @@ back-out. Fixture `testdata/zzhf`. Verify probes `^DIC(9.2,"B",<name>)`, uninsta
 HL7 APPLICATION PARAMETER #771 + HL LOGICAL LINK #870 + HLO APPLICATION REGISTRY
 #779.2 done (below). Templates (#.4/.402/…) still parked on read-live capture (below).
 
+## RPC INPUT PARAMETERS — #8994.02 multiple (2026-06-28)
+Extended RPC #8994 with the optional INPUT PARAMETER multiple (field 2, subfile
+**8994.02A**, stored at node **2**). Per param: data `2,<seq>,0)=
+NAME^TYPE^MAXLEN^REQUIRED^SEQNUM` (.02 TYPE set `1 literal/2 list/3 WP/4 reference`,
+.04 REQUIRED set `1 yes/0 no`, .05 SEQUENCE NUMBER), an optional nested DESCRIPTION
+WP (subfile 8994.021, header ships **empty-subfile** `^^<n>^<n>` like HELP FRAME),
+and **two cross-references the emitter must ship itself**: `2,"B",<NAME>,<seq>)` and
+`2,"PARAMSEQ",<seqnum>,<seq>)`. **Why ship the xrefs:** unlike #779.2 (which
+re-indexes), the **#8994 install is a VERBATIM KRN MERGE** — its ORD tail
+`1;;;;;;;RPCDEL^XPDIA1` has NO gather/pre/post re-file routines, so FileMan does NOT
+rebuild xrefs; whatever the image carries is the live record. Live-proven on vehu +
+foia-t12: the full param subtree (header, 2 data nodes, date-less description WP, B +
+PARAMSEQ xrefs) is **byte-identical** to the shipped image on both — confirming the
+verbatim-merge model. Generalized `wpNodes`→`wpNodesAt(prefix Subs, …)` for the
+nested per-param WP. `RPCParamComp{Name,Type,MaxLength,Required,Sequence,Description}`;
+seq + type default (position / "literal"). Fixture `testdata/zzrpc` now ships 2 params.
+
 ## DESCRIPTION word-processing fields — KEY #19.1 / MAIL GROUP #3.8 / #870 (2026-06-28)
 Unblocked the three deferred DESCRIPTION WP fields with the date-less WP playbook
 (proven with HELP FRAME). Added a shared `wpNodes(node, subfile, lines)` helper in
