@@ -12,12 +12,13 @@
 # It is NOT a cloud-CI gate (it needs the local Docker engines vehu/foia-t12);
 # run it locally / on the engine host.
 #
-# The cycle is self-cleaning for routines/components, but `--register-package`
-# stamps a PACKAGE #9.4 footprint that `uninstall` does NOT remove (no deregister
-# verb yet) — so re-runs update the same #9.4 entry rather than piling up. The
-# register is REQUIRED: VSL's Required-Build check reads $$PATCH/$$VER^XPDUTL
-# (#9.4), so MSL must be registered for the positive dependency test to pass. The
-# same asymmetry is why NEG is a known-gap probe, not a gated assertion.
+# The cycle is fully self-cleaning: `--register-package` stamps a PACKAGE #9.4
+# footprint and the back-out uses `uninstall --force --deregister` to clear it, so
+# $$PATCH^XPDUTL is honest afterward (no ghost). The register is REQUIRED for the
+# POSITIVE dependency test (VSL's Required-Build reads $$PATCH/$$VER^XPDUTL = #9.4,
+# so MSL must be registered to satisfy it); the deregister is what makes the
+# NEGATIVE test real — with MSL's footprint cleared, installing VSL alone is
+# correctly refused. Both directions are now gated assertions (NEG=1).
 #
 # Engine connection is read from the M_<ENGINE>_* environment (same knobs as
 # `v pkg` / `m vista`), NEVER hardcoded here. For YDB+vehu the docker login shell
@@ -75,8 +76,8 @@ note "build the real packages"
 MSL="$WORK/MSL.kids"; VSL="$WORK/VSL.kids"
 
 note "pre-clean ($ENGINE) — best-effort, ignore if absent"
-"$VPKG" uninstall "$VSL" "${conn[@]}" --force --output json >/dev/null 2>&1 || true
-"$VPKG" uninstall "$MSL" "${conn[@]}" --force --output json >/dev/null 2>&1 || true
+"$VPKG" uninstall "$VSL" "${conn[@]}" --force --deregister --output json >/dev/null 2>&1 || true
+"$VPKG" uninstall "$MSL" "${conn[@]}" --force --deregister --output json >/dev/null 2>&1 || true
 
 note "install + content-verify (happy path; VSL->MSL dependency satisfied)"
 run 0 "install MSL"            install "$MSL" --allow-overwrite --register-package "M STANDARD LIBRARY"
@@ -84,28 +85,20 @@ run 0 "verify MSL (content)"   verify  "$MSL"
 run 0 "install VSL (req-build MSL present)" install "$VSL" --allow-overwrite --register-package "VISTA STANDARD LIBRARY"
 run 0 "verify VSL (content)"   verify  "$VSL"
 
-note "back out + verify clean"
-run 0 "uninstall VSL (--force; side-effecting)" uninstall "$VSL" --force
-run 3 "verify VSL clean (installed:false)"      verify    "$VSL"
-run 0 "uninstall MSL (--force)"                 uninstall "$MSL" --force
-run 3 "verify MSL clean (installed:false)"      verify    "$MSL"
+note "back out + verify clean (--deregister clears the #9.4 footprint too)"
+run 0 "uninstall VSL (--force --deregister)" uninstall "$VSL" --force --deregister
+run 3 "verify VSL clean (installed:false)"   verify    "$VSL"
+run 0 "uninstall MSL (--force --deregister)" uninstall "$MSL" --force --deregister
+run 3 "verify MSL clean (installed:false)"   verify    "$MSL"
 
 if [[ "$NEG" == "1" ]]; then
-  note "negative dependency probe — KNOWN GAP (informational, not gated)"
-  # The positive test above needed MSL's #9.4 footprint (--register-package), because
-  # the Required-Build check reads $$PATCH/$$VER^XPDUTL (#9.4/#22/#9.49), not #9.7.
-  # But `uninstall` removes #9.7/#9.6/components and does NOT deregister #9.4 — so
-  # after back-out $$PATCH^XPDUTL("MSL*0.1*1") still returns 1 (a ghost), and VSL
-  # installs even with MSL's #9.7 gone. The negative direction therefore cannot be
-  # exercised until uninstall grows a symmetric deregister (clears VERSION + PATCH
-  # APPLICATION HISTORY). Live-confirmed on vehu 2026-06-29. See [[live-package-gate]].
-  rc=0; "$VPKG" install "$VSL" "${conn[@]}" --allow-overwrite --output json >"$WORK/out.json" 2>&1 || rc=$?
-  if [[ "$rc" == 0 ]]; then
-    printf '  \033[33mGAP\033[0m  VSL installed with MSL #9.7 absent (exit 0) — ghost #9.4 footprint satisfied the req-build\n'
-  else
-    printf '  \033[32mNOTE\033[0m VSL refused (exit %s) — the gap may be closed; re-baseline this probe\n' "$rc"
-  fi
-  "$VPKG" uninstall "$VSL" "${conn[@]}" --force --output json >/dev/null 2>&1 || true
+  note "negative dependency test — VSL alone, MSL absent + deregistered, expect REFUSED"
+  # The back-out above deregistered MSL (cleared its #9.4 footprint), so
+  # $$PATCH^XPDUTL("MSL*0.1*1")=0: VSL's Required-Build MSL*0.1*1 must now block the
+  # install (env-check / required-build enforcement, exit 1). Live-proven on vehu
+  # 2026-06-29 — the deregister is what makes this direction testable.
+  run 1 "install VSL refused (req-build MSL absent)" install "$VSL" --allow-overwrite
+  "$VPKG" uninstall "$VSL" "${conn[@]}" --force --deregister --output json >/dev/null 2>&1 || true
 fi
 
 note "summary — $ENGINE"

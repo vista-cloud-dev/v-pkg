@@ -276,6 +276,31 @@ func VerifyScript(name string, routines, paramDefs, options, keys, protocols, rp
 	return b.String()
 }
 
+// DeregisterScript returns M that REMOVES the PACKAGE #9.4 patch-history footprint a
+// prior `install --register-package` stamped — the inverse of FinalInstallScript's
+// reg block, so $$PATCH^XPDUTL no longer reports the patch after a back-out. It
+// finds the package by PREFIX (the "C" xref), the VERSION (#9.49) by value, and the
+// PATCH APPLICATION HISTORY (#9.4901) entry by value, then FileMan-DIKs that entry
+// (which also clears its "B" xref). It deliberately LEAVES the VERSION + package
+// entries intact — they may carry other patches or be national, and KIDS itself
+// never removes a package; the confirmed gap is only the $$PATCH ghost. A nil reg,
+// or one with no patch (no patch-history entry exists), writes nothing.
+func DeregisterScript(reg *PkgReg) string {
+	if reg == nil || reg.Patch == "" {
+		return ""
+	}
+	var b strings.Builder
+	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
+	w(`S U="^",DUZ=1,DUZ(0)="@"`)
+	w(`N XPDPDA,XPDPV,XPDPP,DA,DIK`)
+	w(`S XPDPDA=+$O(^DIC(9.4,"C",` + kids.MString(reg.Prefix) + `,0))`)
+	w(`S XPDPV=$S(XPDPDA:+$O(^DIC(9.4,XPDPDA,22,"B",` + kids.MString(reg.Version) + `,0)),1:0)`)
+	w(`S XPDPP=$S(XPDPV:+$O(^DIC(9.4,XPDPDA,22,XPDPV,"PAH","B",` + kids.MString(reg.Patch) + `,0)),1:0)`)
+	w(`I XPDPP S DA(2)=XPDPDA,DA(1)=XPDPV,DA=XPDPP,DIK="^DIC(9.4,"_XPDPDA_",22,"_XPDPV_","_$C(34)_"PAH"_$C(34)_"," D ^DIK`)
+	w(`W "` + ResultMarker + `dereg=",$S(XPDPP:1,1:0),!`)
+	return b.String()
+}
+
 // VerifyContentScript returns M that reads back the LIVE 0-node of each shipped
 // KRN entry record so `verify` can assert CONTENT, not just presence: per record
 // it resolves the site IEN via the data file's "B" index, then writes the stored

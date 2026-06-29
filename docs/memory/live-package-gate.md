@@ -12,11 +12,13 @@ full lifecycle against a live engine through the driver stack. `scripts/live-pac
 + `make live-gate [ENGINE=ydb|iris] [NEG=1]`. Complements [[verify-content]],
 [[package-footprint]], [[multi-build-install]].
 
-**YDB/vehu: 10/10 PASS** — build MSL+VSL → install MSL (registered) → verify
-(content) → install VSL (Required-Build MSL satisfied) → verify (content) →
-uninstall VSL (`--force`) → verify-clean → uninstall MSL (`--force`) → verify-clean.
-First-ever LIVE run of content-verify: VSL's `8989.51:VPNG GREETING` graded `ok`
-(the live param-def 0-node matched the shipped image).
+**YDB/vehu: 11/11 PASS (NEG=1)** — build MSL+VSL → install MSL (registered) →
+verify (content) → install VSL (Required-Build MSL satisfied) → verify (content) →
+uninstall VSL (`--force --deregister`) → verify-clean → uninstall MSL
+(`--force --deregister`) → verify-clean → **negative: install VSL alone → REFUSED**
+(MSL deregistered). First-ever LIVE run of content-verify: VSL's
+`8989.51:VPNG GREETING` graded `ok` (the live param-def 0-node matched the shipped
+image).
 
 **KEY GOTCHA — `v pkg --engine ydb --transport docker` env recipe for vehu.** The
 driver's docker login shell sources the container's own gbldir/routines, BUT
@@ -28,18 +30,17 @@ explicitly or it stages nothing → "driver loaded no routine". Required exports
 eval` works without it (no staging); v-pkg verbs do not. The gate hardcodes these
 vehu defaults; IRIS needs M_IRIS_* (base-url/user/password/namespace/container).
 
-**CONFIRMED GAP — uninstall does not deregister the PACKAGE #9.4 footprint.**
-`--register-package` (A.3) stamps VERSION (#9.49) + PATCH APPLICATION HISTORY
-(#9.4901); `uninstall` removes #9.7/#9.6/components but NOT #9.4. Live-confirmed on
-vehu: after uninstalling MSL, `^XPD(9.7,"B","MSL*0.1*1")=0` (gone) but
-`$$PATCH^XPDUTL("MSL*0.1*1")=1` and `^DIC(9.4,"B","M STANDARD LIBRARY")` persist
-(ghost). Consequences: (1) the **negative** Required-Build direction can't be
-exercised — VSL installs to status 3 with MSL's #9.7 absent because the ghost #9.4
-satisfies the `$$PATCH/$$VER` check; (2) the register is REQUIRED for the positive
-test (the check reads #9.4, not #9.7), so the asymmetry is load-bearing. **Fix
-(follow-up):** a symmetric `uninstall --deregister` (or auto when the install
-registered) that clears the #9.49/#9.4901 footprint. Until then the gate's `NEG=1`
-is an informational known-gap probe, not a gated assertion.
+**GAP FOUND → CLOSED — uninstall now deregisters the PACKAGE #9.4 footprint
+(2026-06-29).** Originally `uninstall` removed #9.7/#9.6/components but NOT the #9.4
+footprint `--register-package` stamps, so after back-out `$$PATCH^XPDUTL("MSL*0.1*1")`
+still returned 1 (a ghost) and VSL installed to status 3 with MSL's #9.7 absent —
+the **negative** Required-Build direction couldn't fire. **Fixed by `uninstall
+--deregister`** (see [[package-footprint]]): live-proven on vehu — `$$PATCH` 1→0,
+PAH node gone, VERSION preserved; and with the ghost cleared, installing VSL alone
+is correctly **refused** (env-check/required-build, exit 1). So the gate's `NEG=1`
+is now a **real gated assertion** (11/11), and the back-out steps use `--force
+--deregister` to stay $$PATCH-honest. (The register is still REQUIRED for the
+positive test — the Required-Build check reads #9.4, not #9.7.)
 
 **Side-effecting back-out reality (VSL).** VSL ships a FileMan file (#999001) +
 param-def → class `side-effecting`. `uninstall --force` does a full delete

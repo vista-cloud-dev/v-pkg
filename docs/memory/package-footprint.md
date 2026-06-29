@@ -56,7 +56,26 @@ with the 3-char "ZZV" gave `$$PATCH(ZZV*1.0*3)` **0 → 1** (and a non-installed
   `runInstall` → `FinalInstallScript`; `installResult/installReport.PackageIEN`
   surfaces the stamped #9.4 IEN. `restore.go` + the uninstall re-install path pass nil.
 
+## Symmetric removal — `uninstall --deregister` (2026-06-29)
+`uninstall` removes #9.7/#9.6/components but originally left the #9.4 footprint, so
+`$$PATCH^XPDUTL` kept reporting a **ghost** after back-out (surfaced by the
+[[live-package-gate]]: VSL installed with MSL's #9.7 gone because the ghost satisfied
+the Required-Build). **`v pkg uninstall --deregister`** is the inverse of
+`--register-package`: `installspec.DeregisterScript` finds the package by PREFIX
+("C" xref) → VERSION #9.49 by value ("B") → PATCH APPLICATION HISTORY #9.4901 by
+value ("B"), then **FileMan-DIKs that #9.4901 entry** (clears its "B" too). It
+deliberately LEAVES the VERSION + package entries (they may carry other patches / be
+national; KIDS never removes a package). `pkgcli`: `uninstallCmd.Deregister` flag →
+`deregReg(installName)` (prefix/version/patch, no long NAME needed — find, not create)
+→ `runDeregister` → `<<VPKG>>dereg=1`. **LIVE-PROVEN on vehu:** `$$PATCH("MSL*0.1*1")`
+**1 → 0**, PAH node gone, VERSION preserved; and with the ghost cleared the NEGATIVE
+Required-Build direction correctly **refuses** VSL when MSL is absent (the gate's
+`NEG=1` is now a real assertion — 11/11). A patchless reg deregisters nothing
+(no PAH entry); only the patch-history $$PATCH ghost is in scope (the $$VER /
+CURRENT VERSION footprint is intentionally left).
+
 Companion to [[install-fidelity-spike]] (A.1 phase boundary), [[install-hooks-authoring]]
-(B.3), [[install-question-answers]] (A.1.3). Roadmap item A.3 in
+(B.3), [[install-question-answers]] (A.1.3), [[live-package-gate]] (where the gap was
+found + the fix proven). Roadmap item A.3 in
 `docs/proposals/v-pkg-kids-coverage-analysis.md`. Engine access via
 [[engine-access-through-driver-stack]].

@@ -595,3 +595,39 @@ func anySuffix(ss []string, suffix string) bool {
 	}
 	return false
 }
+
+// --- deregister (clear the #9.4 footprint) ----------------------------------
+
+func TestDeregReg(t *testing.T) {
+	r := deregReg("MSL*0.1*1")
+	if r == nil || r.Prefix != "MSL" || r.Version != "0.1" || r.Patch != "1" {
+		t.Errorf("deregReg(MSL*0.1*1) = %+v", r)
+	}
+	if r := deregReg("MSL*0.1"); r == nil || r.Patch != "" {
+		t.Errorf("deregReg(MSL*0.1) = %+v, want patch empty", r)
+	}
+	if r := deregReg("bogus"); r != nil {
+		t.Errorf("deregReg(bogus) = %+v, want nil", r)
+	}
+}
+
+func TestRunDeregister(t *testing.T) {
+	reg := &installspec.PkgReg{Prefix: "MSL", Version: "0.1", Patch: "1"}
+	f := &fakeDriver{runStdout: installspec.ResultMarker + "dereg=1\n"}
+	ok, err := runDeregister(context.Background(), fakeClient(f), reg)
+	if err != nil {
+		t.Fatalf("runDeregister: %v", err)
+	}
+	if !ok {
+		t.Error("want deregistered=true for dereg=1")
+	}
+	// No footprint found → false (not an error).
+	f2 := &fakeDriver{runStdout: installspec.ResultMarker + "dereg=0\n"}
+	if ok2, _ := runDeregister(context.Background(), fakeClient(f2), reg); ok2 {
+		t.Error("want deregistered=false for dereg=0")
+	}
+	// A patchless reg has nothing to clear → false, no engine call.
+	if ok3, _ := runDeregister(context.Background(), fakeClient(f), &installspec.PkgReg{Prefix: "MSL", Version: "0.1"}); ok3 {
+		t.Error("want deregistered=false for patchless reg")
+	}
+}

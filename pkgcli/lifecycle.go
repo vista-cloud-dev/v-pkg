@@ -390,6 +390,36 @@ func packageReg(installName, regName string) *installspec.PkgReg {
 	return reg
 }
 
+// deregReg parses an install name (PREFIX*VERSION[*PATCH]) into the #9.4 footprint
+// to clear on `uninstall --deregister`. Unlike packageReg it needs no long NAME —
+// deregister FINDS the package by prefix and never creates it. nil if malformed.
+func deregReg(installName string) *installspec.PkgReg {
+	parts := strings.Split(installName, "*")
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		return nil
+	}
+	reg := &installspec.PkgReg{Prefix: parts[0], Version: parts[1]}
+	if len(parts) >= 3 {
+		reg.Patch = parts[2]
+	}
+	return reg
+}
+
+// runDeregister clears the PACKAGE #9.4 patch-history footprint for reg (the inverse
+// of install --register-package). Returns whether a patch-history entry was removed
+// (false, no engine call, for a nil/patchless reg).
+func runDeregister(ctx context.Context, cl *mdriver.Client, reg *installspec.PkgReg) (bool, error) {
+	script := installspec.DeregisterScript(reg)
+	if script == "" {
+		return false, nil
+	}
+	markers, _, err := runMScript(ctx, cl, rtnUninstall, script)
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(markers["dereg"]) == "1", nil
+}
+
 // parseAnswers turns the repeatable --answer NAME=VALUE flags into ordered QUES
 // answers. The name is everything before the first '=', the value everything after
 // (so a value may itself contain '='); order is preserved for deterministic IENs.
@@ -1064,11 +1094,12 @@ func decideUninstall(class kids.ReversibilityClass, restoreKid, backoutKid strin
 
 type uninstallCmd struct {
 	engineConn
-	KidFile string `arg:"" help:"Path to the .KID whose install to reverse."`
-	Restore string `help:"Pre-image snapshot .KID to restore instead of deleting (class-1 reversal for a patched-over routine)."`
-	Backout string `help:"Authored back-out .KID to install instead of deleting (class-2 reversal of a side-effecting patch)."`
-	Force   bool   `help:"Delete routines even for a side-effecting patch (UNSAFE: orphans install-time data/side-effects)."`
-	Verify  bool   `help:"After a restore/back-out, confirm the live routines now match the re-applied artifact (verify-clean)."`
+	KidFile    string `arg:"" help:"Path to the .KID whose install to reverse."`
+	Restore    string `help:"Pre-image snapshot .KID to restore instead of deleting (class-1 reversal for a patched-over routine)."`
+	Backout    string `help:"Authored back-out .KID to install instead of deleting (class-2 reversal of a side-effecting patch)."`
+	Force      bool   `help:"Delete routines even for a side-effecting patch (UNSAFE: orphans install-time data/side-effects)."`
+	Verify     bool   `help:"After a restore/back-out, confirm the live routines now match the re-applied artifact (verify-clean)."`
+	Deregister bool   `help:"Also clear the PACKAGE #9.4 patch-history footprint a prior 'install --register-package' stamped, so $$PATCH^XPDUTL no longer reports this patch (symmetric to register)."`
 }
 
 type uninstallReport struct {
@@ -1078,8 +1109,9 @@ type uninstallReport struct {
 	Reason       string `json:"reason"`
 	AutoDetected bool   `json:"autoDetected,omitempty"` // pre-image found via the sidecar convention
 	Done         bool   `json:"done"`
-	Status       int    `json:"status,omitempty"`      // #9.7 status for restore/backout installs
-	VerifyClean  string `json:"verifyClean,omitempty"` // "" | "clean" | "dirty" (when --verify)
+	Status       int    `json:"status,omitempty"`       // #9.7 status for restore/backout installs
+	VerifyClean  string `json:"verifyClean,omitempty"`  // "" | "clean" | "dirty" (when --verify)
+	Deregistered bool   `json:"deregistered,omitempty"` // #9.4 patch-history footprint cleared (when --deregister)
 }
 
 func (c *uninstallCmd) Run(cc *clikit.Context) error {
@@ -1152,6 +1184,19 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 		res.Done = ur.Uninstalled
 	}
 
+	// --deregister: clear the #9.4 patch-history footprint a prior
+	// --register-package stamped (uninstall otherwise leaves it, so $$PATCH^XPDUTL
+	// keeps reporting a ghost). Symmetric to install --register-package.
+	if c.Deregister && res.Done {
+		if reg := deregReg(name); reg != nil {
+			removed, derr := runDeregister(ctx, cl, reg)
+			if derr != nil {
+				return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", derr.Error(), "")
+			}
+			res.Deregistered = removed
+		}
+	}
+
 	if err := cc.Result(res, func() {
 		cc.Title("pkg uninstall — " + c.Engine)
 		fmt.Fprintf(cc.Stdout, "%s [%s] %s\n", cc.Accent(name), rev.ClassName, cc.Faint(reason))
@@ -1168,6 +1213,13 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 			fmt.Fprintln(cc.Stdout, cc.Success("verify-clean: live routines match the re-applied artifact"))
 		case "dirty":
 			fmt.Fprintln(cc.Stdout, cc.Failure("verify-clean FAILED: live routines do not match the re-applied artifact"))
+		}
+		if c.Deregister {
+			if res.Deregistered {
+				fmt.Fprintln(cc.Stdout, cc.Success("deregistered: #9.4 patch-history footprint cleared"))
+			} else {
+				fmt.Fprintln(cc.Stdout, cc.Faint("deregister: no #9.4 patch-history footprint found"))
+			}
 		}
 	}); err != nil {
 		return err

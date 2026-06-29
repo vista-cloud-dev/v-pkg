@@ -563,3 +563,29 @@ func TestUninstallScript_File(t *testing.T) {
 		}
 	}
 }
+
+// DeregisterScript removes the PACKAGE #9.4 patch-history footprint a prior
+// install --register-package stamped (the inverse of the FinalInstallScript reg
+// block): find package by PREFIX, VERSION #9.49 by value, PATCH APPLICATION
+// HISTORY #9.4901 by value, then FileMan-DIK that entry.
+func TestDeregisterScript(t *testing.T) {
+	got := DeregisterScript(&PkgReg{Prefix: "MSL", Version: "0.1", Patch: "1"})
+	for _, want := range []string{
+		`$O(^DIC(9.4,"C","MSL",0))`, // find package by PREFIX ("C" xref)
+		`,22,"B","0.1",`,            // find VERSION #9.49 by value
+		`,"PAH","B","1",`,           // find PATCH APPLICATION HISTORY #9.4901 by value
+		`D ^DIK`,                    // DIK the patch-history entry (clears its "B")
+		ResultMarker + `dereg=`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("DeregisterScript missing %q\n---\n%s", want, got)
+		}
+	}
+	// A patchless registration has no patch-history entry to clear; nil → nothing.
+	if s := DeregisterScript(&PkgReg{Prefix: "MSL", Version: "0.1"}); s != "" {
+		t.Errorf("patchless DeregisterScript = %q, want empty", s)
+	}
+	if s := DeregisterScript(nil); s != "" {
+		t.Errorf("nil DeregisterScript = %q, want empty", s)
+	}
+}

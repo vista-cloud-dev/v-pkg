@@ -419,6 +419,11 @@
           "name": "verify",
           "type": "bool",
           "help": "After a restore/back-out, confirm the live routines now match the re-applied artifact (verify-clean)."
+        },
+        {
+          "name": "deregister",
+          "type": "bool",
+          "help": "Also clear the PACKAGE #9.4 patch-history footprint a prior 'install --register-package' stamped, so $PATCH^XPDUTL no longer reports this patch (symmetric to register)."
         }
       ],
       "args": [
