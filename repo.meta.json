@@ -4,9 +4,9 @@
   "role": "VistA KIDS packaging — the `v pkg` domain (build/install/verify/uninstall over the m engine seam)",
   "language": ["go"],
   "layer": "v",
-  "license": "AGPL-3.0",
+  "license": "Apache-2.0",
   "exposes": {
     "contract": "dist/v-contract.json"
   },
-  "verification_commands": ["go test ./...", "./dist/m arch check ."]
+  "verification_commands": ["go test ./...", "m arch check ."]
 }

@@ -4,7 +4,8 @@
 // standalone `v-pkg` binary embeds the same Commands for top-level verbs. The
 // offline verbs (decompose / assemble / roundtrip / canonicalize / parse / lint)
 // are the byte-identical port of py-kids-vc / XPDK2VC; the live KIDS lifecycle
-// (build / install / verify / uninstall / status) lands in M0a's later tasks.
+// (build / install / verify / uninstall / snapshot / restore) runs over the
+// m-driver-sdk engine seam.
 package pkgcli
 
 import (

@@ -12,10 +12,10 @@ grounding:
   - "MSL / VSL builds — m-stdlib/kids/std.build.json (MSL*0.1*1, 39 routines) + v-stdlib/kids/vsl.build.json (VSL*1.0*15: routines + #999001 VSL AUDIT + param-def + MSL required build)"
   - "v-pkg source — internal/buildspec, internal/kids, pkgcli, internal/installspec, pkgcli/commands.go verb surface (HEAD 2026-06-29)"
 related:
-  - kids-corpus-findings.md
-  - patch-existing-routines-proposal.md
-  - kids-installation-automation.md
-  - fileman-dd-install-plan.md
+  - ../design/kids-corpus-findings.md
+  - ../archive/patch-existing-routines-proposal.md
+  - ../design/kids-installation-automation.md
+  - ../archive/fileman-dd-install-plan.md
   - "../v-stdlib/docs/proposals/v-stdlib-remediation-plan.md (R3 — the multi-field VSL AUDIT DD that triggered this analysis)"
 ---
 

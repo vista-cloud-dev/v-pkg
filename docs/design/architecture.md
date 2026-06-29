@@ -330,7 +330,7 @@ flowchart LR
 
 It parses, decomposes to a temp dir, reassembles, re-parses, and compares the
 two parsed builds for canonical equality. Drift yields exit `3`. Running the
-oracle over the full WorldVistA corpus (≈2,406 patches) is the toolchain's
+oracle over the full WorldVistA corpus (≈2,404 patches) is the toolchain's
 **G6** acceptance gate.
 
 ---
