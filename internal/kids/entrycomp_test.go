@@ -533,6 +533,38 @@ func TestMakeBuildPairs_HLOApp_NoVersion(t *testing.T) {
 	}
 }
 
+// An optional DESCRIPTION word-processing field ships on the description-bearing
+// types (SECURITY KEY #19.1 → subfile 19.11 at node 1, MAIL GROUP #3.8 → 3.801 at
+// node 2, HL LOGICAL LINK #870 → 870.02 at node 3) via the shared date-less WP
+// playbook: a header ^<subfile>^<n>^<n> (no install-stamped date) plus one node per
+// line, so identical input is byte-identical.
+func TestMakeBuildPairs_DescriptionWP(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZD*1.0*1", Namespace: "ZZD",
+		Keys:         []SecurityKey{{Name: "ZZKEY MGR", Description: []string{"Line one.", "Line two."}}},
+		MailGroups:   []MailGroup{{Name: "ZZMG ALERTS", Description: []string{"MG desc."}}},
+		LogicalLinks: []LogicalLink{{Name: "ZZLINK", LLPType: "TCP", Description: []string{"Link desc."}}},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	want := map[string]string{
+		`"KRN",19.1,1,1,0)`:   "^19.11^2^2",
+		`"KRN",19.1,1,1,1,0)`: "Line one.",
+		`"KRN",19.1,1,1,2,0)`: "Line two.",
+		`"KRN",3.8,1,2,0)`:    "^3.801^1^1",
+		`"KRN",3.8,1,2,1,0)`:  "MG desc.",
+		`"KRN",870,1,3,0)`:    "^870.02^1^1",
+		`"KRN",870,1,3,1,0)`:  "Link desc.",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+}
+
 // TestMakeBuildPairs_MixedEntryTypes proves the unified KRN manifest header spans
 // multiple entry types in one build (B.1 next step): an OPTION (#19) AND a
 // PARAMETER DEFINITION (#8989.51) share one "BLD",1,"KRN",0) header

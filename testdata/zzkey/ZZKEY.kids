@@ -36,6 +36,10 @@ SECURITY KEY
 0^1
 "KRN",19.1,1,0)
 ZZKEY MANAGER
+"KRN",19.1,1,1,0)
+^19.11^1^1
+"KRN",19.1,1,1,1,0)
+Holders of this key may run the ZZKEY manager menu.
 "VER")
 8.0^22.2
 **END**

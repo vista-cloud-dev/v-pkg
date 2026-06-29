@@ -9,7 +9,8 @@
         "name": "ZZLINK",
         "llpType": "TCP",
         "port": "5000",
-        "serviceType": "C"
+        "serviceType": "C",
+        "description": ["ZZLL test logical link."]
       }
     ]
   }

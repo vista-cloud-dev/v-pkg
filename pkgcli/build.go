@@ -223,7 +223,7 @@ func resolveOptions(opts []buildspec.OptionComp) []kids.Option {
 func resolveKeys(keys []buildspec.KeyComp) []kids.SecurityKey {
 	out := make([]kids.SecurityKey, 0, len(keys))
 	for _, k := range keys {
-		out = append(out, kids.SecurityKey{Name: k.Name})
+		out = append(out, kids.SecurityKey{Name: k.Name, Description: k.Description})
 	}
 	return out
 }
@@ -283,6 +283,7 @@ func resolveMailGroups(mgs []buildspec.MailGroupComp) []kids.MailGroup {
 			Name:            m.Name,
 			TypeCode:        buildspec.MailGroupTypeCode[typ],
 			AllowSelfEnroll: self,
+			Description:     m.Description,
 		})
 	}
 	return out
@@ -376,7 +377,7 @@ func resolveLogicalLinks(lls []buildspec.LogicalLinkComp) []kids.LogicalLink {
 			svc = "C"
 		}
 		out = append(out, kids.LogicalLink{
-			Name: l.Name, LLPType: llp, Port: l.Port, ServiceType: svc,
+			Name: l.Name, LLPType: llp, Port: l.Port, ServiceType: svc, Description: l.Description,
 		})
 	}
 	return out

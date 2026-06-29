@@ -5,7 +5,10 @@
   "components": {
     "routines": ["ZZKEYRT"],
     "keys": [
-      { "name": "ZZKEY MANAGER" }
+      {
+        "name": "ZZKEY MANAGER",
+        "description": ["Holders of this key may run the ZZKEY manager menu."]
+      }
     ]
   }
 }

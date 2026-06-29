@@ -8,7 +8,8 @@
       {
         "name": "ZZMG ALERTS",
         "type": "public",
-        "allowSelfEnrollment": true
+        "allowSelfEnrollment": true,
+        "description": ["Receives ZZMG alert bulletins."]
       }
     ]
   }

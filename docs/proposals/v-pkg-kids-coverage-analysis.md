@@ -514,6 +514,18 @@ not the populate-and-`EN^XPDIJ` shortcut.
     B-index gone after back-out. **This closes the HL7 family** (#771 + #779.2 + #870);
     remaining HL follow-ups are #870 DESCRIPTION WP (#870.02) and #779.2 multi-app
     batches. ([[option-entry-component]])
+  - **B.1-l ✅ DONE + LIVE-PROVEN 2026-06-28 — optional DESCRIPTION WP for KEY #19.1,
+    MAIL GROUP #3.8, HL LOGICAL LINK #870, both engines.** Closed the three deferred
+    DESCRIPTION word-processing fields (B.1-c / B.1-f / B.1-j) with the date-less WP
+    playbook. Added a shared `wpNodes(node, subfile, lines)` helper (header
+    `^<subfile>^<n>^<n>` date-less + one node per line); refactored HELP FRAME's inline
+    WP onto it (golden unchanged). Field→subfile→node: #19.1 f1→19.11@1, #3.8 f3→3.801@2,
+    #870 f1→870.02@3. Each `*Comp` gained `description []string`. **Live finding:** the
+    engines file the date-less header VERBATIM (live stays `^19.11^1^1`, no re-stamped
+    date) — byte-identical in the live global too. TDD; lint/race/contract green; corpus
+    DRIFT=0; goldens `testdata/zzkey|zzmg|zzll` regenerated. Live install→verify→`--force`
+    uninstall→clean on vehu + foia-t12, headers + text byte-identical on both.
+    ([[option-entry-component]])
 - **B.2 Real FILE DD + DATA (F3; the R3 enabler).** Extend `FileComp` to a
   multi-field DD (see §8 for the grounded node-set) and add **DATA** export with
   the four action codes (ADD-IF-NEW / MERGE / OVERWRITE / REPLACE) and FULL/PARTIAL

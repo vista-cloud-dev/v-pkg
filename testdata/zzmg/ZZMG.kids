@@ -36,6 +36,10 @@ MAIL GROUP
 0^1
 "KRN",3.8,1,0)
 ZZMG ALERTS^PU^y
+"KRN",3.8,1,2,0)
+^3.801^1^1
+"KRN",3.8,1,2,1,0)
+Receives ZZMG alert bulletins.
 "VER")
 8.0^22.2
 **END**

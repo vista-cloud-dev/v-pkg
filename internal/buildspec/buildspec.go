@@ -192,7 +192,8 @@ var ProtocolTypeCode = map[string]string{
 // a named token holders are granted; the build files the key by name (its optional
 // word-processing DESCRIPTION is a follow-up).
 type KeyComp struct {
-	Name string `json:"name"` // #19.1 .01 NAME (uppercase, e.g. "ZZKEY MANAGER")
+	Name        string   `json:"name"`                  // #19.1 .01 NAME (uppercase, e.g. "ZZKEY MANAGER")
+	Description []string `json:"description,omitempty"` // #19.1 DESCRIPTION word-processing lines (optional)
 }
 
 // MailGroupComp is a #3.8 MAIL GROUP shipped as a KIDS KRN component (B.1). Type is
@@ -202,9 +203,10 @@ type KeyComp struct {
 // and the word-processing DESCRIPTION is deferred (its header carries a volatile
 // last-edited date that would defeat the deterministic-build invariant).
 type MailGroupComp struct {
-	Name                string `json:"name"`                          // #3.8 .01 NAME (uppercase, e.g. "ZZMG ALERTS")
-	Type                string `json:"type,omitempty"`                // mail-group type: public (default) | private
-	AllowSelfEnrollment bool   `json:"allowSelfEnrollment,omitempty"` // #3.8 field 7 ALLOW SELF ENROLLMENT?
+	Name                string   `json:"name"`                          // #3.8 .01 NAME (uppercase, e.g. "ZZMG ALERTS")
+	Type                string   `json:"type,omitempty"`                // mail-group type: public (default) | private
+	AllowSelfEnrollment bool     `json:"allowSelfEnrollment,omitempty"` // #3.8 field 7 ALLOW SELF ENROLLMENT?
+	Description         []string `json:"description,omitempty"`         // #3.8 DESCRIPTION word-processing lines (optional)
 }
 
 // MailGroupTypeCode maps a human mail-group-type name to its #3.8 field 4 (TYPE)
@@ -266,10 +268,11 @@ type HL7AppComp struct {
 // — see kids.LogicalLink). v-pkg ships the link definition; the site configures the
 // endpoint. (The DESCRIPTION word-processing field is a follow-up.)
 type LogicalLinkComp struct {
-	Name        string `json:"name"`                  // #870 .01 NODE (3..10 chars)
-	LLPType     string `json:"llpType,omitempty"`     // #870 field 2 LLP TYPE (default "TCP")
-	Port        string `json:"port,omitempty"`        // #870 400.02 TCP/IP PORT
-	ServiceType string `json:"serviceType,omitempty"` // #870 400.03 TCP/IP SERVICE TYPE (C/S/M, default "C")
+	Name        string   `json:"name"`                  // #870 .01 NODE (3..10 chars)
+	LLPType     string   `json:"llpType,omitempty"`     // #870 field 2 LLP TYPE (default "TCP")
+	Port        string   `json:"port,omitempty"`        // #870 400.02 TCP/IP PORT
+	ServiceType string   `json:"serviceType,omitempty"` // #870 400.03 TCP/IP SERVICE TYPE (C/S/M, default "C")
+	Description []string `json:"description,omitempty"` // #870 DESCRIPTION word-processing lines (optional)
 }
 
 // HLOAppComp is a #779.2 HLO APPLICATION REGISTRY shipped as a KIDS KRN component

@@ -303,19 +303,18 @@ var securityKeyEntryType = entryType{number: securityKeyFile, name: securityKeyF
 // the record image is minimal — the .01 NAME alone (stored in ^DIC(19.1,). The
 // optional DESCRIPTION (word-processing) field is a follow-up.
 type SecurityKey struct {
-	Name string // #19.1 .01 NAME (0;1)
+	Name        string   // #19.1 .01 NAME (0;1)
+	Description []string // #19.1 field 1 DESCRIPTION (subfile 19.11 at node 1), optional
 }
 
 // securityKeyRecords packs each SecurityKey into the generic entry-record shape:
-// the SEND XPDFL flag and a single 0-node carrying the key name.
+// the SEND XPDFL flag, a single 0-node carrying the key name, and (optionally) the
+// DESCRIPTION word-processing field (subfile 19.11 at node 1).
 func securityKeyRecords(keys []SecurityKey) []entryRec {
 	recs := make([]entryRec, 0, len(keys))
 	for _, k := range keys {
-		recs = append(recs, entryRec{
-			name:  k.Name,
-			xpdfl: "0^1",
-			image: []imageNode{{Subs{intSub(0)}, k.Name}},
-		})
+		img := append([]imageNode{{Subs{intSub(0)}, k.Name}}, wpNodes(1, "19.11", k.Description)...)
+		recs = append(recs, entryRec{name: k.Name, xpdfl: "0^1", image: img})
 	}
 	return recs
 }
@@ -442,9 +441,10 @@ var mailGroupEntryType = entryType{number: mailGroupFile, name: mailGroupFileNam
 // word-processing DESCRIPTION (field 3, node 2) is deferred — its header carries a
 // volatile last-edited date that would defeat the deterministic-build invariant.
 type MailGroup struct {
-	Name            string // #3.8 .01 NAME (0;1)
-	TypeCode        string // #3.8 field 4 TYPE set-of-codes value (0;2): PU / PR
-	AllowSelfEnroll string // #3.8 field 7 ALLOW SELF ENROLLMENT (0;3): y / n / ""
+	Name            string   // #3.8 .01 NAME (0;1)
+	TypeCode        string   // #3.8 field 4 TYPE set-of-codes value (0;2): PU / PR
+	AllowSelfEnroll string   // #3.8 field 7 ALLOW SELF ENROLLMENT (0;3): y / n / ""
+	Description     []string // #3.8 field 3 DESCRIPTION (subfile 3.801 at node 2), optional
 }
 
 // mailGroupRecords packs each MailGroup into the generic entry-record shape: the
@@ -462,11 +462,8 @@ func mailGroupRecords(mgs []MailGroup) []entryRec {
 		if m.AllowSelfEnroll != "" {
 			zero += "^" + m.AllowSelfEnroll
 		}
-		recs = append(recs, entryRec{
-			name:  m.Name,
-			xpdfl: "0^1",
-			image: []imageNode{{Subs{intSub(0)}, zero}},
-		})
+		img := append([]imageNode{{Subs{intSub(0)}, zero}}, wpNodes(2, "3.801", m.Description)...)
+		recs = append(recs, entryRec{name: m.Name, xpdfl: "0^1", image: img})
 	}
 	return recs
 }
@@ -591,16 +588,7 @@ type HelpFrame struct {
 func helpFrameRecords(hfs []HelpFrame) []entryRec {
 	recs := make([]entryRec, 0, len(hfs))
 	for _, h := range hfs {
-		img := []imageNode{
-			{Subs{intSub(0)}, h.Name + "^" + h.Header},
-		}
-		if n := len(h.Text); n > 0 {
-			ns := strconv.Itoa(n)
-			img = append(img, imageNode{Subs{intSub(1), intSub(0)}, "^^" + ns + "^" + ns})
-			for i, line := range h.Text {
-				img = append(img, imageNode{Subs{intSub(1), intSub(int64(i + 1)), intSub(0)}, line})
-			}
-		}
+		img := append([]imageNode{{Subs{intSub(0)}, h.Name + "^" + h.Header}}, wpNodes(1, "", h.Text)...)
 		recs = append(recs, entryRec{name: h.Name, xpdfl: "0^1", image: img})
 	}
 	return recs
@@ -688,10 +676,11 @@ var logicalLinkEntryType = entryType{number: logicalLinkFile, name: logicalLinkF
 // definition (name, protocol, port, role); the receiving site configures the
 // endpoint. (The DESCRIPTION word-processing field #870.02 is a follow-up.)
 type LogicalLink struct {
-	Name        string // #870 .01 NODE (0;1) — 3..10 chars, no leading punctuation
-	LLPType     string // #870 field 2 LLP TYPE (0;3) — #869.1 pointer, external e.g. "TCP"
-	Port        string // #870 400.02 TCP/IP PORT (400;2)
-	ServiceType string // #870 400.03 TCP/IP SERVICE TYPE (400;3) — C/S/M
+	Name        string   // #870 .01 NODE (0;1) — 3..10 chars, no leading punctuation
+	LLPType     string   // #870 field 2 LLP TYPE (0;3) — #869.1 pointer, external e.g. "TCP"
+	Port        string   // #870 400.02 TCP/IP PORT (400;2)
+	ServiceType string   // #870 400.03 TCP/IP SERVICE TYPE (400;3) — C/S/M
+	Description []string // #870 field 1 DESCRIPTION (subfile 870.02 at node 3), optional
 }
 
 // logicalLinkRecords packs each LogicalLink into the generic entry-record shape:
@@ -705,6 +694,7 @@ func logicalLinkRecords(lls []LogicalLink) []entryRec {
 		if l.Port != "" || l.ServiceType != "" {
 			img = append(img, imageNode{Subs{intSub(400)}, caretJoin(map[int]string{2: l.Port, 3: l.ServiceType})})
 		}
+		img = append(img, wpNodes(3, "870.02", l.Description)...)
 		recs = append(recs, entryRec{name: l.Name, xpdfl: "0^1", image: img})
 	}
 	return recs
@@ -800,6 +790,25 @@ func versionSub(v string) Sub {
 		return fltSub(f)
 	}
 	return strSub(v)
+}
+
+// wpNodes packs a word-processing field's lines into image nodes hanging off the
+// given parent storage node: a DATE-LESS header (^<subfile>^<last>^<count>) plus one
+// node per line (<node>,<i>,0)=line). The header omits the install-stamped DATE
+// (piece 5 in a native export) so identical input is byte-identical — the
+// WP-determinism playbook first proven with HELP FRAME. subfile may be "" (the bare
+// ^^<last>^<count> form some WP fields ship). Returns nil for no lines.
+func wpNodes(node int64, subfile string, lines []string) []imageNode {
+	if len(lines) == 0 {
+		return nil
+	}
+	ns := strconv.Itoa(len(lines))
+	out := make([]imageNode, 0, len(lines)+1)
+	out = append(out, imageNode{Subs{intSub(node), intSub(0)}, "^" + subfile + "^" + ns + "^" + ns})
+	for i, line := range lines {
+		out = append(out, imageNode{Subs{intSub(node), intSub(int64(i + 1)), intSub(0)}, line})
+	}
+	return out
 }
 
 // caretJoin builds a ^-delimited FileMan node from a sparse 1-based piece map,

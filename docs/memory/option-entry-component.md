@@ -192,6 +192,21 @@ back-out. Fixture `testdata/zzhf`. Verify probes `^DIC(9.2,"B",<name>)`, uninsta
 HL7 APPLICATION PARAMETER #771 + HL LOGICAL LINK #870 + HLO APPLICATION REGISTRY
 #779.2 done (below). Templates (#.4/.402/…) still parked on read-live capture (below).
 
+## DESCRIPTION word-processing fields — KEY #19.1 / MAIL GROUP #3.8 / #870 (2026-06-28)
+Unblocked the three deferred DESCRIPTION WP fields with the date-less WP playbook
+(proven with HELP FRAME). Added a shared `wpNodes(node, subfile, lines)` helper in
+entrycomp.go — emits header `^<subfile>^<n>^<n>` (DATE-LESS; piece 5 is the volatile
+install-stamp a native export carries) + one `<node>,<i>,0)=line`. Refactored HELP
+FRAME's inline WP block to call it (subfile `""` → bare `^^<n>^<n>`; golden
+unchanged). Field/subfile/node map (ground-truthed): **KEY #19.1** field 1 →
+subfile **19.11** at node **1**; **MAIL GROUP #3.8** field 3 → **3.801** at node
+**2**; **#870** field 1 → **870.02** at node **3**. Each `*Comp` gained an optional
+`description []string`. **Live finding:** the engines file the date-less header
+**verbatim** — live header stays `^19.11^1^1` (NO re-stamped date), so it is even
+byte-identical in the live global, not just the shipped artifact. Live-proven on
+vehu + foia-t12 for all three (install→verify→`--force` uninstall→clean), headers +
+text byte-identical. Fixtures `testdata/zzkey|zzmg|zzll` now carry a description.
+
 ## HLO APPLICATION REGISTRY #779.2 (eleventh type, 2026-06-28) — first COMPUTED xrefs
 The HL7-Optimized (HLO) counterpart to #771: registers an application and maps the
 HL7 message types it handles to action routines. Global `^HLD(779.2,`. Record:
