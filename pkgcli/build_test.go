@@ -439,6 +439,44 @@ func TestBuild_ZZHL_Deterministic(t *testing.T) {
 	}
 }
 
+// TestBuild_ZZHO_Deterministic is the B.1 gate for a package shipping an HLO
+// APPLICATION REGISTRY (#779.2) as a KIDS KRN component (the eleventh type on the
+// generic emitter — the first with COMPUTED multi-key xref nodes): two builds are
+// byte-identical and match the committed golden.
+func TestBuild_ZZHO_Deterministic(t *testing.T) {
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a.kids")
+	b := filepath.Join(dir, "b.kids")
+	runBuildPkg(t, "zzho", "ZZHO", a)
+	runBuildPkg(t, "zzho", "ZZHO", b)
+
+	gotA, err := os.ReadFile(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotB, err := os.ReadFile(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(gotA, gotB) {
+		t.Fatal("v pkg build (hlo app) is not deterministic — two builds differ")
+	}
+
+	golden := filepath.Join("..", "testdata", "zzho", "ZZHO.kids")
+	if os.Getenv("UPDATE_GOLDEN") == "1" {
+		if err := os.WriteFile(golden, gotA, 0o644); err != nil {
+			t.Fatalf("write golden: %v", err)
+		}
+	}
+	want, err := os.ReadFile(golden)
+	if err != nil {
+		t.Fatalf("read golden (UPDATE_GOLDEN=1 to create): %v", err)
+	}
+	if !bytes.Equal(gotA, want) {
+		t.Errorf("ZZHO.kids drift — run UPDATE_GOLDEN=1\n--- got ---\n%s", gotA)
+	}
+}
+
 // TestBuild_ZZLL_Deterministic is the B.1 gate for a package shipping an HL
 // LOGICAL LINK (#870) as a KIDS KRN component (the tenth type on the generic
 // emitter): two builds are byte-identical and match the committed golden.

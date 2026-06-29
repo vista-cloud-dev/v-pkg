@@ -496,6 +496,24 @@ not the populate-and-`EN^XPDIJ` shortcut.
     identical on both, B-index gone after `DIK` on `^HLCS(870,`. Remaining HL7
     follow-ups: #779.2 (HLO registry — multiple #779.21 with computed `B`/`D` xref
     nodes) and #870 DESCRIPTION WP (#870.02). ([[option-entry-component]])
+  - **B.1-k ✅ DONE + LIVE-PROVEN 2026-06-28 — HLO APPLICATION REGISTRY (#779.2), both
+    engines.** The eleventh type and the **first with computed cross-reference nodes**.
+    Stored in `^HLD(779.2,`. Record: `-1)=0^1`, `0)=APPNAME`, plus the #779.21 MESSAGE
+    TYPE ACTIONS multiple (header `^779.21I^n^n`, data
+    `MSGTYPE^EVENT^^TAG^RTN^VERSION`) with the emitter shipping each entry's computed
+    xrefs. ORD tail `1;;HLOAP^XPDTA1;;HLOE^XPDIA1;;;` (no DEL routine). Added a generic
+    `versionSub` (numeric subscript when canonical, e.g. `2.4`, string otherwise).
+    **Xref rule (live-prove-corrected):** `"B"` on MSG TYPE always, plus EXACTLY ONE of
+    `"D"` `(MSGTYPE,EVENT,VERSION)` when versioned / `"C"` `(MSGTYPE,EVENT)` when not —
+    C and D are mutually exclusive. (Shipped C unconditionally first; install
+    ground-truth showed #779.2 RE-INDEXES through FileMan and rebuilds B+D, dropping the
+    stray C — corpus confirms native ships B+D.) TDD; lint/race/contract green; corpus
+    DRIFT=0; golden `testdata/zzho/ZZHO.kids`. **Live install→verify→`--force`
+    uninstall→verify-clean** on vehu (IEN 34) + foia-t12 (IEN 35): the full subtree
+    (0-node, #779.21 entry, B + D xrefs) byte-identical to the shipped image on both,
+    B-index gone after back-out. **This closes the HL7 family** (#771 + #779.2 + #870);
+    remaining HL follow-ups are #870 DESCRIPTION WP (#870.02) and #779.2 multi-app
+    batches. ([[option-entry-component]])
 - **B.2 Real FILE DD + DATA (F3; the R3 enabler).** Extend `FileComp` to a
   multi-field DD (see §8 for the grounded node-set) and add **DATA** export with
   the four action codes (ADD-IF-NEW / MERGE / OVERWRITE / REPLACE) and FULL/PARTIAL

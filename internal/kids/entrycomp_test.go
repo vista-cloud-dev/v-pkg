@@ -1,6 +1,9 @@
 package kids
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // optionInput is a build with a routine and one #19 OPTION KRN component: a
 // run-routine option (TYPE "R") whose ENTRY action is a routine the build ships.
@@ -446,6 +449,87 @@ func TestMakeBuildPairs_LogicalLink_Skeleton(t *testing.T) {
 	}
 	if _, ok := got[`"KRN",870,1,400)`]; ok {
 		t.Errorf("skeleton link should ship no 400-node, got %q", got[`"KRN",870,1,400)`])
+	}
+}
+
+// A #779.2 HLO APPLICATION REGISTRY ships the 0-node (APPLICATION NAME) and the
+// MESSAGE TYPE ACTIONS multiple (#779.21) with its COMPUTED cross-references: a "B"
+// index on MSG TYPE always, plus exactly one of the (MSG TYPE, EVENT) lookups — the
+// "D" index (MSG TYPE, EVENT, VERSION) when a version is present, else the "C" index
+// (MSG TYPE, EVENT). This versioned entry ships B + D (no C — live + corpus proven
+// the #779.21 re-index builds exactly one). The VERSION subscript stays numeric when
+// canonical (2.4 unquoted). MSG TYPE/EVENT are free text, so the shipped xrefs match
+// what FileMan rebuilds.
+func TestMakeBuildPairs_HLOApp_KRN(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZHO*1.0*1",
+		Namespace:   "ZZHO",
+		Routines:    []RoutineSrc{{Name: "ZZHORT", Lines: []string{"ZZHORT ;x", " quit"}}},
+		HLOApps: []HLOApp{{
+			Name: "ZZHO_APP",
+			MessageTypes: []HLOMsgType{
+				{MessageType: "ORU", Event: "R01", ActionTag: "START", ActionRoutine: "ZZHORT", Version: "2.4"},
+			},
+		}},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	want := map[string]string{
+		`"KRN",779.2,1,-1)`:    "0^1",
+		`"KRN",779.2,1,0)`:     "ZZHO_APP",
+		`"KRN",779.2,1,1,0)`:   "^779.21I^1^1",
+		`"KRN",779.2,1,1,1,0)`: "ORU^R01^^START^ZZHORT^2.4",
+		// computed xrefs: B (always) + D (versioned). No C for a versioned entry.
+		`"KRN",779.2,1,1,"B","ORU",1)`:           "",
+		`"KRN",779.2,1,1,"D","ORU","R01",2.4,1)`: "",
+		`"ORD",1,779.2)`:                         "779.2;1;1;;HLOAP^XPDTA1;;HLOE^XPDIA1;;;",
+		`"ORD",1,779.2,0)`:                       "HLO APPLICATION REGISTRY",
+		`"BLD",1,"KRN",0)`:                       "^9.67PA^779.2^1",
+		`"BLD",1,"KRN",779.2,"NM",1,0)`:          "ZZHO_APP^^0",
+		`"BLD",1,"KRN","B",779.2,779.2)`:         "",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+	for k := range got {
+		if strings.HasPrefix(k, `"KRN",779.2,1,1,"C"`) {
+			t.Errorf("versioned message type must ship no C xref, got %s", k)
+		}
+	}
+	b := newBuild()
+	for _, p := range MakeBuildPairs(in) {
+		b.Set(p.Subs, p.Value)
+	}
+	if as := b.HLOAppNames(); len(as) != 1 || as[0] != "ZZHO_APP" {
+		t.Errorf("HLOAppNames = %v, want [ZZHO_APP]", as)
+	}
+}
+
+// A message-type action with NO version ships the B and C xrefs but NOT the D xref
+// (which keys on version) — matching the live #779.21 index behavior.
+func TestMakeBuildPairs_HLOApp_NoVersion(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZHO*1.0*1", Namespace: "ZZHO",
+		HLOApps: []HLOApp{{Name: "ZZHO_APP", MessageTypes: []HLOMsgType{{MessageType: "PMU", Event: "B01"}}}},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	if _, ok := got[`"KRN",779.2,1,1,"B","PMU",1)`]; !ok {
+		t.Error("expected B xref for versionless message type")
+	}
+	if _, ok := got[`"KRN",779.2,1,1,"C","PMU","B01",1)`]; !ok {
+		t.Error("expected C xref for versionless message type")
+	}
+	for k := range got {
+		if strings.HasPrefix(k, `"KRN",779.2,1,1,"D"`) {
+			t.Errorf("versionless message type must ship no D xref, got %s", k)
+		}
 	}
 }
 

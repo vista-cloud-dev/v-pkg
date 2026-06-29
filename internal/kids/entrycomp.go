@@ -60,10 +60,13 @@ type entryGroup struct {
 // types, so the shared "BLD",1,"KRN",0) header and the ORD ordering are computed
 // once across all of them. PARAMETER DEFINITION (#8989.51) and OPTION (#19) ride
 // the same path; new SEND/DELETE types append here.
-func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey, protos []Protocol, rpcs []RPC, mgs []MailGroup, lts []ListTemplate, hfs []HelpFrame, h7s []HL7App, lls []LogicalLink) []entryGroup {
+func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey, protos []Protocol, rpcs []RPC, mgs []MailGroup, lts []ListTemplate, hfs []HelpFrame, h7s []HL7App, hos []HLOApp, lls []LogicalLink) []entryGroup {
 	var groups []entryGroup
 	if len(lls) > 0 {
 		groups = append(groups, entryGroup{logicalLinkEntryType, logicalLinkRecords(lls)})
+	}
+	if len(hos) > 0 {
+		groups = append(groups, entryGroup{hloAppEntryType, hloAppRecords(hos)})
 	}
 	if len(mgs) > 0 {
 		groups = append(groups, entryGroup{mailGroupEntryType, mailGroupRecords(mgs)})
@@ -710,6 +713,94 @@ func logicalLinkRecords(lls []LogicalLink) []entryRec {
 // LogicalLinkNames returns the #870 HL LOGICAL LINK component names in build order
 // — what `v pkg verify`/`uninstall` probe and back out.
 func (b *Build) LogicalLinkNames() []string { return b.entryNames(logicalLinkFile) }
+
+// --- HLO APPLICATION REGISTRY (#779.2) — the eleventh type on the generic core --
+
+const (
+	hloAppFile     = 779.2
+	hloAppFileName = "HLO APPLICATION REGISTRY"
+	// hloAppOrdTail is the national-constant tail of the #779.2 ORD install line
+	// (pieces after "<file>;<ord>;"): piece 3 = 1 (this file's data ships with the
+	// build), then the SEND action routines (HLOAP gather / HLOE post-install). No
+	// delete routine (trailing ";;;"). Lifted verbatim from real exports.
+	hloAppOrdTail = "1;;HLOAP^XPDTA1;;HLOE^XPDIA1;;;"
+)
+
+var hloAppEntryType = entryType{number: hloAppFile, name: hloAppFileName, ordTail: hloAppOrdTail}
+
+// HLOMsgType is one MESSAGE TYPE ACTIONS entry (#779.21 subfile) of an HLO
+// application: which incoming HL7 message type/event the application handles and
+// the action routine that processes it. MessageType (.01) and Event (.02) are free
+// text and double as cross-reference keys; Version (.06) keys the "D" index when
+// present.
+type HLOMsgType struct {
+	MessageType   string // #779.21 .01 HL7 MESSAGE TYPE (0;1) — e.g. "ORU"
+	Event         string // #779.21 .02 HL7 EVENT (0;2) — e.g. "R01"
+	ActionTag     string // #779.21 .04 ACTION TAG (0;4)
+	ActionRoutine string // #779.21 .05 ACTION ROUTINE (0;5)
+	Version       string // #779.21 .06 HL7 VERSION (0;6) — e.g. "2.4"
+}
+
+// HLOApp is one #779.2 HLO APPLICATION REGISTRY record to ship as a KIDS KRN
+// component — the HL7-Optimized (HLO) counterpart to #771: it registers an
+// application and maps the HL7 message types it handles to action routines. Stored
+// in ^HLD(779.2,. The record is the 0-node (APPLICATION NAME) plus the #779.21
+// MESSAGE TYPE ACTIONS multiple, each entry of which the emitter ships WITH its
+// computed cross-references (the "B"/"C"/"D" indices KRN^XPDIK would otherwise
+// rebuild) so the export is byte-identical to a native KIDS build.
+type HLOApp struct {
+	Name         string       // #779.2 .01 APPLICATION NAME (0;1)
+	MessageTypes []HLOMsgType // #779.21 MESSAGE TYPE ACTIONS multiple
+}
+
+// hloAppRecords packs each HLOApp into the generic entry-record shape: the SEND
+// XPDFL flag, the 0-node, and the #779.21 MESSAGE TYPE ACTIONS multiple — a header
+// (^779.21I^<last>^<count>), one data node per entry, and the entry's computed
+// cross-references. Every entry gets a "B" index on MSG TYPE; the (MSG TYPE, EVENT)
+// lookup is keyed by version availability — a versioned entry gets the "D" index
+// (MSG TYPE, EVENT, VERSION) and a versionless entry the "C" index (MSG TYPE,
+// EVENT). C and D are mutually exclusive (live + corpus proven: the #779.21
+// re-index builds exactly one of them). The version subscript stays numeric when
+// canonical (2.4) and falls back to a string subscript otherwise (2.5.1).
+func hloAppRecords(apps []HLOApp) []entryRec {
+	recs := make([]entryRec, 0, len(apps))
+	for _, a := range apps {
+		img := []imageNode{{Subs{intSub(0)}, a.Name}}
+		if n := len(a.MessageTypes); n > 0 {
+			ns := strconv.Itoa(n)
+			img = append(img, imageNode{Subs{intSub(1), intSub(0)}, "^779.21I^" + ns + "^" + ns})
+			for i, mt := range a.MessageTypes {
+				seq := int64(i + 1)
+				img = append(img,
+					imageNode{Subs{intSub(1), intSub(seq), intSub(0)},
+						caretJoin(map[int]string{1: mt.MessageType, 2: mt.Event, 4: mt.ActionTag, 5: mt.ActionRoutine, 6: mt.Version})},
+					imageNode{Subs{intSub(1), strSub("B"), strSub(mt.MessageType), intSub(seq)}, ""},
+				)
+				if mt.Version != "" {
+					img = append(img, imageNode{Subs{intSub(1), strSub("D"), strSub(mt.MessageType), strSub(mt.Event), versionSub(mt.Version), intSub(seq)}, ""})
+				} else {
+					img = append(img, imageNode{Subs{intSub(1), strSub("C"), strSub(mt.MessageType), strSub(mt.Event), intSub(seq)}, ""})
+				}
+			}
+		}
+		recs = append(recs, entryRec{name: a.Name, xpdfl: "0^1", image: img})
+	}
+	return recs
+}
+
+// HLOAppNames returns the #779.2 HLO APPLICATION REGISTRY component names in build
+// order — what `v pkg verify`/`uninstall` probe and back out.
+func (b *Build) HLOAppNames() []string { return b.entryNames(hloAppFile) }
+
+// versionSub renders an HL7 version as a subscript: a canonical M number stays
+// numeric (unquoted, e.g. 2.4), anything else becomes a string subscript (e.g.
+// "2.5.1") — matching how M collates the live #779.21 "D" index.
+func versionSub(v string) Sub {
+	if f, err := strconv.ParseFloat(v, 64); err == nil && formatKIDSFloat(f) == v {
+		return fltSub(f)
+	}
+	return strSub(v)
+}
 
 // caretJoin builds a ^-delimited FileMan node from a sparse 1-based piece map,
 // trimming trailing empty pieces so the result is minimal and deterministic.

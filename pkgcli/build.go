@@ -37,6 +37,7 @@ type buildResult struct {
 	ListTemplates   int    `json:"listTemplates,omitempty"`
 	HelpFrames      int    `json:"helpFrames,omitempty"`
 	HL7Applications int    `json:"hl7Applications,omitempty"`
+	HLOApplications int    `json:"hloApplications,omitempty"`
 	LogicalLinks    int    `json:"logicalLinks,omitempty"`
 	Files           int    `json:"files,omitempty"`
 	RequiredBuilds  int    `json:"requiredBuilds,omitempty"`
@@ -72,6 +73,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 	listTemplates := resolveListTemplates(spec.Components.ListTemplates)
 	helpFrames := resolveHelpFrames(spec.Components.HelpFrames)
 	hl7Apps := resolveHL7Apps(spec.Components.HL7Applications)
+	hloApps := resolveHLOApps(spec.Components.HLOApplications)
 	logicalLinks := resolveLogicalLinks(spec.Components.LogicalLinks)
 	reqBuilds := resolveRequiredBuilds(spec.RequiredBuilds)
 
@@ -88,6 +90,7 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 		ListTemplates:  listTemplates,
 		HelpFrames:     helpFrames,
 		HL7Apps:        hl7Apps,
+		HLOApps:        hloApps,
 		LogicalLinks:   logicalLinks,
 		Files:          files,
 		RequiredBuilds: reqBuilds,
@@ -110,11 +113,11 @@ func (c *buildCmd) Run(cc *clikit.Context) error {
 
 	return cc.Result(buildResult{
 		InstallName: spec.InstallName(), Out: out, Routines: len(rtns),
-		ParamDefs: len(paramDefs), Options: len(options), Keys: len(keys), Protocols: len(protocols), RPCs: len(rpcs), MailGroups: len(mailGroups), ListTemplates: len(listTemplates), HelpFrames: len(helpFrames), HL7Applications: len(hl7Apps), LogicalLinks: len(logicalLinks), Files: len(files), RequiredBuilds: len(reqBuilds),
+		ParamDefs: len(paramDefs), Options: len(options), Keys: len(keys), Protocols: len(protocols), RPCs: len(rpcs), MailGroups: len(mailGroups), ListTemplates: len(listTemplates), HelpFrames: len(helpFrames), HL7Applications: len(hl7Apps), HLOApplications: len(hloApps), LogicalLinks: len(logicalLinks), Files: len(files), RequiredBuilds: len(reqBuilds),
 	}, func() {
 		cc.Title("pkg build")
-		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d option(s), %d key(s), %d protocol(s), %d rpc(s), %d mail group(s), %d list template(s), %d help frame(s), %d hl7 app(s), %d logical link(s), %d file(s), %d required build(s)) → %s\n",
-			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(options), len(keys), len(protocols), len(rpcs), len(mailGroups), len(listTemplates), len(helpFrames), len(hl7Apps), len(logicalLinks), len(files), len(reqBuilds), cc.Accent(out))
+		fmt.Fprintf(cc.Stdout, "%s built %s (%d routine(s), %d param def(s), %d option(s), %d key(s), %d protocol(s), %d rpc(s), %d mail group(s), %d list template(s), %d help frame(s), %d hl7 app(s), %d hlo app(s), %d logical link(s), %d file(s), %d required build(s)) → %s\n",
+			cc.Success("ok"), cc.Accent(spec.InstallName()), len(rtns), len(paramDefs), len(options), len(keys), len(protocols), len(rpcs), len(mailGroups), len(listTemplates), len(helpFrames), len(hl7Apps), len(hloApps), len(logicalLinks), len(files), len(reqBuilds), cc.Accent(out))
 	})
 }
 
@@ -335,6 +338,24 @@ func resolveHL7Apps(apps []buildspec.HL7AppComp) []kids.HL7App {
 			cc = "USA"
 		}
 		out = append(out, kids.HL7App{Name: a.Name, Facility: a.Facility, CountryCode: cc})
+	}
+	return out
+}
+
+// resolveHLOApps maps the spec's HLO APPLICATION REGISTRY components onto the kids
+// emit shape, carrying each MESSAGE TYPE ACTIONS entry through unchanged (the
+// emitter computes the cross-references).
+func resolveHLOApps(apps []buildspec.HLOAppComp) []kids.HLOApp {
+	out := make([]kids.HLOApp, 0, len(apps))
+	for _, a := range apps {
+		mts := make([]kids.HLOMsgType, 0, len(a.MessageTypes))
+		for _, mt := range a.MessageTypes {
+			mts = append(mts, kids.HLOMsgType{
+				MessageType: mt.MessageType, Event: mt.Event, ActionTag: mt.ActionTag,
+				ActionRoutine: mt.ActionRoutine, Version: mt.Version,
+			})
+		}
+		out = append(out, kids.HLOApp{Name: a.Name, MessageTypes: mts})
 	}
 	return out
 }

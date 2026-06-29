@@ -72,6 +72,7 @@ type Components struct {
 	ListTemplates        []ListTemplateComp `json:"listTemplates,omitempty"`   // #409.61 LIST TEMPLATE KRN components (B.1)
 	HelpFrames           []HelpFrameComp    `json:"helpFrames,omitempty"`      // #9.2 HELP FRAME KRN components (B.1)
 	HL7Applications      []HL7AppComp       `json:"hl7Applications,omitempty"` // #771 HL7 APPLICATION PARAMETER KRN components (B.1)
+	HLOApplications      []HLOAppComp       `json:"hloApplications,omitempty"` // #779.2 HLO APPLICATION REGISTRY KRN components (B.1)
 	LogicalLinks         []LogicalLinkComp  `json:"logicalLinks,omitempty"`    // #870 HL LOGICAL LINK KRN components (B.1)
 }
 
@@ -80,7 +81,7 @@ func (c Components) empty() bool {
 		len(c.Keys) == 0 && len(c.Parameters) == 0 && len(c.ParameterDefinitions) == 0 &&
 		len(c.Protocols) == 0 && len(c.Templates) == 0 && len(c.RPCs) == 0 &&
 		len(c.MailGroups) == 0 && len(c.ListTemplates) == 0 && len(c.HelpFrames) == 0 &&
-		len(c.HL7Applications) == 0 && len(c.LogicalLinks) == 0
+		len(c.HL7Applications) == 0 && len(c.HLOApplications) == 0 && len(c.LogicalLinks) == 0
 }
 
 // unsupported returns the JSON names of populated component slices the build
@@ -271,6 +272,26 @@ type LogicalLinkComp struct {
 	ServiceType string `json:"serviceType,omitempty"` // #870 400.03 TCP/IP SERVICE TYPE (C/S/M, default "C")
 }
 
+// HLOAppComp is a #779.2 HLO APPLICATION REGISTRY shipped as a KIDS KRN component
+// (B.1) — the HL7-Optimized counterpart to #771. It registers an application and
+// maps the HL7 message types it handles (the messageTypes multiple) to action
+// routines. The emitter ships each message-type entry with its computed
+// cross-references.
+type HLOAppComp struct {
+	Name         string          `json:"name"`                   // #779.2 .01 APPLICATION NAME (3..60 chars)
+	MessageTypes []HLOMsgTypComp `json:"messageTypes,omitempty"` // #779.21 MESSAGE TYPE ACTIONS
+}
+
+// HLOMsgTypComp is one MESSAGE TYPE ACTIONS entry (#779.21) of an HLO application:
+// the HL7 message type/event it handles and the action routine that processes it.
+type HLOMsgTypComp struct {
+	MessageType   string `json:"messageType"`             // #779.21 .01 HL7 MESSAGE TYPE
+	Event         string `json:"event"`                   // #779.21 .02 HL7 EVENT
+	ActionTag     string `json:"actionTag,omitempty"`     // #779.21 .04 ACTION TAG
+	ActionRoutine string `json:"actionRoutine,omitempty"` // #779.21 .05 ACTION ROUTINE
+	Version       string `json:"version,omitempty"`       // #779.21 .06 HL7 VERSION
+}
+
 // OptionTypeCode maps a human option-type name to its #19 field 4 (TYPE)
 // set-of-codes value. Grounded in the live ^DD(19,4) set string (Kernel Menu
 // Manager). These codes are national constants — portable across YDB and IRIS.
@@ -428,6 +449,7 @@ var (
 	reHL7Name   = regexp.MustCompile(`^[A-Z][A-Z0-9 _]*[A-Z0-9]$`)          // #771 HL7 APPLICATION .01 NAME (uppercase, spaces AND underscores)
 	reLinkName  = regexp.MustCompile(`^[A-Z][A-Z0-9 ._-]*$`)                // #870 HL LOGICAL LINK .01 NODE (no leading punctuation; spaces/dots/hyphens/underscores)
 	reSvcType   = regexp.MustCompile(`^[CSM]$`)                             // #870 400.03 SERVICE TYPE set code
+	reHL7Code   = regexp.MustCompile(`^[A-Z][A-Z0-9]*$`)                    // #779.21 HL7 MESSAGE TYPE / EVENT code (uppercase alnum)
 	reFileName  = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // FileMan FILE .01 name (uppercase, internal spaces)
 	reGlobalRt  = regexp.MustCompile(`^\^%?[A-Z][A-Z0-9]*\(.*,$`)           // open global root, e.g. ^DIZ(999000,
 	reLabel     = regexp.MustCompile(`^[A-Z][A-Z0-9]*$`)                    // M line label (entryref tag)
@@ -509,6 +531,9 @@ func (s *Spec) Validate() error {
 		return err
 	}
 	if err := validateHL7Applications(s.Components.HL7Applications); err != nil {
+		return err
+	}
+	if err := validateHLOApplications(s.Components.HLOApplications); err != nil {
 		return err
 	}
 	if err := validateLogicalLinks(s.Components.LogicalLinks); err != nil {
@@ -759,6 +784,34 @@ func validateHL7Applications(apps []HL7AppComp) error {
 		}
 		if len(a.Name) > 30 || !reHL7Name.MatchString(a.Name) {
 			return fmt.Errorf("buildspec: hl7 application name %q must be uppercase ≤30 chars (spaces/underscores ok) (#771 HL7 APPLICATION PARAMETER NAME)", a.Name)
+		}
+	}
+	return nil
+}
+
+// validateHLOApplications checks each HLO APPLICATION REGISTRY component: a valid
+// #779.2 APPLICATION NAME (3–60 chars, uppercase, spaces/underscores) and, for each
+// MESSAGE TYPE ACTIONS entry, an uppercase HL7 message type + event code and (when
+// present) a valid action routine. The records are filed by KRN^XPDIK; only their
+// build-side shape is validated here.
+func validateHLOApplications(apps []HLOAppComp) error {
+	for _, a := range apps {
+		if a.Name == "" {
+			return fmt.Errorf("buildspec: an hlo application is missing its name")
+		}
+		if n := len(a.Name); n < 3 || n > 60 || !reHL7Name.MatchString(a.Name) {
+			return fmt.Errorf("buildspec: hlo application name %q must be uppercase 3–60 chars (spaces/underscores ok) (#779.2 HLO APPLICATION REGISTRY NAME)", a.Name)
+		}
+		for _, mt := range a.MessageTypes {
+			if !reHL7Code.MatchString(mt.MessageType) {
+				return fmt.Errorf("buildspec: hlo application %q message type %q must be an uppercase HL7 code (#779.21 HL7 MESSAGE TYPE)", a.Name, mt.MessageType)
+			}
+			if !reHL7Code.MatchString(mt.Event) {
+				return fmt.Errorf("buildspec: hlo application %q event %q must be an uppercase HL7 code (#779.21 HL7 EVENT)", a.Name, mt.Event)
+			}
+			if mt.ActionRoutine != "" && !reRoutine.MatchString(mt.ActionRoutine) {
+				return fmt.Errorf("buildspec: hlo application %q action routine %q is not a valid M routine name (#779.21 ACTION ROUTINE)", a.Name, mt.ActionRoutine)
+			}
 		}
 	}
 	return nil

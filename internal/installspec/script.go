@@ -188,7 +188,7 @@ func FinalInstallScript(name, header string, nPairs int, runEnvCheck bool, ques 
 // index), per HL7 APPLICATION PARAMETER whether it is present in #771 (the "B"
 // index), and per FileMan FILE whether its data dictionary installed (^DD(file,0)
 // present). Each fact is a ResultMarker line.
-func VerifyScript(name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, logicalLinks, files []string) string {
+func VerifyScript(name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, hloApps, logicalLinks, files []string) string {
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
 
@@ -226,6 +226,9 @@ func VerifyScript(name string, routines, paramDefs, options, keys, protocols, rp
 	for _, ha := range hl7Apps {
 		w(`W "` + ResultMarker + `hl7app:` + ha + `=",$S($D(^HL(771,"B",` + kids.MString(ha) + `)):1,1:0),!`)
 	}
+	for _, ho := range hloApps {
+		w(`W "` + ResultMarker + `hloapp:` + ho + `=",$S($D(^HLD(779.2,"B",` + kids.MString(ho) + `)):1,1:0),!`)
+	}
 	for _, ll := range logicalLinks {
 		w(`W "` + ResultMarker + `logicallink:` + ll + `=",$S($D(^HLCS(870,"B",` + kids.MString(ll) + `)):1,1:0),!`)
 	}
@@ -248,7 +251,7 @@ func VerifyScript(name string, routines, paramDefs, options, keys, protocols, rp
 // DIK. The monotonic
 // #9.x / #8989.51 / #19 / #19.1 / #101 / #8994 / #3.8 / #409.61 / #9.2 / #771 IEN
 // counters are not rolled back (inherent to FileMan, not a leak).
-func UninstallScript(name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, logicalLinks, files []string) string {
+func UninstallScript(name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, hloApps, logicalLinks, files []string) string {
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
 
@@ -282,6 +285,9 @@ func UninstallScript(name string, routines, paramDefs, options, keys, protocols,
 	}
 	for _, ha := range hl7Apps {
 		w(`S DA=$O(^HL(771,"B",` + kids.MString(ha) + `,0)),DIK="^HL(771," I DA D ^DIK`)
+	}
+	for _, ho := range hloApps {
+		w(`S DA=$O(^HLD(779.2,"B",` + kids.MString(ho) + `,0)),DIK="^HLD(779.2," I DA D ^DIK`)
 	}
 	for _, ll := range logicalLinks {
 		w(`S DA=$O(^HLCS(870,"B",` + kids.MString(ll) + `,0)),DIK="^HLCS(870," I DA D ^DIK`)

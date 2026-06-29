@@ -1,0 +1,16 @@
+{
+  "package": "ZZHO",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "routines": ["ZZHORT"],
+    "hloApplications": [
+      {
+        "name": "ZZHO_APP",
+        "messageTypes": [
+          {"messageType": "ORU", "event": "R01", "actionTag": "START", "actionRoutine": "ZZHORT", "version": "2.4"}
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,50 @@
+KIDS Distribution saved by v-pkg
+m-kids reassembled output
+**KIDS**:ZZHO*1.0*1^
+
+**INSTALL NAME**
+ZZHO*1.0*1
+"BLD",1,0)
+ZZHO*1.0*1^ZZHO^0^0
+"BLD",1,"KRN",0)
+^9.67PA^779.2^1
+"BLD",1,"KRN",779.2,0)
+779.2
+"BLD",1,"KRN",779.2,"NM",0)
+^9.68A^1^1
+"BLD",1,"KRN",779.2,"NM",1,0)
+ZZHO_APP^^0
+"BLD",1,"KRN",779.2,"NM","B","ZZHO_APP",1)
+
+"BLD",1,"KRN","B",779.2,779.2)
+
+"RTN")
+1
+"RTN","ZZHORT")
+0^3^0^0
+"RTN","ZZHORT",1,0)
+ZZHORT ;VCD/VSL - throwaway test package (KRN hlo application registry component) ;1.0
+"RTN","ZZHORT",2,0)
+ ;;1.0;ZZHO;;
+"RTN","ZZHORT",3,0)
+ quit
+"ORD",1,779.2)
+779.2;1;1;;HLOAP^XPDTA1;;HLOE^XPDIA1;;;
+"ORD",1,779.2,0)
+HLO APPLICATION REGISTRY
+"KRN",779.2,1,-1)
+0^1
+"KRN",779.2,1,0)
+ZZHO_APP
+"KRN",779.2,1,1,0)
+^779.21I^1^1
+"KRN",779.2,1,1,1,0)
+ORU^R01^^START^ZZHORT^2.4
+"KRN",779.2,1,1,"B","ORU",1)
+
+"KRN",779.2,1,1,"D","ORU","R01",2.4,1)
+
+"VER")
+8.0^22.2
+**END**
+**END**

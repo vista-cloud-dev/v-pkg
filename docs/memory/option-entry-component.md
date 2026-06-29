@@ -189,8 +189,37 @@ install→verify→`--force` uninstall→verify-clean on vehu (YDB) + foia-t12 (
 back-out. Fixture `testdata/zzhf`. Verify probes `^DIC(9.2,"B",<name>)`, uninstall is
 `DIK` on `^DIC(9.2,`.
 
-HL7 APPLICATION PARAMETER #771 + HL LOGICAL LINK #870 done (below). Templates
-(#.4/.402/…) still parked on read-live capture (below).
+HL7 APPLICATION PARAMETER #771 + HL LOGICAL LINK #870 + HLO APPLICATION REGISTRY
+#779.2 done (below). Templates (#.4/.402/…) still parked on read-live capture (below).
+
+## HLO APPLICATION REGISTRY #779.2 (eleventh type, 2026-06-28) — first COMPUTED xrefs
+The HL7-Optimized (HLO) counterpart to #771: registers an application and maps the
+HL7 message types it handles to action routines. Global `^HLD(779.2,`. Record:
+`-1)=0^1`, `0)=APPNAME` (.01 free text 3–60), plus the **#779.21 MESSAGE TYPE
+ACTIONS multiple** at node 1 — header `1,0)=^779.21I^<n>^<n>`, data
+`1,<seq>,0)=MSGTYPE^EVENT^^ACTIONTAG^ACTIONRTN^VERSION`. ORD tail
+`1;;HLOAP^XPDTA1;;HLOE^XPDIA1;;;` (no DEL routine). MSG TYPE/EVENT are free text
+(`reHL7Code`). This is the **first type with computed cross-reference nodes** — the
+emitter ships the xrefs KRN^XPDIK would otherwise rebuild.
+
+**The xref rule (live + corpus proven — got it WRONG first, live-prove caught it):**
+each #779.21 entry ships a `"B"` index on MSG TYPE ALWAYS, plus EXACTLY ONE of the
+(MSG TYPE, EVENT) lookups — **`"D"` `(MSGTYPE,EVENT,VERSION)` when a version is set,
+else `"C"` `(MSGTYPE,EVENT)`. C and D are MUTUALLY EXCLUSIVE.** I first shipped C
+unconditionally (misled by a live record that had both); install ground-truth showed
+the #779.2 install **RE-INDEXES** (HLOAP/HLOE re-file through FileMan) — it dropped my
+stray C and kept B+D. Corpus confirms native KIDS ships B+D for a versioned entry.
+The VERSION subscript is **numeric when canonical** (`2.4` unquoted via
+`versionSub`→`fltSub`), string otherwise (`"2.5.1"`). Because the install re-indexes,
+the live xrefs are byte-identical to the shipped image only when the shipped set
+matches FileMan's rebuild — so shipping the right C-XOR-D set is load-bearing, not
+cosmetic. Pure-data type → bare uninstall OK (DIK on `^HLD(779.2,`). Fixture
+`testdata/zzho`; verify probes `^HLD(779.2,"B",<app>)`. **Live install→verify→
+`--force` uninstall→clean** on vehu (IEN 34) + foia-t12 (IEN 35): subtree
+byte-identical (`0)=ZZHO_APP`, `1,1,0)=ORU^R01^^START^ZZHORT^2.4`, B + D xrefs),
+B-index gone after back-out. This **closes the HL7 family** for v-pkg (#771 + #779.2 +
+#870); remaining HL follow-ups are #870 DESCRIPTION WP (#870.02) and #779.2 multi-app
+batches.
 
 ## HL LOGICAL LINK #870 (tenth type, 2026-06-28)
 The HL7 communication-endpoint type. Global `^HLCS(870,`. Record: `-1)=0^1`, sparse

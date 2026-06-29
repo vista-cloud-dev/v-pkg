@@ -603,6 +603,51 @@ func TestParse_HL7Applications_Invalid(t *testing.T) {
 	}
 }
 
+func TestParse_HLOApplications(t *testing.T) {
+	js := `{"package":"ZZHO","version":"1.0","patch":"1","components":{
+	  "routines":["ZZHORT"],
+	  "hloApplications":[{"name":"ZZHO_APP","messageTypes":[{"messageType":"ORU","event":"R01","actionTag":"START","actionRoutine":"ZZHORT","version":"2.4"}]}]
+	}}`
+	s, err := Parse([]byte(js))
+	if err != nil {
+		t.Fatalf("Parse hloApplications spec: %v", err)
+	}
+	if len(s.Components.HLOApplications) != 1 {
+		t.Fatalf("hloApplications = %+v", s.Components.HLOApplications)
+	}
+	a := s.Components.HLOApplications[0]
+	if a.Name != "ZZHO_APP" || len(a.MessageTypes) != 1 {
+		t.Fatalf("hloApp = %+v", a)
+	}
+	mt := a.MessageTypes[0]
+	if mt.MessageType != "ORU" || mt.Event != "R01" || mt.ActionRoutine != "ZZHORT" || mt.Version != "2.4" {
+		t.Errorf("messageType = %+v", mt)
+	}
+	// A name-only HLO app (no message types) is still a non-empty spec.
+	d, err := Parse([]byte(`{"package":"ZZHO","version":"1.0","components":{"hloApplications":[{"name":"ZZHO_APP"}]}}`))
+	if err != nil {
+		t.Fatalf("Parse minimal hlo app: %v", err)
+	}
+	if d.Components.empty() {
+		t.Error("spec with an hlo application must not be empty")
+	}
+}
+
+func TestParse_HLOApplications_Invalid(t *testing.T) {
+	cases := map[string]string{
+		"no name":      `{"package":"ZZHO","version":"1.0","components":{"hloApplications":[{"messageTypes":[{"messageType":"ORU","event":"R01"}]}]}}`,
+		"lower name":   `{"package":"ZZHO","version":"1.0","components":{"hloApplications":[{"name":"zzho app"}]}}`,
+		"bad msg type": `{"package":"ZZHO","version":"1.0","components":{"hloApplications":[{"name":"ZZHO_APP","messageTypes":[{"messageType":"oru","event":"R01"}]}]}}`,
+		"bad event":    `{"package":"ZZHO","version":"1.0","components":{"hloApplications":[{"name":"ZZHO_APP","messageTypes":[{"messageType":"ORU","event":"r 01"}]}]}}`,
+		"bad routine":  `{"package":"ZZHO","version":"1.0","components":{"hloApplications":[{"name":"ZZHO_APP","messageTypes":[{"messageType":"ORU","event":"R01","actionRoutine":"123bad"}]}]}}`,
+	}
+	for name, js := range cases {
+		if _, err := Parse([]byte(js)); err == nil {
+			t.Errorf("%s: expected an error, got nil", name)
+		}
+	}
+}
+
 func TestParse_LogicalLinks(t *testing.T) {
 	js := `{"package":"ZZLL","version":"1.0","patch":"1","components":{
 	  "routines":["ZZLLRT"],
