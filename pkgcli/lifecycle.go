@@ -204,10 +204,11 @@ func loadBuild(kidFile string) (string, *kids.Build, error) {
 // --- install ----------------------------------------------------------------
 
 type installResult struct {
-	Name      string `json:"name"`
-	Installed bool   `json:"installed"`
-	Status    int    `json:"status"`          // #9.7 STATUS piece 9 (3 = Install Completed)
-	Error     string `json:"error,omitempty"` // e.g. "already-installed"
+	Name       string `json:"name"`
+	Installed  bool   `json:"installed"`
+	Status     int    `json:"status"`               // #9.7 STATUS piece 9 (3 = Install Completed)
+	Error      string `json:"error,omitempty"`      // e.g. "already-installed"
+	PackageIEN string `json:"packageIen,omitempty"` // #9.4 entry the A.3 footprint stamped, if any
 }
 
 // stageChunkBytes bounds each staging routine so the driver stages it reliably.
@@ -221,14 +222,14 @@ const stageChunkBytes = 40000
 // finalize routine verifies the staged count and runs INST → MERGE → EN^XPDIJ in
 // one process. The outcome is read from the #9.7 status marker (or the
 // already-installed guard). A staged-count mismatch is surfaced as an error.
-func runInstall(ctx context.Context, cl *mdriver.Client, name, header string, pairs []kids.Pair, runEnvCheck bool, ques []installspec.QuesAnswer) (installResult, error) {
+func runInstall(ctx context.Context, cl *mdriver.Client, name, header string, pairs []kids.Pair, runEnvCheck bool, ques []installspec.QuesAnswer, reg *installspec.PkgReg) (installResult, error) {
 	chunks := installspec.StageChunks(pairs, stageChunkBytes)
 	for i, body := range chunks {
 		if _, _, err := runMScript(ctx, cl, rtnInstall, body); err != nil {
 			return installResult{Name: name}, fmt.Errorf("stage chunk %d/%d: %w", i+1, len(chunks), err)
 		}
 	}
-	markers, _, err := runMScript(ctx, cl, rtnInstall, installspec.FinalInstallScript(name, header, len(pairs), runEnvCheck, ques))
+	markers, _, err := runMScript(ctx, cl, rtnInstall, installspec.FinalInstallScript(name, header, len(pairs), runEnvCheck, ques, reg))
 	if err != nil {
 		return installResult{Name: name}, err
 	}
@@ -253,6 +254,7 @@ func runInstall(ctx context.Context, cl *mdriver.Client, name, header string, pa
 	}
 	r.Status, _ = strconv.Atoi(strings.TrimSpace(markers["status"]))
 	r.Installed = r.Status == 3
+	r.PackageIEN = strings.TrimSpace(markers["pkg"])
 	return r, nil
 }
 
@@ -314,6 +316,7 @@ type liveInstallInput struct {
 	allowOverwrite bool
 	runEnvCheck    bool                     // run the build's env-check + Required-Build enforcement before filing (A.1.2)
 	quesAnswers    []installspec.QuesAnswer // pre-answered build install questions (A.1.3)
+	pkgReg         *installspec.PkgReg      // optional PACKAGE #9.4 footprint to write after filing (A.3)
 }
 
 // liveInstall is the ONE class-aware install path (waterline rule: no caller
@@ -347,24 +350,44 @@ func liveInstall(ctx context.Context, cl *mdriver.Client, in liveInstallInput) (
 		}
 		res.Snapshot = in.snapshotPath
 	}
-	ir, ierr := runInstall(ctx, cl, in.name, in.header, in.pairs, in.runEnvCheck, in.quesAnswers)
+	ir, ierr := runInstall(ctx, cl, in.name, in.header, in.pairs, in.runEnvCheck, in.quesAnswers, in.pkgReg)
 	if ierr != nil {
 		return res, clikit.Fail(clikit.ExitRuntime, "INSTALL_FAILED", ierr.Error(), "")
 	}
 	res.Installed = ir.Installed
 	res.Status = ir.Status
 	res.Error = ir.Error
+	res.PackageIEN = ir.PackageIEN
 	return res, nil
 }
 
 type installCmd struct {
 	engineConn
-	KidFile        string   `arg:"" help:"Path to the built .KID transport file to install on the live engine."`
-	Snapshot       string   `help:"Capture the pre-image of any routine this install overwrites to this .KID before installing (enables uninstall --restore)."`
-	AutoSnapshot   bool     `help:"Like --snapshot, but to the conventional sidecar path (<kid>.preimage.kids) that uninstall auto-detects."`
-	AllowOverwrite bool     `help:"Overwrite existing routines WITHOUT capturing a pre-image (unsafe: uninstall cannot then restore them)."`
-	SkipEnvCheck   bool     `help:"Skip the build's environment-check routine + Required-Build (#9.611) enforcement before filing (default: run them, KIDS-faithful)."`
-	Answer         []string `help:"Pre-answer a build install question as NAME=VALUE (the internal answer $$ANSWER^XPDIQ returns); repeatable." placeholder:"NAME=VALUE"`
+	KidFile         string   `arg:"" help:"Path to the built .KID transport file to install on the live engine."`
+	Snapshot        string   `help:"Capture the pre-image of any routine this install overwrites to this .KID before installing (enables uninstall --restore)."`
+	AutoSnapshot    bool     `help:"Like --snapshot, but to the conventional sidecar path (<kid>.preimage.kids) that uninstall auto-detects."`
+	AllowOverwrite  bool     `help:"Overwrite existing routines WITHOUT capturing a pre-image (unsafe: uninstall cannot then restore them)."`
+	SkipEnvCheck    bool     `help:"Skip the build's environment-check routine + Required-Build (#9.611) enforcement before filing (default: run them, KIDS-faithful)."`
+	Answer          []string `help:"Pre-answer a build install question as NAME=VALUE (the internal answer $$ANSWER^XPDIQ returns); repeatable." placeholder:"NAME=VALUE"`
+	RegisterPackage string   `help:"Record the PACKAGE #9.4 footprint under this long NAME (find-or-create by the install-name prefix; stamps VERSION + PATCH APPLICATION HISTORY so $$VER/$$PATCH^XPDUTL see the install)." placeholder:"PACKAGE NAME"`
+}
+
+// packageReg derives the #9.4 registration from the install name (PREFIX*VERSION
+// [*PATCH]) and the --register-package NAME. Returns nil when no name was given (no
+// footprint) or when the install name is malformed.
+func packageReg(installName, regName string) *installspec.PkgReg {
+	if regName == "" {
+		return nil
+	}
+	parts := strings.Split(installName, "*")
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		return nil
+	}
+	reg := &installspec.PkgReg{Prefix: parts[0], Name: regName, Version: parts[1]}
+	if len(parts) >= 3 {
+		reg.Patch = parts[2]
+	}
+	return reg
 }
 
 // parseAnswers turns the repeatable --answer NAME=VALUE flags into ordered QUES
@@ -393,6 +416,7 @@ type installReport struct {
 	Installed  bool     `json:"installed"`
 	Status     int      `json:"status"`
 	Error      string   `json:"error,omitempty"`
+	PackageIEN string   `json:"packageIen,omitempty"` // #9.4 entry the A.3 footprint stamped, if any
 }
 
 func (c *installCmd) Run(cc *clikit.Context) error {
@@ -429,6 +453,7 @@ func (c *installCmd) Run(cc *clikit.Context) error {
 		routineNames: b.RoutineNames(), pairs: b.Pairs(),
 		snapshotPath: snapshot, allowOverwrite: c.AllowOverwrite,
 		runEnvCheck: !c.SkipEnvCheck, quesAnswers: answers,
+		pkgReg: packageReg(name, c.RegisterPackage),
 	})
 	if ferr != nil {
 		return ferr
@@ -441,6 +466,9 @@ func (c *installCmd) Run(cc *clikit.Context) error {
 		}
 		if res.Snapshot != "" {
 			fmt.Fprintf(cc.Stdout, "  pre-image captured → %s\n", cc.Accent(res.Snapshot))
+		}
+		if res.PackageIEN != "" {
+			fmt.Fprintf(cc.Stdout, "  PACKAGE #9.4 footprint → entry %s\n", cc.Accent(res.PackageIEN))
 		}
 		switch {
 		case res.Error != "":
@@ -938,7 +966,7 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 		if lerr != nil {
 			return clikit.Fail(clikit.ExitRuntime, "READ_FAILED", lerr.Error(), "")
 		}
-		ir, ierr := runInstall(ctx, cl, rname, rname+" via v pkg uninstall --"+action.String(), rb.Pairs(), false, nil)
+		ir, ierr := runInstall(ctx, cl, rname, rname+" via v pkg uninstall --"+action.String(), rb.Pairs(), false, nil, nil)
 		if ierr != nil {
 			return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", ierr.Error(), "")
 		}

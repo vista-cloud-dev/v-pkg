@@ -225,6 +225,11 @@
           "name": "answer",
           "type": "list",
           "help": "Pre-answer a build install question as NAME=VALUE (the internal answer $ANSWER^XPDIQ returns); repeatable."
+        },
+        {
+          "name": "register-package",
+          "type": "string",
+          "help": "Record the PACKAGE #9.4 footprint under this long NAME (find-or-create by the install-name prefix; stamps VERSION + PATCH APPLICATION HISTORY so $VER/$PATCH^XPDUTL see the install)."
         }
       ],
       "args": [

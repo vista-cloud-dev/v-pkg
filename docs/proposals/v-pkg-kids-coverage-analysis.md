@@ -172,7 +172,7 @@ line-items and must not become spec.)
 | FILE — DATA | **FULL** | `filecomp.go` `emitFileRecords` | records ship under `("DATA",file,ien,node)`; the 4 action codes a/m/o/r (B.2-b) — live-proven both engines |
 | OPTION/KEY/PROTOCOL/RPC/TEMPLATE/MAILGROUP/HL7 | **NONE** | `buildspec.go:60–71` accepts, `build.go` ignores | **silently dropped** — see F1 |
 | Required Builds | **PARTIAL** | manifest `krncomp.go:120`; install path runs no check | declared, **not enforced** — F4 |
-| Package #9.4 link / patch history | **NONE** | (no PKG emit) | F6 |
+| Package #9.4 link / patch history | **FULL** | `installspec/script.go` footprint; `--register-package` | A.3: $$PKGVER/$$PKGPAT after filing — live-proven both engines (≤4-char prefix for $$PATCH honesty) |
 | Environment Check | **NONE** | `buildspec.go:44` accepted, never emitted/run | F2 |
 | Pre / Post-Install routine | **NONE** | not emitted; `EN^XPDIJ` runs whatever is staged | F2 |
 | Install questions (DIFQ/`XPDQUES`) | **PARTIAL (modeled, unwired)** | `installspec/installspec.go:36` defined, `lifecycle.go` doesn't consume it | F2 |
@@ -336,9 +336,23 @@ not the populate-and-`EN^XPDIJ` shortcut.
 - **A.2 Enforce Required Builds (F4).** Run KIDS' #9.611 check (or replicate it
   against #9.4 → #22 → #9.49,1105) and honor WARNING / DON'T-INSTALL-LEAVE /
   DON'T-INSTALL-REMOVE before filing.
-- **A.3 Write the PACKAGE #9.4 footprint (F6).** Use `$$PKGPAT^XPDIP` /
-  `$$PKGVER^XPDIP` so each install records VERSION + PATCH APPLICATION HISTORY,
-  keeping downstream `$$PATCH^XPDUTL` checks honest.
+- **A.3 ✅ DONE + LIVE-PROVEN 2026-06-28 — PACKAGE #9.4 footprint (F6), both
+  engines.** `v pkg install --register-package "<LONG NAME>"` writes the footprint
+  via the REAL `$$PKGVER^XPDIP` (VERSION #9.49 + CURRENT VERSION #9.4 field 13) and
+  `$$PKGPAT^XPDIP` (PATCH APPLICATION HISTORY #9.4901) after `EN^XPDIJ`, gated on
+  #9.7 status 3 — find-or-creating the #9.4 entry by PREFIX (the `"C"` xref; KIDS
+  itself never creates it, but an authored package must register itself). Makes
+  downstream `$$PATCH^XPDUTL` honest. **KEY GOTCHA:** `$$LKPKG^XPDUTL` resolves a
+  package by PREFIX only when `$L(prefix)<5` (else by NAME), and `$$PATCH`'s own
+  install-name regex caps the prefix at **1-4 uppercase/numeric chars** — so the
+  footprint is `$$PATCH`-honest only for a **≤4-char prefix** (a 6-char "ZZSKEL"
+  filed fine but `$$PATCH` returned 0; re-proving with 3-char "ZZV" gave
+  `$$PATCH(ZZV*1.0*3)` 0→1, negative `*99` stays 0, on both engines). Not hard-gated
+  (the footprint still files; longer namespaces are valid for routines) —
+  documented. Route (c): calls the real XPDIP, never reimplements KIDS (inside the
+  waterline). TDD; lint/race/contract green. `internal/installspec/script.go`
+  (`PkgReg`), `pkgcli/lifecycle.go` (`--register-package`, `packageReg`,
+  `installResult.PackageIEN`). ([[package-footprint]])
 - **A.4 Multi-package builds (F7).** Install the ordered constituent list.
 
 ### Track B — Authoring coverage (build new packages, incl. VSL)

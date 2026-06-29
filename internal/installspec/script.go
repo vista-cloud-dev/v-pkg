@@ -83,7 +83,19 @@ type QuesAnswer struct {
 // partial package). header is the #9.7 install header (cosmetic). ques pre-answers
 // the build's install questions (A.1.3) so pre/post routines read them via
 // $$ANSWER^XPDIQ.
-func FinalInstallScript(name, header string, nPairs int, runEnvCheck bool, ques []QuesAnswer) string {
+// PkgReg is an optional PACKAGE #9.4 registration: the footprint a build writes so
+// downstream $$VER/$$PATCH^XPDUTL checks see the install. Prefix is the #9.4 PREFIX
+// (the namespace), Name the #9.4 .01 long NAME (used to create the entry when it is
+// absent), Version/Patch the install's version + patch. A nil *PkgReg writes no
+// footprint (matching a "NO package" build).
+type PkgReg struct {
+	Prefix  string
+	Name    string
+	Version string
+	Patch   string
+}
+
+func FinalInstallScript(name, header string, nPairs int, runEnvCheck bool, ques []QuesAnswer, reg *PkgReg) string {
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
 	nameLit := kids.MString(name)
@@ -173,6 +185,32 @@ func FinalInstallScript(name, header string, nPairs int, runEnvCheck bool, ques 
 	w(`D EN^XPDIJ`)
 	w(`K ` + stageGbl)
 	w(`W "` + ResultMarker + `status=",$P($G(^XPD(9.7,XPDA,0)),U,9),!`)
+	// A.3 PACKAGE #9.4 footprint (F6). The real install line (XPDIP, PKGV) stamps the
+	// package's VERSION (#9.49) + PATCH APPLICATION HISTORY (#9.4901) from the build's
+	// PACKAGE FILE LINK; the direct-populate path files the build but writes no #9.4
+	// footprint, so a v-pkg install is invisible to later $$VER/$$PATCH^XPDUTL checks.
+	// When the build declares a registration, replicate it via the REAL XPDIP
+	// extrinsics (route (c), inside the waterline): find the #9.4 entry by PREFIX (the
+	// "C" xref), CREATE it (NAME + PREFIX) when absent — KIDS itself requires the entry
+	// to pre-exist, but an authored package must register itself — then $$PKGVER^XPDIP
+	// (VERSION + CURRENT VERSION) and, when a patch is present, $$PKGPAT^XPDIP (patch
+	// history). Only when the build actually filed (status 3).
+	if reg != nil {
+		w(`I $P($G(^XPD(9.7,XPDA,0)),U,9)=3 D`)
+		w(` . N XPDPDA,XPDPV,XPDPP`)
+		w(` . S XPDPDA=+$O(^DIC(9.4,"C",` + kids.MString(reg.Prefix) + `,0))`)
+		w(` . I 'XPDPDA D`)
+		w(` . . N XPDFDA,XPDPIEN`)
+		w(` . . S XPDFDA(9.4,"+1,",.01)=` + kids.MString(reg.Name) + `,XPDFDA(9.4,"+1,",1)=` + kids.MString(reg.Prefix))
+		w(` . . D UPDATE^DIE("","XPDFDA","XPDPIEN")`)
+		w(` . . S XPDPDA=+$G(XPDPIEN(1))`)
+		w(` . Q:'XPDPDA`)
+		w(` . S XPDPV=$$PKGVER^XPDIP(XPDPDA,` + kids.MString(reg.Version) + `_"^^"_DT_"^"_DUZ)`)
+		if reg.Patch != "" {
+			w(` . S XPDPP=$$PKGPAT^XPDIP(XPDPDA,` + kids.MString(reg.Version) + `,` + kids.MString(reg.Patch) + `_"^"_DT_"^"_DUZ)`)
+		}
+		w(` . W "` + ResultMarker + `pkg=",XPDPDA,!`)
+	}
 	return b.String()
 }
 
