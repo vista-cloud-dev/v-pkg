@@ -419,34 +419,70 @@ type installReport struct {
 	PackageIEN string   `json:"packageIen,omitempty"` // #9.4 entry the A.3 footprint stamped, if any
 }
 
+// installSequence installs each named build in order through the one class-aware
+// install path, stopping at the first build that fails — an engine/refuse error or
+// a build that does not reach #9.7 status 3. A multi-build distribution lists its
+// constituents in dependency order in the **KIDS** header, so a failed prerequisite
+// must abort the rest rather than install dependents against a missing base (A.4).
+func installSequence(ctx context.Context, cl *mdriver.Client, names []string, mk func(name string) liveInstallInput) (multiInstallResult, *clikit.Error) {
+	out := multiInstallResult{Installed: true}
+	for _, name := range names {
+		res, ferr := liveInstall(ctx, cl, mk(name))
+		out.Builds = append(out.Builds, res)
+		if ferr != nil {
+			out.Installed = false
+			return out, ferr
+		}
+		if res.Error != "" || !res.Installed {
+			out.Installed = false
+			return out, nil
+		}
+	}
+	return out, nil
+}
+
+// multiInstallResult is the per-build roll-up for a multi-build distribution.
+type multiInstallResult struct {
+	Builds    []installReport `json:"builds"`
+	Installed bool            `json:"installed"` // every constituent reached status 3
+}
+
 func (c *installCmd) Run(cc *clikit.Context) error {
 	k, err := kids.ParseKID(c.KidFile)
 	if err != nil {
 		return clikit.Fail(clikit.ExitRuntime, "READ_FAILED", err.Error(), "")
 	}
-	if len(k.InstallNames) != 1 {
-		return clikit.Fail(clikit.ExitUsage, "MULTI_BUILD",
-			fmt.Sprintf("install expects exactly one build, found %d", len(k.InstallNames)), "install one build at a time")
+	if len(k.InstallNames) == 0 {
+		return clikit.Fail(clikit.ExitUsage, "NO_BUILD", "no build found in "+c.KidFile, "")
 	}
-	name := k.InstallNames[0]
-	b := k.Builds[name]
-	rev := kids.Classify(k)
 
 	cl, err := c.client()
 	if err != nil {
 		return c.noDriver(err)
 	}
 	ctx := context.Background()
+	answers, aerr := parseAnswers(c.Answer)
+	if aerr != nil {
+		return clikit.Fail(clikit.ExitUsage, "BAD_ANSWER", aerr.Error(), "use --answer NAME=VALUE")
+	}
+
+	// A multi-build distribution (the **KIDS** header lists >1 build) installs each
+	// constituent in header order (A.4). The per-build flags are inherently ambiguous
+	// across constituents, so refuse the build-specific ones; --auto-snapshot still
+	// pairs each build to its own sidecar path.
+	if len(k.InstallNames) > 1 {
+		return c.runMulti(ctx, cc, cl, k, answers)
+	}
+
+	name := k.InstallNames[0]
+	b := k.Builds[name]
+	rev := kids.Classify(k)
 
 	// --auto-snapshot supplies the conventional sidecar path when no explicit
 	// --snapshot is given, so install/uninstall pair without a path.
 	snapshot := c.Snapshot
 	if snapshot == "" && c.AutoSnapshot {
 		snapshot = defaultPreimagePath(c.KidFile)
-	}
-	answers, aerr := parseAnswers(c.Answer)
-	if aerr != nil {
-		return clikit.Fail(clikit.ExitUsage, "BAD_ANSWER", aerr.Error(), "use --answer NAME=VALUE")
 	}
 	res, ferr := liveInstall(ctx, cl, liveInstallInput{
 		name: name, header: name + " via v pkg install", className: rev.ClassName,
@@ -490,6 +526,77 @@ func (c *installCmd) Run(cc *clikit.Context) error {
 			fmt.Sprintf("%s did not reach Install Completed (status %d)", res.Name, res.Status), "")
 	}
 	return nil
+}
+
+// runMulti installs a multi-build distribution: each constituent in **KIDS**-header
+// order, stopping at the first failure (A.4). The build-specific flags
+// (--register-package, --skip-env-check answers, --snapshot path) are ambiguous
+// across constituents, so registration is refused and --auto-snapshot pairs each
+// build to its own sidecar. --answer applies to every build (KIDS scopes a question
+// per build, so a NAME matches whichever build defines it).
+func (c *installCmd) runMulti(ctx context.Context, cc *clikit.Context, cl *mdriver.Client, k *kids.KID, answers []installspec.QuesAnswer) error {
+	if c.RegisterPackage != "" {
+		return clikit.Fail(clikit.ExitUsage, "MULTI_BUILD_REGISTER",
+			"--register-package is ambiguous for a multi-build distribution", "install constituents one at a time to register a package footprint")
+	}
+	if c.Snapshot != "" {
+		return clikit.Fail(clikit.ExitUsage, "MULTI_BUILD_SNAPSHOT",
+			"--snapshot <path> is ambiguous for a multi-build distribution", "use --auto-snapshot (a per-build sidecar) instead")
+	}
+	mk := func(name string) liveInstallInput {
+		b := k.Builds[name]
+		snap := ""
+		if c.AutoSnapshot {
+			snap = defaultPreimagePath(c.KidFile) + "." + sanitizeName(name)
+		}
+		return liveInstallInput{
+			name: name, header: name + " via v pkg install",
+			className:    kids.ClassifyBuild(name, b).ClassName,
+			routineNames: b.RoutineNames(), pairs: b.Pairs(),
+			snapshotPath: snap, allowOverwrite: c.AllowOverwrite,
+			runEnvCheck: !c.SkipEnvCheck, quesAnswers: answers,
+		}
+	}
+	res, ferr := installSequence(ctx, cl, k.InstallNames, mk)
+	if rerr := cc.Result(res, func() {
+		cc.Title("pkg install (multi-build) — " + c.Engine)
+		for _, b := range res.Builds {
+			switch {
+			case b.Error != "":
+				fmt.Fprintln(cc.Stdout, cc.Failure(b.Name+": "+b.Error))
+			case b.Installed:
+				fmt.Fprintln(cc.Stdout, cc.Success(fmt.Sprintf("installed %s (#9.7 status %d)", b.Name, b.Status)))
+			default:
+				fmt.Fprintln(cc.Stdout, cc.Failure(fmt.Sprintf("%s did not complete (#9.7 status %d)", b.Name, b.Status)))
+			}
+		}
+		fmt.Fprintf(cc.Stdout, "  %d of %d build(s) installed\n", countInstalled(res.Builds), len(k.InstallNames))
+	}); rerr != nil {
+		return rerr
+	}
+	if ferr != nil {
+		return ferr
+	}
+	if !res.Installed {
+		return clikit.Fail(clikit.ExitRuntime, "NOT_INSTALLED",
+			fmt.Sprintf("multi-build install stopped after %d of %d build(s)", countInstalled(res.Builds), len(k.InstallNames)), "")
+	}
+	return nil
+}
+
+// sanitizeName turns an install name (PKG*VER*PATCH) into a filename-safe token for
+// per-build snapshot sidecars (the "*" becomes "_").
+func sanitizeName(s string) string { return strings.ReplaceAll(s, "*", "_") }
+
+// countInstalled counts how many of the gathered reports reached status 3.
+func countInstalled(reports []installReport) int {
+	n := 0
+	for _, r := range reports {
+		if r.Installed {
+			n++
+		}
+	}
+	return n
 }
 
 // --- verify -----------------------------------------------------------------

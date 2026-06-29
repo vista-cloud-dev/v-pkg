@@ -129,6 +129,46 @@ func TestRunInstall_Success(t *testing.T) {
 	}
 }
 
+// A.4: a multi-build distribution installs each constituent in header order. When
+// every build files, all reports come back in order with Installed=true.
+func TestInstallSequence_AllInOrder(t *testing.T) {
+	f := &fakeDriver{runStdout: installspec.ResultMarker + "status=3\n"}
+	names := []string{"EAS*1.0*96", "IVM*2.0*156"}
+	mk := func(name string) liveInstallInput {
+		return liveInstallInput{name: name, header: name, pairs: zzskelPairs(), runEnvCheck: false}
+	}
+	got, ferr := installSequence(context.Background(), fakeClient(f), names, mk)
+	if ferr != nil {
+		t.Fatalf("installSequence: %v", ferr)
+	}
+	if !got.Installed || len(got.Builds) != 2 {
+		t.Fatalf("got %+v, want 2 builds all installed", got)
+	}
+	if got.Builds[0].Name != "EAS*1.0*96" || got.Builds[1].Name != "IVM*2.0*156" {
+		t.Errorf("builds out of header order: %s, %s", got.Builds[0].Name, got.Builds[1].Name)
+	}
+}
+
+// A.4: if a constituent build fails to reach status 3, the sequence stops — later
+// builds (which may depend on it) are never attempted.
+func TestInstallSequence_StopsOnFailure(t *testing.T) {
+	f := &fakeDriver{runStdout: installspec.ResultMarker + "status=2\n"} // never completes
+	names := []string{"EAS*1.0*96", "IVM*2.0*156"}
+	mk := func(name string) liveInstallInput {
+		return liveInstallInput{name: name, header: name, pairs: zzskelPairs(), runEnvCheck: false}
+	}
+	got, ferr := installSequence(context.Background(), fakeClient(f), names, mk)
+	if ferr != nil {
+		t.Fatalf("installSequence: %v", ferr)
+	}
+	if got.Installed {
+		t.Error("sequence must report not-installed when a build fails")
+	}
+	if len(got.Builds) != 1 {
+		t.Errorf("want the sequence to stop after the first failed build, got %d reports", len(got.Builds))
+	}
+}
+
 // A package whose transport global exceeds one chunk must stage in several
 // load+run cycles (none big enough to truncate), then finalize once.
 func TestRunInstall_MultiChunkStages(t *testing.T) {

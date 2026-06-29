@@ -232,7 +232,9 @@ this document supersedes the old table.
 + PATCH APPLICATION HISTORY; v-pkg writes none, so a v-pkg install is invisible to
 later builds' `$$PATCH^XPDUTL` checks — silently breaking the dependency chain.
 
-**F7 — Multi-package builds unsupported.** 3.66% of distributions are meta-builds
+**F7 — Multi-package builds ✅ RESOLVED (A.4, 2026-06-28).** `v pkg install` installs
+each constituent in `**KIDS**`-header order, stopping on first failure (live-proven
+both engines). The note below stands as the original finding. 3.66% of distributions are meta-builds
 with an ordered install list; "any and all" requires them.
 
 **F8 — "Install all 2,000 packages" is an install-fidelity problem, not an
@@ -353,7 +355,23 @@ not the populate-and-`EN^XPDIJ` shortcut.
   waterline). TDD; lint/race/contract green. `internal/installspec/script.go`
   (`PkgReg`), `pkgcli/lifecycle.go` (`--register-package`, `packageReg`,
   `installResult.PackageIEN`). ([[package-footprint]])
-- **A.4 Multi-package builds (F7).** Install the ordered constituent list.
+- **A.4 ✅ DONE + LIVE-PROVEN 2026-06-28 — multi-package builds (F7), both engines.**
+  `v pkg install` now installs a multi-build distribution: each constituent **in
+  `**KIDS**`-header order** (which IS the install order — the header lists names
+  `^`-separated in dependency order, preserved in `k.InstallNames`), **stopping at
+  the first failure** (a failed prerequisite aborts the rest). Each constituent
+  installs independently (its own #9.7 entry + transport) through the *same*
+  class-aware `liveInstall` path — faithful to real KIDS (one `EN^XPDIJ` per
+  constituent), no parallel installer (waterline). Build-specific flags are
+  ambiguous across constituents, so `--register-package` and an explicit
+  `--snapshot <path>` are refused; `--auto-snapshot` pairs each build to its own
+  sidecar; `--answer`/`--allow-overwrite`/`--skip-env-check` apply to all. `MBREQ`
+  is per-build metadata (doesn't block a standalone constituent install). VERIFY /
+  UNINSTALL stay one-build-at-a-time (A.4 scope is install). Live-proven by merging
+  two tiny builds (ZZM1+ZZM2) into one multi-build `.KID` (`WriteKID`'s multi-name
+  header) — both reached status 3 in order on vehu + foia-t12. TDD
+  (`installSequence` order + stop-on-failure via the fake driver); lint/race/contract
+  green. `pkgcli/lifecycle.go`. ([[multi-build-install]])
 
 ### Track B — Authoring coverage (build new packages, incl. VSL)
 - **B.1 A generic entry-component emitter.** Generalize the #8989.51 `KRN` path to
