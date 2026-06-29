@@ -228,9 +228,12 @@ corrected order promotes SECURITY KEY and the template family. **Recommendation:
 fix `analyze.py`'s node probes and re-issue the findings; the priority order in
 this document supersedes the old table.
 
-**F6 — No PACKAGE #9.4 link / patch history.** Real installs append VERSION (#22)
-+ PATCH APPLICATION HISTORY; v-pkg writes none, so a v-pkg install is invisible to
-later builds' `$$PATCH^XPDUTL` checks — silently breaking the dependency chain.
+**F6 — PACKAGE #9.4 link / patch history ✅ RESOLVED (A.3, 2026-06-28).** `v pkg
+install --register-package` now stamps VERSION + PATCH APPLICATION HISTORY via
+`$$PKGVER`/`$$PKGPAT^XPDIP` (live-proven both engines). The original finding stands:
+real installs append VERSION (#22) + PATCH APPLICATION HISTORY; v-pkg previously
+wrote none, so an install was invisible to later builds' `$$PATCH^XPDUTL` checks —
+silently breaking the dependency chain.
 
 **F7 — Multi-package builds ✅ RESOLVED (A.4, 2026-06-28).** `v pkg install` installs
 each constituent in `**KIDS**`-header order, stopping on first failure (live-proven
