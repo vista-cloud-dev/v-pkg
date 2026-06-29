@@ -41,6 +41,16 @@ CORPUS ?= ~/data/kids-patches/VistA/Packages
 corpus:
 	VPKG_KIDS_CORPUS=$(CORPUS) go test $(GOFLAGS) ./internal/kids/ -run Corpus -v
 
+# Live "ship the real package" gate (NOT in CI — needs the local Docker engines).
+# Builds MSL + VSL from their sibling specs and drives install -> content-verify ->
+# back out -> verify-clean against a live engine through the driver stack. Engine
+# via ENGINE=ydb|iris (connection from M_<ENGINE>_*; YDB+vehu has built-in
+# defaults). NEG=1 also runs the negative-dependency known-gap probe.
+#   make live-gate                 # ydb / vehu
+#   make live-gate ENGINE=iris     # needs M_IRIS_* exported
+live-gate: build
+	ENGINE=$(or $(ENGINE),ydb) NEG=$(or $(NEG),0) ./scripts/live-package-gate.sh
+
 tidy:
 	go mod tidy
 
