@@ -62,6 +62,36 @@ func TestMakeBuildPairs_Option_KRN(t *testing.T) {
 	}
 }
 
+// A menu OPTION with MENU items (#19.01) ships the menu multiple at node 10 — a
+// header (^19.01IP^n^n) and, per item, a data node <placeholder>^<synonym>^<order>
+// plus the "^" resolver node carrying the child OPTION's NAME (same KIDS
+// pointer-transport convention as PROTOCOL #101.01, live-proven).
+func TestMakeBuildPairs_Option_MenuItems(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZOPT*1.0*1", Namespace: "ZZOPT",
+		Options: []Option{
+			{Name: "ZZOPT RUN ROUTINE", MenuText: "rr", TypeCode: "R", Routine: "EN^ZZOPTRT"},
+			{Name: "ZZOPT MENU", MenuText: "menu", TypeCode: "M", MenuItems: []OptionMenuItem{{Name: "ZZOPT RUN ROUTINE", Synonym: "RR", DisplayOrder: "1"}}},
+		},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	// ZZOPT MENU sorts after RUN ROUTINE (build order) → record seq 2.
+	want := map[string]string{
+		`"KRN",19,2,0)`:        "ZZOPT MENU^menu^^M",
+		`"KRN",19,2,10,0)`:     "^19.01IP^1^1",
+		`"KRN",19,2,10,1,0)`:   "1^RR^1", // placeholder ^ synonym ^ display order
+		`"KRN",19,2,10,1,"^")`: "ZZOPT RUN ROUTINE",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+}
+
 // TestMakeBuildPairs_SecurityKey_KRN locks the transport shape for a SECURITY KEY
 // (#19.1) shipped as a KRN component — the third type on the generic emitter.
 // Ground-truthed against the WorldVistA corpus: a key record is minimal (-1 XPDFL

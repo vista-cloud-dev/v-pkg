@@ -392,11 +392,26 @@ func TestParse_Options_Invalid(t *testing.T) {
 		"bad type":        `{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"ZZOPT A","type":"bogus"}]}}`,
 		"run no routine":  `{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"ZZOPT A","type":"run routine"}]}}`,
 		"bad routine ref": `{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"ZZOPT A","type":"run routine","routine":"EN^123BAD"}]}}`,
+		"bad menu item":   `{"package":"ZZOPT","version":"1.0","components":{"options":[{"name":"ZZOPT M","type":"menu","menuItems":[{"name":"lower"}]}]}}`,
 	}
 	for name, js := range cases {
 		if _, err := Parse([]byte(js)); err == nil {
 			t.Errorf("%s: expected an error, got nil", name)
 		}
+	}
+}
+
+// A menu OPTION's MENU items parse with name + synonym + display order.
+func TestParse_Options_MenuItems(t *testing.T) {
+	js := `{"package":"ZZOPT","version":"1.0","components":{"options":[
+	  {"name":"ZZOPT MENU","type":"menu","menuItems":[{"name":"ZZOPT A","synonym":"A","displayOrder":1}]}]}}`
+	s, err := Parse([]byte(js))
+	if err != nil {
+		t.Fatalf("Parse option menu items: %v", err)
+	}
+	its := s.Components.Options[0].MenuItems
+	if len(its) != 1 || its[0].Name != "ZZOPT A" || its[0].Synonym != "A" || its[0].DisplayOrder != 1 {
+		t.Errorf("menu items = %+v", its)
 	}
 }
 

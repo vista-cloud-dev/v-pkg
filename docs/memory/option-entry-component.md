@@ -213,8 +213,17 @@ COUNTRY / #870 LLP TYPE external-value resolution, which is the *input-transform
 path; this is the explicit `"^"`-node path KIDS uses for #101-pointer-to-#101 etc.).
 Fixture `testdata/zzproto` is now self-contained (ACTION + MENU→ACTION). Basic
 attach needs NO extended action (the menu attached cleanly without USE-AS-LINK/
-MERGE/ATTACH/DISABLE — those remain a minor follow-up, as do OPTION #19.01 menu
-items via the same `"^"` convention).
+MERGE/ATTACH/DISABLE — those remain a minor follow-up).
+
+**OPTION #19.01 menu items — same convention, also done (B.1-o).** OPTION #19 MENU
+multiple (field 10, subfile 19.01IP @ node 10) is structurally identical: data
+`10,<seq>,0)=<placeholder>^<synonym>^<displayorder>` + `10,<seq>,"^")=<CHILD NAME>`.
+OPTION also re-files (OPTF1/OPTE1) so it re-points by name AND rebuilds the menu "B"
+index (emitter ships neither the IEN nor the "B" xref — both are install-derived).
+Live-proven self-contained (`testdata/zzoption` MENU→RUN ROUTINE): item re-pointed to
+the sibling's live IEN (17086 vehu / 14290 foia-t12), synonym+order preserved.
+`OptionMenuItem{Name,Synonym,DisplayOrder}` / `OptionMenuItemComp`. So the `"^"`
+resolver path is now proven for BOTH #101-pointer and #19-pointer menu multiples.
 
 ## RPC INPUT PARAMETERS — #8994.02 multiple (2026-06-28)
 Extended RPC #8994 with the optional INPUT PARAMETER multiple (field 2, subfile

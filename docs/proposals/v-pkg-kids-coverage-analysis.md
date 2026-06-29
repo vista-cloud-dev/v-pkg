@@ -556,8 +556,21 @@ not the populate-and-`EN^XPDIJ` shortcut.
     `testdata/zzproto` now self-contained (ACTION + MENU→ACTION). TDD; lint/race/contract
     green; corpus DRIFT=0; golden regenerated. Live install→verify→`--force` uninstall→
     clean both engines. Basic attach needs no extended action (USE-AS-LINK / MERGE /
-    ATTACH / DISABLE + OPTION #19.01 menu items via the same `"^"` convention remain
-    minor follow-ups). ([[option-entry-component]])
+    ATTACH / DISABLE remain a minor follow-up). ([[option-entry-component]])
+  - **B.1-o ✅ DONE + LIVE-PROVEN 2026-06-28 — OPTION MENU multiple (#19.01), both
+    engines.** Parity with B.1-n: the OPTION #19 MENU multiple (field 10, subfile
+    19.01IP @ node 10) via the same KIDS `"^"` resolver convention — data
+    `10,<seq>,0)=<placeholder>^<synonym>^<displayorder>` + `10,<seq>,"^")=<CHILD NAME>`.
+    OPTION re-files (OPTF1/OPTE1) so it re-points by name AND rebuilds the menu "B"
+    index (emitter ships neither). `OptionMenuItem{Name,Synonym,DisplayOrder}` +
+    `OptionMenuItemComp`; validateOptions checks item names. Fixture `testdata/zzoption`
+    now self-contained (MENU→RUN ROUTINE). TDD; lint/race/contract green; corpus
+    DRIFT=0; golden regenerated. Live install→verify→`--force` uninstall→clean both
+    engines: the menu item re-points to the sibling option's live IEN (17086 vehu /
+    14290 foia-t12), synonym + order preserved. **The `"^"` resolver path is now proven
+    for both #101- and #19-pointer menus.** Remaining minor follow-up: the extended
+    menu-actions (USE-AS-LINK / MERGE-ITEMS / ATTACH / DISABLE), not needed for basic
+    attach. ([[option-entry-component]])
 - **B.2 Real FILE DD + DATA (F3; the R3 enabler).** Extend `FileComp` to a
   multi-field DD (see §8 for the grounded node-set) and add **DATA** export with
   the four action codes (ADD-IF-NEW / MERGE / OVERWRITE / REPLACE) and FULL/PARTIAL

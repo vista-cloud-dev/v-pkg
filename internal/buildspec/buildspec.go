@@ -130,12 +130,22 @@ type ParamEntity struct {
 // resolved to its #19 field 4 (TYPE) set-of-codes value by OptionTypeCode. A
 // run-routine option requires Routine; an action option typically sets EntryAction.
 type OptionComp struct {
-	Name        string `json:"name"`                  // #19 .01 NAME (uppercase, e.g. "ZZOPT RUN ROUTINE")
-	MenuText    string `json:"menuText,omitempty"`    // #19 field 1 MENU TEXT
-	Type        string `json:"type"`                  // option type: menu | run routine | action | ...
-	Routine     string `json:"routine,omitempty"`     // #19 field 25 ROUTINE entryref (required for "run routine")
-	EntryAction string `json:"entryAction,omitempty"` // #19 field 20 ENTRY ACTION (M code)
-	ExitAction  string `json:"exitAction,omitempty"`  // #19 field 15 EXIT ACTION (M code)
+	Name        string               `json:"name"`                  // #19 .01 NAME (uppercase, e.g. "ZZOPT RUN ROUTINE")
+	MenuText    string               `json:"menuText,omitempty"`    // #19 field 1 MENU TEXT
+	Type        string               `json:"type"`                  // option type: menu | run routine | action | ...
+	Routine     string               `json:"routine,omitempty"`     // #19 field 25 ROUTINE entryref (required for "run routine")
+	EntryAction string               `json:"entryAction,omitempty"` // #19 field 20 ENTRY ACTION (M code)
+	ExitAction  string               `json:"exitAction,omitempty"`  // #19 field 15 EXIT ACTION (M code)
+	MenuItems   []OptionMenuItemComp `json:"menuItems,omitempty"`   // #19.01 MENU multiple — child options of a menu
+}
+
+// OptionMenuItemComp is one MENU entry of a menu OPTION (#19.01): the NAME of the
+// child option to attach, an optional synonym, and its display order. The install
+// re-points the child by name (KIDS "^" resolver node).
+type OptionMenuItemComp struct {
+	Name         string `json:"name"`                   // child OPTION .01 NAME (#19 pointer target)
+	Synonym      string `json:"synonym,omitempty"`      // #19.01 .02 SYNONYM
+	DisplayOrder int    `json:"displayOrder,omitempty"` // #19.01 .03 DISPLAY ORDER (default = position)
 }
 
 // RPCComp is a #8994 REMOTE PROCEDURE shipped as a KIDS KRN component (B.1). The
@@ -683,6 +693,14 @@ func validateOptions(opts []OptionComp, maxName int) error {
 			tag, rtn, ok := splitEntryref(o.Routine)
 			if !ok || !isRoutineName(rtn, maxName) || (tag != "" && !reLabel.MatchString(tag)) {
 				return fmt.Errorf("buildspec: option %s routine %q must be a routine entryref (ROUTINE or TAG^ROUTINE)", o.Name, o.Routine)
+			}
+		}
+		for _, it := range o.MenuItems {
+			if len(it.Name) > 30 || !reEntryName.MatchString(it.Name) {
+				return fmt.Errorf("buildspec: option %s menu item %q must be an uppercase ≤30-char #19 OPTION name", o.Name, it.Name)
+			}
+			if it.DisplayOrder < 0 {
+				return fmt.Errorf("buildspec: option %s menu item %s displayOrder must be non-negative", o.Name, it.Name)
 			}
 		}
 	}

@@ -201,12 +201,23 @@ var optionEntryType = entryType{number: optionFile, name: optionFileName, ordTai
 // against the live #19 DD): MENU TEXT 0;2, TYPE 0;4, EXIT ACTION node 15, ENTRY
 // ACTION node 20, ROUTINE node 25, UPPERCASE MENU TEXT node "U".
 type Option struct {
-	Name        string // #19 .01 NAME (0;1)
-	MenuText    string // #19 field 1 MENU TEXT (0;2)
-	TypeCode    string // #19 field 4 TYPE set-of-codes value
-	Routine     string // #19 field 25 ROUTINE entryref (run-routine type); node 25
-	EntryAction string // #19 field 20 ENTRY ACTION (M code); node 20
-	ExitAction  string // #19 field 15 EXIT ACTION (M code); node 15
+	Name        string           // #19 .01 NAME (0;1)
+	MenuText    string           // #19 field 1 MENU TEXT (0;2)
+	TypeCode    string           // #19 field 4 TYPE set-of-codes value
+	Routine     string           // #19 field 25 ROUTINE entryref (run-routine type); node 25
+	EntryAction string           // #19 field 20 ENTRY ACTION (M code); node 20
+	ExitAction  string           // #19 field 15 EXIT ACTION (M code); node 15
+	MenuItems   []OptionMenuItem // #19.01 MENU multiple (node 10), optional — menu children
+}
+
+// OptionMenuItem is one MENU entry (#19.01 subfile) of a menu option: the child
+// OPTION it points to, its synonym, and its display order. The .01 ITEM is a #19
+// pointer transported via the KIDS "^" resolver convention (placeholder IEN +
+// "^" NAME node), same as PROTOCOL #101.01 — see entrycomp ProtocolItem.
+type OptionMenuItem struct {
+	Name         string // child OPTION .01 NAME (the #19 pointer target)
+	Synonym      string // #19.01 field 2 SYNONYM (0;2)
+	DisplayOrder string // #19.01 field 3 DISPLAY ORDER (0;3)
 }
 
 // optionRecords packs each Option into the generic entry-record shape: the SEND
@@ -231,6 +242,24 @@ func optionRecords(opts []Option) []entryRec {
 		}
 		if o.MenuText != "" {
 			img = append(img, imageNode{Subs{strSub("U")}, strings.ToUpper(o.MenuText)})
+		}
+		if n := len(o.MenuItems); n > 0 {
+			ns := strconv.Itoa(n)
+			img = append(img, imageNode{Subs{intSub(10), intSub(0)}, "^19.01IP^" + ns + "^" + ns})
+			for i, it := range o.MenuItems {
+				seq := int64(i + 1)
+				order := it.DisplayOrder
+				if order == "" {
+					order = strconv.FormatInt(seq, 10)
+				}
+				// Data node <pointer>^<synonym>^<display order>; pointer is a build-local
+				// placeholder the install re-points from the "^" NAME node (#19.01 .01).
+				img = append(img,
+					imageNode{Subs{intSub(10), intSub(seq), intSub(0)},
+						caretJoin(map[int]string{1: strconv.FormatInt(seq, 10), 2: it.Synonym, 3: order})},
+					imageNode{Subs{intSub(10), intSub(seq), strSub("^")}, it.Name},
+				)
+			}
 		}
 		recs = append(recs, entryRec{name: o.Name, xpdfl: "0^1", image: img})
 	}

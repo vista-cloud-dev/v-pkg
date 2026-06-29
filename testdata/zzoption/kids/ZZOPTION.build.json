@@ -10,6 +10,14 @@
         "menuText": "ZZOPTION Run Routine Demo",
         "type": "run routine",
         "routine": "EN^ZZOPTRT"
+      },
+      {
+        "name": "ZZOPTION MENU",
+        "menuText": "ZZOPTION Menu Demo",
+        "type": "menu",
+        "menuItems": [
+          { "name": "ZZOPTION RUN ROUTINE", "synonym": "RR", "displayOrder": 1 }
+        ]
       }
     ]
   }

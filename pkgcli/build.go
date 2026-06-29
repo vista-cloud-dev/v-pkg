@@ -207,6 +207,14 @@ func resolveFields(fields []buildspec.FieldSpec) []kids.FileField {
 func resolveOptions(opts []buildspec.OptionComp) []kids.Option {
 	out := make([]kids.Option, 0, len(opts))
 	for _, o := range opts {
+		items := make([]kids.OptionMenuItem, 0, len(o.MenuItems))
+		for _, it := range o.MenuItems {
+			order := ""
+			if it.DisplayOrder > 0 {
+				order = strconv.Itoa(it.DisplayOrder)
+			}
+			items = append(items, kids.OptionMenuItem{Name: it.Name, Synonym: it.Synonym, DisplayOrder: order})
+		}
 		out = append(out, kids.Option{
 			Name:        o.Name,
 			MenuText:    o.MenuText,
@@ -214,6 +222,7 @@ func resolveOptions(opts []buildspec.OptionComp) []kids.Option {
 			Routine:     o.Routine,
 			EntryAction: o.EntryAction,
 			ExitAction:  o.ExitAction,
+			MenuItems:   items,
 		})
 	}
 	return out
