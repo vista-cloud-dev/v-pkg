@@ -28,6 +28,14 @@ type entryType struct {
 	number  float64
 	name    string
 	ordTail string
+	// dataRoot is the storage global the type files into (e.g. "^DIC(19,") — where
+	// a content-asserting verify resolves the site IEN via "B" and reads the live
+	// 0-node back. volatile lists the 0-node ^-piece indices FileMan rewrites at
+	// install (a pointer resolved to a site IEN, a set-of-codes external resolved to
+	// its internal code), which content comparison must skip. Empty for types whose
+	// 0-node files verbatim.
+	dataRoot string
+	volatile []int
 }
 
 // imageNode is one node of a record image: the subscripts BELOW the
@@ -182,6 +190,102 @@ func (b *Build) entryNames(file float64) []string {
 	return names
 }
 
+// entryTypeByFile maps a file number to its entry type — the registry a
+// content-asserting verify uses to recover the storage global + transform mask of
+// any shipped KRN record. Every type buildEntryGroups can emit is registered here.
+var entryTypeByFile = map[float64]entryType{
+	optionFile:       optionEntryType,
+	paramDefFile:     paramDefEntryType,
+	securityKeyFile:  securityKeyEntryType,
+	protocolFile:     protocolEntryType,
+	rpcFile:          rpcEntryType,
+	mailGroupFile:    mailGroupEntryType,
+	listTemplateFile: listTemplateEntryType,
+	helpFrameFile:    helpFrameEntryType,
+	hl7AppFile:       hl7AppEntryType,
+	logicalLinkFile:  logicalLinkEntryType,
+	hloAppFile:       hloAppEntryType,
+}
+
+// EntryContent is what `v pkg verify` needs to assert a shipped KRN entry record
+// is filed CORRECTLY, not merely present: the .01 NAME (the "B" lookup key), the
+// data global it files into, the expected stored 0-node, and the 0-node ^-piece
+// indices FileMan rewrites at install (skipped in comparison). FileStr is the
+// file number rendered for the result marker key.
+type EntryContent struct {
+	File     float64
+	FileStr  string
+	Name     string
+	DataRoot string
+	Zero     string
+	Volatile []int
+}
+
+// EntryContents returns one EntryContent per shipped KRN entry record (every entry
+// type, in build order), read from the top-level "KRN",<file>,<seq>,0) 0-nodes
+// with each type's storage global + transform mask attached. The presence probe
+// answers "does a record by this name exist"; this is what lets verify answer "is
+// the record we shipped the record that got filed."
+func (b *Build) EntryContents() []EntryContent {
+	var out []EntryContent
+	for _, p := range b.Pairs() {
+		s := p.Subs
+		if len(s) == 4 && s[0].IsStr() && s[0].Str() == "KRN" &&
+			s[1].IsNumeric() && s[2].IsInt() && s[3].IsZeroInt() {
+			et, ok := entryTypeByFile[subNum(s[1])]
+			if !ok {
+				continue
+			}
+			name := p.Value
+			if i := strings.IndexByte(name, '^'); i >= 0 {
+				name = name[:i]
+			}
+			out = append(out, EntryContent{
+				File: et.number, FileStr: formatKIDSFloat(et.number),
+				Name: name, DataRoot: et.dataRoot, Zero: p.Value, Volatile: et.volatile,
+			})
+		}
+	}
+	return out
+}
+
+// ZeroMatch reports whether a live stored 0-node matches the one a build shipped,
+// comparing ^-piece by ^-piece and skipping the volatile indices (the pieces
+// FileMan rewrites at install — a pointer resolved to its site IEN, a set-of-codes
+// external resolved to internal). Trailing empty pieces equal absent ones (FileMan
+// trims them), so a shipped "NAME^^^" matches a stored "NAME". An empty live
+// 0-node never matches — it signals the record is absent.
+func ZeroMatch(expected, live string, volatile []int) bool {
+	if live == "" {
+		return false
+	}
+	skip := make(map[int]bool, len(volatile))
+	for _, i := range volatile {
+		skip[i] = true
+	}
+	ep := strings.Split(expected, "^")
+	lp := strings.Split(live, "^")
+	n := len(ep)
+	if len(lp) > n {
+		n = len(lp)
+	}
+	piece := func(ps []string, i int) string {
+		if i < len(ps) {
+			return ps[i]
+		}
+		return ""
+	}
+	for i := 1; i <= n; i++ {
+		if skip[i] {
+			continue
+		}
+		if piece(ep, i-1) != piece(lp, i-1) {
+			return false
+		}
+	}
+	return true
+}
+
 // --- OPTION (#19) — the first type on the generic emitter ---------------------
 
 const (
@@ -193,7 +297,7 @@ const (
 	optionOrdTail = ";;OPT^XPDTA;OPTF1^XPDIA;OPTE1^XPDIA;OPTF2^XPDIA;;OPTDEL^XPDIA"
 )
 
-var optionEntryType = entryType{number: optionFile, name: optionFileName, ordTail: optionOrdTail}
+var optionEntryType = entryType{number: optionFile, name: optionFileName, ordTail: optionOrdTail, dataRoot: "^DIC(19,"}
 
 // Option is one #19 OPTION record to ship as a KIDS KRN component (SEND-TO-SITE).
 // The build files the option definition; TypeCode is the #19 field 4 (TYPE)
@@ -272,7 +376,7 @@ func (b *Build) OptionNames() []string { return b.entryNames(optionFile) }
 
 // --- PARAMETER DEFINITION (#8989.51) — migrated onto the generic core ---------
 
-var paramDefEntryType = entryType{number: paramDefFile, name: paramDefFileName, ordTail: "1;;;;;;;"}
+var paramDefEntryType = entryType{number: paramDefFile, name: paramDefFileName, ordTail: "1;;;;;;;", dataRoot: "^XTV(8989.51,"}
 
 // paramDefRecords packs each #8989.51 PARAMETER DEFINITION into the generic
 // entry-record shape: the SEND XPDFL flag ("0" — a single piece, unlike OPTION's
@@ -325,7 +429,7 @@ const (
 	securityKeyOrdTail = ";;KEY^XPDTA1;KEYF1^XPDIA1;KEYE1^XPDIA1;KEYF2^XPDIA1;;KEYDEL^XPDIA1"
 )
 
-var securityKeyEntryType = entryType{number: securityKeyFile, name: securityKeyFileName, ordTail: securityKeyOrdTail}
+var securityKeyEntryType = entryType{number: securityKeyFile, name: securityKeyFileName, ordTail: securityKeyOrdTail, dataRoot: "^DIC(19.1,"}
 
 // SecurityKey is one #19.1 SECURITY KEY record to ship as a KIDS KRN component
 // (SEND-TO-SITE). A key is fundamentally just a named token holders are granted;
@@ -363,7 +467,7 @@ const (
 	protocolOrdTail = ";;PRO^XPDTA;PROF1^XPDIA;PROE1^XPDIA;PROF2^XPDIA;;PRODEL^XPDIA"
 )
 
-var protocolEntryType = entryType{number: protocolFile, name: protocolFileName, ordTail: protocolOrdTail}
+var protocolEntryType = entryType{number: protocolFile, name: protocolFileName, ordTail: protocolOrdTail, dataRoot: "^ORD(101,"}
 
 // Protocol is one #101 PROTOCOL record to ship as a KIDS KRN component
 // (SEND-TO-SITE). Stored in ^ORD(101,; the node skeleton matches OPTION but the
@@ -444,7 +548,7 @@ const (
 	rpcOrdTail = "1;;;;;;;RPCDEL^XPDIA1"
 )
 
-var rpcEntryType = entryType{number: rpcFile, name: rpcFileName, ordTail: rpcOrdTail}
+var rpcEntryType = entryType{number: rpcFile, name: rpcFileName, ordTail: rpcOrdTail, dataRoot: "^XWB(8994,"}
 
 // RPC is one #8994 REMOTE PROCEDURE record to ship as a KIDS KRN component
 // (SEND-TO-SITE). Stored in ^XWB(8994,; the record is a single 0-node carrying the
@@ -520,7 +624,7 @@ const (
 	mailGroupOrdTail = ";;MAILG^XPDTA1;MAILGF1^XPDIA1;MAILGE1^XPDIA1;MAILGF2^XPDIA1;;MAILGDEL^XPDIA1(%)"
 )
 
-var mailGroupEntryType = entryType{number: mailGroupFile, name: mailGroupFileName, ordTail: mailGroupOrdTail}
+var mailGroupEntryType = entryType{number: mailGroupFile, name: mailGroupFileName, ordTail: mailGroupOrdTail, dataRoot: "^XMB(3.8,"}
 
 // MailGroup is one #3.8 MAIL GROUP record to ship as a KIDS KRN component
 // (SEND-TO-SITE). Stored in ^XMB(3.8,; the record is a single 0-node
@@ -574,7 +678,7 @@ const (
 	listTemplateOrdTail = "1;;;;LME1^XPDIA1;;;LMDEL^XPDIA1"
 )
 
-var listTemplateEntryType = entryType{number: listTemplateFile, name: listTemplateFileName, ordTail: listTemplateOrdTail}
+var listTemplateEntryType = entryType{number: listTemplateFile, name: listTemplateFileName, ordTail: listTemplateOrdTail, dataRoot: "^SD(409.61,"}
 
 // ListTemplate is one #409.61 LIST TEMPLATE (List Manager screen) record to ship as
 // a KIDS KRN component (SEND-TO-SITE). Stored in ^SD(409.61,. The record is a fixed
@@ -655,7 +759,7 @@ const (
 	helpFrameOrdTail = ";;HELP^XPDTA1;HLPF1^XPDIA1;HLPE1^XPDIA1;HLPF2^XPDIA1;;HLPDEL^XPDIA1"
 )
 
-var helpFrameEntryType = entryType{number: helpFrameFile, name: helpFrameFileName, ordTail: helpFrameOrdTail}
+var helpFrameEntryType = entryType{number: helpFrameFile, name: helpFrameFileName, ordTail: helpFrameOrdTail, dataRoot: "^DIC(9.2,"}
 
 // HelpFrame is one #9.2 HELP FRAME record to ship as a KIDS KRN component
 // (SEND-TO-SITE). Stored in ^DIC(9.2,. The record is the 0-node (.01 NAME ^ HEADER)
@@ -700,7 +804,9 @@ const (
 	hl7AppOrdTail = ";;HLAP^XPDTA1;HLAPF1^XPDIA1;HLAPE1^XPDIA1;HLAPF2^XPDIA1;;HLAPDEL^XPDIA1(%)"
 )
 
-var hl7AppEntryType = entryType{number: hl7AppFile, name: hl7AppFileName, ordTail: hl7AppOrdTail}
+// hl7App #771 0-node piece 7 is COUNTRY CODE, a #779.004 pointer FileMan resolves
+// from the shipped external value ("USA") to its IEN at install — skip it (B.1-i).
+var hl7AppEntryType = entryType{number: hl7AppFile, name: hl7AppFileName, ordTail: hl7AppOrdTail, dataRoot: "^HL(771,", volatile: []int{7}}
 
 // HL7App is one #771 HL7 APPLICATION PARAMETER record to ship as a KIDS KRN
 // component (SEND-TO-SITE) — the canonical "register an HL7 application" entry.
@@ -748,7 +854,9 @@ const (
 	logicalLinkOrdTail = "1;;HLLL^XPDTA1;;HLLLE^XPDIA1;;;HLLLDEL^XPDIA1(%)"
 )
 
-var logicalLinkEntryType = entryType{number: logicalLinkFile, name: logicalLinkFileName, ordTail: logicalLinkOrdTail}
+// logicalLink #870 0-node piece 3 is LLP TYPE, a #869.1 pointer FileMan resolves
+// from the shipped external value ("TCP") to its IEN at install — skip it (B.1-j).
+var logicalLinkEntryType = entryType{number: logicalLinkFile, name: logicalLinkFileName, ordTail: logicalLinkOrdTail, dataRoot: "^HLCS(870,", volatile: []int{3}}
 
 // LogicalLink is one #870 HL LOGICAL LINK record to ship as a KIDS KRN component —
 // an HL7 communication endpoint. Stored in ^HLCS(870,. The record is the sparse
@@ -806,7 +914,7 @@ const (
 	hloAppOrdTail = "1;;HLOAP^XPDTA1;;HLOE^XPDIA1;;;"
 )
 
-var hloAppEntryType = entryType{number: hloAppFile, name: hloAppFileName, ordTail: hloAppOrdTail}
+var hloAppEntryType = entryType{number: hloAppFile, name: hloAppFileName, ordTail: hloAppOrdTail, dataRoot: "^HLD(779.2,"}
 
 // HLOMsgType is one MESSAGE TYPE ACTIONS entry (#779.21 subfile) of an HLO
 // application: which incoming HL7 message type/event the application handles and

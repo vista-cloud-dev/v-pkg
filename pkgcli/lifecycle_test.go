@@ -518,6 +518,53 @@ func TestRunVerify_NotInstalled(t *testing.T) {
 	}
 }
 
+// --- content verification ---------------------------------------------------
+
+// verifyContent reads the live 0-node of each shipped entry record and grades it
+// against the shipped image: ok (matches aside from FileMan-transformed pieces),
+// mismatch (a record by that name exists but differs), or absent (no record).
+func TestVerifyContent(t *testing.T) {
+	contents := []kids.EntryContent{
+		{File: 19, FileStr: "19", Name: "ZZOPT", DataRoot: "^DIC(19,", Zero: "ZZOPT^Demo^^R"},
+		{File: 19.1, FileStr: "19.1", Name: "ZZKEY", DataRoot: "^DIC(19.1,", Zero: "ZZKEY"},
+		{File: 771, FileStr: "771", Name: "ZZHL", DataRoot: "^HL(771,", Zero: "ZZHL^a^500^^^^USA", Volatile: []int{7}},
+	}
+	f := &fakeDriver{runStdout: installspec.ResultMarker + "z:19:ZZOPT=ZZOPT^Demo^^R\n" + // exact match
+		installspec.ResultMarker + "z:19.1:ZZKEY=ZZKEY WRONG\n" + // record exists but differs
+		installspec.ResultMarker + "z:771:ZZHL=ZZHL^a^500^^^^1\n"} // country USA resolved to pointer 1 (volatile)
+	got, err := verifyContent(context.Background(), fakeClient(f), contents)
+	if err != nil {
+		t.Fatalf("verifyContent: %v", err)
+	}
+	want := map[string]string{"19:ZZOPT": "ok", "19.1:ZZKEY": "mismatch", "771:ZZHL": "ok"}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("content %s = %q, want %q", k, got[k], v)
+		}
+	}
+	// A record with no marker (the engine returned nothing) grades as absent.
+	g2, err := verifyContent(context.Background(), fakeClient(&fakeDriver{runStdout: ""}), contents[:1])
+	if err != nil {
+		t.Fatalf("verifyContent (absent): %v", err)
+	}
+	if g2["19:ZZOPT"] != "absent" {
+		t.Errorf("absent case = %q, want absent", g2["19:ZZOPT"])
+	}
+}
+
+// A content mismatch defeats ok(): an install that filed a wrong record is not a
+// verified install, even though the #9.7 status reads complete and the name exists.
+func TestVerifyResultOK_ContentGate(t *testing.T) {
+	r := verifyResult{Installed: true, Status: 3, Content: map[string]string{"19:ZZOPT": "mismatch"}}
+	if r.ok() {
+		t.Error("ok() must be false when a shipped record's content mismatches")
+	}
+	r.Content["19:ZZOPT"] = "ok"
+	if !r.ok() {
+		t.Error("ok() must be true when content matches and the install completed")
+	}
+}
+
 // --- uninstall --------------------------------------------------------------
 
 func TestRunUninstall(t *testing.T) {

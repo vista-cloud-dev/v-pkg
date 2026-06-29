@@ -276,6 +276,28 @@ func VerifyScript(name string, routines, paramDefs, options, keys, protocols, rp
 	return b.String()
 }
 
+// VerifyContentScript returns M that reads back the LIVE 0-node of each shipped
+// KRN entry record so `verify` can assert CONTENT, not just presence: per record
+// it resolves the site IEN via the data file's "B" index, then writes the stored
+// 0-node as a `z:<file>:<name>` marker (empty when the record is absent). The Go
+// side compares each against the shipped image (kids.ZeroMatch), skipping the
+// FileMan-transformed pieces. Reading the literal stored node (not the DBS API) is
+// deliberate: it is the same image the KRN transport shipped, so a byte difference
+// is a real filing fault.
+func VerifyContentScript(contents []kids.EntryContent) string {
+	var b strings.Builder
+	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
+	for _, c := range contents {
+		nameLit := kids.MString(c.Name)
+		// VIEN = the site IEN for this name; VR = the 0-node ref built by indirection
+		// (the data global root is per-type, so the node is assembled at runtime).
+		w(`S VIEN=+$O(` + c.DataRoot + `"B",` + nameLit + `,0))`)
+		w(`S VR="` + c.DataRoot + `"_VIEN_",0)"`)
+		w(`W "` + ResultMarker + `z:` + c.FileStr + `:` + c.Name + `=",$S(VIEN:$G(@VR),1:""),!`)
+	}
+	return b.String()
+}
+
 // UninstallScript returns M source that reverses an install (T0a.4): delete each
 // routine (^%ZOSF("DEL") removes the .m + .o), each PARAMETER DEFINITION from
 // #8989.51 (FileMan DIK by IEN — clears its "B" and subfile xrefs), each OPTION

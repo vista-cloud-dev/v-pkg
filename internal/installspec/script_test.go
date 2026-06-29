@@ -396,6 +396,24 @@ func TestVerifyScript_LogicalLink(t *testing.T) {
 	}
 }
 
+// VerifyContentScript reads back the LIVE 0-node of each shipped KRN entry record
+// (resolving its site IEN via the data file's "B" index) so verify can assert
+// content, not just presence — one z:<file>:<name> marker per record.
+func TestVerifyContentScript(t *testing.T) {
+	got := VerifyContentScript([]kids.EntryContent{
+		{File: 19, FileStr: "19", Name: "ZZOPT RUN ROUTINE", DataRoot: "^DIC(19,", Zero: "ZZOPT RUN ROUTINE^x^^R"},
+	})
+	for _, want := range []string{
+		`$O(^DIC(19,"B","ZZOPT RUN ROUTINE",0))`, // resolve site IEN by name
+		`S VR="^DIC(19,"_VIEN_",0)"`,             // build the 0-node ref by indirection
+		ResultMarker + `z:19:ZZOPT RUN ROUTINE=`, // emit the live 0-node
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("VerifyContentScript missing %q\n---\n%s", want, got)
+		}
+	}
+}
+
 // VerifyScript also probes each installed FileMan FILE by its data dictionary
 // header node (^DD(file,0) present iff the DD installed).
 func TestVerifyScript_File(t *testing.T) {

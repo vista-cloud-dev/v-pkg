@@ -788,3 +788,63 @@ func TestBuild_OptionNames_AfterReparse(t *testing.T) {
 		t.Errorf("OptionNames after .KID reparse = %v, want [ZZOPT RUN ROUTINE]", got)
 	}
 }
+
+// TestZeroMatch locks the content-comparison rule a content-asserting `v pkg
+// verify` relies on: ^-piece equality, with FileMan-transformed pieces skipped
+// (a pointer/set resolved to an internal value at install) and trailing empty
+// pieces treated as absent (FileMan trims them). An empty live 0-node = absent.
+func TestZeroMatch(t *testing.T) {
+	cases := []struct {
+		name      string
+		exp, live string
+		volatile  []int
+		want      bool
+	}{
+		{"identical", "ZZOPT^ZZ Demo^^R", "ZZOPT^ZZ Demo^^R", nil, true},
+		{"FileMan trims trailing empties", "VPNG GREETING^greet^", "VPNG GREETING^greet", nil, true},
+		{"middle piece differs", "A^B^C", "A^X^C", nil, false},
+		{"volatile piece skipped (#771 country USA->1)", "ZZHL^a^500^^^^USA", "ZZHL^a^500^^^^1", []int{7}, true},
+		{"volatile masks only its own piece", "ZZHL^a^500^^^^USA", "ZZHL^i^500^^^^1", []int{7}, false},
+		{"absent live never matches", "A^B", "", nil, false},
+	}
+	for _, c := range cases {
+		if got := ZeroMatch(c.exp, c.live, c.volatile); got != c.want {
+			t.Errorf("%s: ZeroMatch(%q,%q,%v)=%v want %v", c.name, c.exp, c.live, c.volatile, got, c.want)
+		}
+	}
+}
+
+// TestEntryContents proves the build exposes, per shipped KRN entry record, the
+// storage global + transform mask a content-asserting verify needs — covering a
+// no-transform type (OPTION #19) and a transform type (HL7 APP #771, whose
+// COUNTRY-code 0-node piece 7 FileMan resolves to an internal pointer at install).
+func TestEntryContents(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZEC*1.0*1",
+		Namespace:   "ZZEC",
+		Options:     []Option{{Name: "ZZEC OPT", MenuText: "Demo", TypeCode: "R"}},
+		HL7Apps:     []HL7App{{Name: "ZZEC_APP", Facility: "500", CountryCode: "USA"}},
+	}
+	b := newBuild()
+	for _, p := range MakeBuildPairs(in) {
+		b.Set(parseSubscriptLine(formatSubscript(p.Subs)), p.Value)
+	}
+	byName := map[string]EntryContent{}
+	for _, c := range b.EntryContents() {
+		byName[c.Name] = c
+	}
+	opt, ok := byName["ZZEC OPT"]
+	if !ok || opt.DataRoot != "^DIC(19," || opt.FileStr != "19" || opt.Volatile != nil {
+		t.Errorf("option EntryContent = %+v", opt)
+	}
+	if opt.Zero != "ZZEC OPT^Demo^^R" {
+		t.Errorf("option Zero = %q, want ZZEC OPT^Demo^^R", opt.Zero)
+	}
+	app, ok := byName["ZZEC_APP"]
+	if !ok || app.DataRoot != "^HL(771," || app.FileStr != "771" {
+		t.Errorf("hl7 EntryContent = %+v", app)
+	}
+	if len(app.Volatile) != 1 || app.Volatile[0] != 7 {
+		t.Errorf("hl7 Volatile = %v, want [7]", app.Volatile)
+	}
+}

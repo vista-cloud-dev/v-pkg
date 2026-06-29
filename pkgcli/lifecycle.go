@@ -622,11 +622,17 @@ type verifyResult struct {
 	// requested: does the LIVE routine still match the source this patch shipped?
 	// "drifted" = a later national patch overwrote our code (the FU-21 re-pin gate).
 	Drift map[string]string `json:"drift,omitempty"`
+	// Content maps each shipped entry record ("<file>:<name>") -> "ok" | "mismatch"
+	// | "absent": does the LIVE 0-node match the image this build shipped (aside
+	// from FileMan-transformed pieces)? This turns "a record by this name exists"
+	// into "the record we shipped is the record that got filed."
+	Content map[string]string `json:"content,omitempty"`
 }
 
 // ok reports a fully verified install: #9.7 present + completed, every routine
-// loaded, every PARAMETER DEFINITION present, and — when --drift was checked —
-// every routine still carrying the shipped patch (none drifted/absent).
+// loaded, every component present, every shipped entry record matching the image
+// we filed (content, not just presence), and — when --drift was checked — every
+// routine still carrying the shipped patch (none drifted/absent).
 func (r verifyResult) ok() bool {
 	if !r.Installed || r.Status != 3 {
 		return false
@@ -701,6 +707,11 @@ func (r verifyResult) ok() bool {
 			return false
 		}
 	}
+	for _, state := range r.Content {
+		if state != "ok" {
+			return false
+		}
+	}
 	return true
 }
 
@@ -725,6 +736,35 @@ func checkDrift(ctx context.Context, cl *mdriver.Client, b *kids.Build) (map[str
 		}
 	}
 	return drift, nil
+}
+
+// verifyContent reads the live 0-node of each shipped entry record off the engine
+// and grades it against the shipped image: "ok" (matches, FileMan-transformed
+// pieces aside), "mismatch" (a record by that name exists but differs), or
+// "absent" (no record by that name). This is the content half of verify, run as a
+// second staged script so the presence path is untouched.
+func verifyContent(ctx context.Context, cl *mdriver.Client, contents []kids.EntryContent) (map[string]string, error) {
+	if len(contents) == 0 {
+		return nil, nil
+	}
+	markers, _, err := runMScript(ctx, cl, rtnVerify, installspec.VerifyContentScript(contents))
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]string, len(contents))
+	for _, c := range contents {
+		key := c.FileStr + ":" + c.Name
+		live := strings.TrimSpace(markers["z:"+key])
+		switch {
+		case live == "":
+			out[key] = "absent"
+		case kids.ZeroMatch(c.Zero, live, c.Volatile):
+			out[key] = "ok"
+		default:
+			out[key] = "mismatch"
+		}
+	}
+	return out, nil
 }
 
 func runVerify(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, hloApps, logicalLinks, files []string) (verifyResult, error) {
@@ -802,6 +842,10 @@ func (c *verifyCmd) Run(cc *clikit.Context) error {
 		if err != nil {
 			return clikit.Fail(clikit.ExitRuntime, "VERIFY_FAILED", err.Error(), "")
 		}
+	}
+	res.Content, err = verifyContent(ctx, cl, b.EntryContents())
+	if err != nil {
+		return clikit.Fail(clikit.ExitRuntime, "VERIFY_FAILED", err.Error(), "")
 	}
 	if err := cc.Result(res, func() {
 		cc.Title("pkg verify — " + c.Engine)
@@ -910,6 +954,13 @@ func (c *verifyCmd) Run(cc *clikit.Context) error {
 				mark = cc.Failure("absent")
 			}
 			fmt.Fprintf(cc.Stdout, "  drift %s %s\n", rt, mark)
+		}
+		for key, state := range res.Content {
+			mark := cc.Success("match")
+			if state != "ok" {
+				mark = cc.Failure(state)
+			}
+			fmt.Fprintf(cc.Stdout, "  content %s %s\n", key, mark)
 		}
 	}); err != nil {
 		return err
