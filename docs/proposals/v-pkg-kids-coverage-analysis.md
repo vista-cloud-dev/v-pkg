@@ -497,8 +497,10 @@ not the populate-and-`EN^XPDIJ` shortcut.
     structures** (the `"DR"` edit string with embedded MUMPS, `"DIAB"` nodes, ScreenMan
     FORM/BLOCK subtrees) NOT derivable from a declarative spec. Needs a **read-live
     capture** image source (`--from-engine`); templates are its forcing function.
-    Remaining spec-derivable types: **HL7 family**.
-    Detail: [[option-entry-component]].
+    **Scoped 2026-06-29: [`v-pkg-from-engine-capture.md`](v-pkg-from-engine-capture.md)**
+    (one new image source, zero new transport; capture/build split for determinism;
+    the DBS-vs-global-walk waterline decision is the gate). Remaining spec-derivable
+    types: **HL7 family**. Detail: [[option-entry-component]].
   - **B.1-i ✅ DONE + LIVE-PROVEN 2026-06-28 — HL7 APPLICATION PARAMETER (#771), both
     engines.** The ninth type; the portable, fully spec-derivable member of the HL7
     family. Stored in `^HL(771,`. Record: `-1)=0^1`, `0)=NAME^a^FACILITY^^^^COUNTRY`

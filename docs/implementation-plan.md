@@ -5,7 +5,9 @@ Single source of truth for m-kids status. Per the org Increment Protocol
 that lands work, add a note under the matching `§ Implementation notes` row,
 append any new `§ Lessons learned`, and log directional decisions in `§ Q&A`.
 
-**Last reconciled:** 2026-06-06 (plan created; P0–P3 backfilled as done; P4–P7 pending).
+**Last reconciled:** 2026-06-29 (coverage-analysis tracks T0/A/B folded in — see
+§1b; P5 superseded by the install-fidelity + authoring expansion). Prior:
+2026-06-06 (plan created; P0–P3 backfilled as done; P4–P7 pending).
 
 **Legend:** ☑ done · ◐ in progress / partial · ☐ not started · — n/a · 🔒 gated (needs a resource)
 
@@ -29,6 +31,45 @@ append any new `§ Lessons learned`, and log directional decisions in `§ Q&A`.
 
 Critical path for the next phase of work: **P6 (acquire gold doc) → P4.1 (inventory) → P4.2 → P5/P4.3 → P7**.
 P4.1 has no dependency on P6 and is the safe first build.
+
+> **Note (2026-06-29):** P5 has been overtaken by the **coverage-analysis
+> workstreams** (§1b) — the install path now drives the real KIDS phases
+> (Track A) and the build path authors ~15 component types from source
+> (Track B). The P0–P7 framing predates that effort; §1b is the live status for
+> install-fidelity + authoring.
+
+---
+
+## 1b. Coverage-analysis workstreams (T0 / Track A / Track B)
+
+Source of truth for the two-track effort opened by
+[`docs/proposals/v-pkg-kids-coverage-analysis.md`](proposals/v-pkg-kids-coverage-analysis.md)
+("build+install any of the ~2,400 real KIDS distributions"). That proposal
+carries the per-item narrative + live-proof detail; this table is the rolled-up
+status. **Track A** = install the existing corpus through real KIDS phases;
+**Track B** = author new component types from source (the VSL/R3 enabler).
+
+| ID | Item | Status | Head / evidence |
+|---|---|---|---|
+| **T0.1** | Stop silently dropping declared components (F1) — `buildspec.Validate` rejects unemittable slices | ☑ | `internal/buildspec/buildspec.go` `unsupported()` |
+| **T0.2** | Correct the corpus evidence (F5) — `analyze.py` probes fixed, `kids-corpus-findings.md` re-issued | ☑ | `~/data/kids-patches/` re-tally; `docs/design/kids-corpus-findings.md` |
+| **A.1** | Drive real KIDS load phases (F2) — route (c) augmented direct-populate (env-check + checkpoints + pre/post-install routines + seeded `#9.7` QUES) | ☑ live both engines | `d6a9a11` (A.1.1 pre/post), `2a90618` (A.1.2 env-check), `7a1a154` (A.1.3 `--answer`); spike `proposals/v-pkg-install-fidelity-spike.md` |
+| **A.2** | Enforce Required Builds (#9.611, F4) before filing | ☑ | landed with A.1.2 `2a90618` |
+| **A.3** | PACKAGE #9.4 footprint — VERSION + PATCH APPLICATION HISTORY via `$$PKGVER`/`$$PKGPAT^XPDIP` (F6) | ☑ live both engines | `5ce08f4` (`--register-package`) |
+| **A.4** | Multi-build distributions install in `**KIDS**`-header order, stop-on-failure (F7) | ☑ live both engines | `e1e9cd7` |
+| **B.1-a…o** | Generic KRN entry-component emitter + **15 types** live-proven: OPTION #19 · PARAMETER DEFINITION #8989.51 · SECURITY KEY #19.1 · PROTOCOL #101 (+ITEM #101.01) · RPC #8994 (+INPUT #8994.02) · MAIL GROUP #3.8 · LIST TEMPLATE #409.61 · HELP FRAME #9.2 · HL7 APP #771 · HL LOGICAL LINK #870 · HLO REGISTRY #779.2 · OPTION MENU #19.01 · DESCRIPTION WP | ☑ live both engines | `70ac995`→`2b2e8ca` (B.1-a…o); `12603fe` (#779.2 multi-app regression) |
+| **B.1 templates** | PRINT/SORT/INPUT TEMPLATE #.4/.401/.402, FORM/BLOCK #.403/.404, FUNCTION #.5, DIALOG #.84, BULLETIN #3.6 | ☐ **DEFERRED** | needs read-live capture → [`proposals/v-pkg-from-engine-capture.md`](proposals/v-pkg-from-engine-capture.md) |
+| **B.1 ext-actions** | USE-AS-LINK / MERGE / ATTACH / DISABLE menu-actions | — scoped out | `3b1e8a5` — install-time menu mgmt, not authoring |
+| **B.2-a** | Multi-field DD authoring (the R3 unblock) — `.01` + 5 typed scalar fields | ☑ live both engines | `internal/kids/filecomp.go`; `294a46b` (pointer piece-3 fix) |
+| **B.2-b** | File DATA + 4 action codes (a/m/o/r) + permanent file numbers | ☑ live both engines | `4d182e8` |
+| **B.3** | Install-time code authoring — env-check / pre / post-install hooks from spec | ☑ | `30b8e62` |
+
+**Open / remaining:** only **B.1 templates** (the compiled-FileMan family —
+blocked on read-live capture, now scoped in
+[`proposals/v-pkg-from-engine-capture.md`](proposals/v-pkg-from-engine-capture.md))
+plus documented minor gaps (pointer *data values* in B.2-b; `^DD(200,"PT")`
+back-ref in B.2-a). R3 (v-stdlib's `VSL AUDIT` multi-field file) is **unblocked**
+by B.2-a.
 
 ---
 
@@ -155,6 +196,12 @@ add explicit calls to the real phase functions (`$$ENV^XPDIL1(1)`,
 `$$NEWCP^XPDUTL` checkpoints, seeded `#9.7` QUES answers); land **A.1.1 pre/post
 routines** first, live-gated on both engines. (Routes (a) headless `EN^XPDI` /
 (b) expect rejected/fallback — see the spike.)
+
+**LANDED (2026-06-29):** route (c) shipped — A.1/A.2 (env-check + Required-Build
+enforcement + pre/post-install routines + seeded `#9.7` QUES), A.3 (#9.4
+footprint), A.4 (multi-build). Authoring (Track B) added ~15 KRN component types.
+**See §1b for the rolled-up status**; per-item detail + live-proof in
+`docs/proposals/v-pkg-kids-coverage-analysis.md`.
 
 ### P6 — Gold-doc gap {#p6}
 **Update 2026-06-28: the gap is largely illusory.** The *KIDS Developer Tools*
