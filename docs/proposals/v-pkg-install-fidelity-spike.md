@@ -13,7 +13,7 @@ grounding:
 related:
   - kids-installation-automation.md
   - v-pkg-kids-coverage-analysis.md
-  - implementation-plan.md (P5/P6)
+  - ../archive/implementation-plan.md (P5/P6)
 ---
 
 # v-pkg install-fidelity spike (coverage-analysis Track A.1)

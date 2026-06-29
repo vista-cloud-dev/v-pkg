@@ -11,7 +11,7 @@ grounding:
 related:
   - v-pkg-kids-coverage-analysis.md
   - v-pkg-install-fidelity-spike.md
-  - ../implementation-plan.md
+  - ../archive/implementation-plan.md
 ---
 
 # v-pkg `--from-engine`: read-live capture for the compiled-FileMan family
