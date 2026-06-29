@@ -215,6 +215,22 @@ Fixture `testdata/zzproto` is now self-contained (ACTION + MENU→ACTION). Basic
 attach needs NO extended action (the menu attached cleanly without USE-AS-LINK/
 MERGE/ATTACH/DISABLE — those remain a minor follow-up).
 
+## Extended menu-actions (USE-AS-LINK / MERGE / ATTACH / DISABLE) — scope decision (2026-06-28)
+Investigated the last loosely-noted follow-up to ground truth. These live in the BLD
+manifest NM node piece 3 — the **#9.68 .03 ACTION** set: `0 SEND TO SITE` (what the
+emitter always ships), `1 DELETE AT SITE`, `2 USE AS LINK FOR MENU/ITEM/SUBSCRIBERS`,
+`3 MERGE MENU ITEMS`, `4 ATTACH TO MENU`, `5 DISABLE DURING INSTALL`. Codes 2-4 are
+used in the corpus but are **install-time menu-MANAGEMENT semantics against an
+EXISTING site menu** (link new items into / merge into / attach to a menu the site
+already has) — a *patch* concern, NOT authoring a fresh component; codes 2/4 likely
+ship a reduced/link-only transport shape (no full 0-node), and none can be
+meaningfully live-proven without an elaborate pre-existing-menu fixture. **Decision:
+out of B.1 scope** — B.1 authors fresh entry components (always ACTION=0 SEND); the
+menu-management actions are a distinct capability to design + build + verify on their
+own (like the parked template family), not a B.1 authoring gap. Recorded so the
+follow-up is resolved, not left vague. (DELETE-at-site, code 1, is separately covered
+by the `--force` uninstall back-out path.)
+
 **OPTION #19.01 menu items — same convention, also done (B.1-o).** OPTION #19 MENU
 multiple (field 10, subfile 19.01IP @ node 10) is structurally identical: data
 `10,<seq>,0)=<placeholder>^<synonym>^<displayorder>` + `10,<seq>,"^")=<CHILD NAME>`.

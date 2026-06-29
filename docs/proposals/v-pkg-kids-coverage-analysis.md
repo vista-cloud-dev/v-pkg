@@ -568,9 +568,17 @@ not the populate-and-`EN^XPDIJ` shortcut.
     DRIFT=0; golden regenerated. Live install→verify→`--force` uninstall→clean both
     engines: the menu item re-points to the sibling option's live IEN (17086 vehu /
     14290 foia-t12), synonym + order preserved. **The `"^"` resolver path is now proven
-    for both #101- and #19-pointer menus.** Remaining minor follow-up: the extended
-    menu-actions (USE-AS-LINK / MERGE-ITEMS / ATTACH / DISABLE), not needed for basic
-    attach. ([[option-entry-component]])
+    for both #101- and #19-pointer menus.** ([[option-entry-component]])
+  - **Extended menu-actions (USE-AS-LINK / MERGE / ATTACH / DISABLE) — INVESTIGATED &
+    SCOPED OUT 2026-06-28 (not a B.1 gap).** Ground-truthed: these are the BLD-manifest
+    NM piece-3 codes (#9.68 .03 ACTION set: `0 SEND`/`1 DELETE`/`2 USE-AS-LINK`/
+    `3 MERGE MENU ITEMS`/`4 ATTACH TO MENU`/`5 DISABLE`). The emitter always ships
+    `0 SEND`. Codes 2-4 are **install-time menu-management semantics against an EXISTING
+    site menu** (link/merge/attach) — a patch concern, not authoring; 2/4 likely ship a
+    reduced link-only shape, and none is live-provable without a pre-existing-menu
+    fixture. Decision: a distinct future capability (like the parked template family),
+    NOT a B.1 authoring gap. Rationale in [[option-entry-component]]; DELETE (code 1) is
+    covered by the `--force` uninstall path.
 - **B.2 Real FILE DD + DATA (F3; the R3 enabler).** Extend `FileComp` to a
   multi-field DD (see §8 for the grounded node-set) and add **DATA** export with
   the four action codes (ADD-IF-NEW / MERGE / OVERWRITE / REPLACE) and FULL/PARTIAL
