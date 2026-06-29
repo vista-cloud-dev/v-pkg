@@ -30,6 +30,26 @@ type FileDD struct {
 	Name       string
 	GlobalRoot string      // data global root, e.g. "^DIZ(999000,"
 	Fields     []FileField // additional fields beyond the .01 NAME (empty = single-.01 file)
+	Data       *FileData   // optional data records to ship with the file (nil = DD only)
+}
+
+// FileData is the set of records shipped with a file plus the install action that
+// governs how they merge with any site data (FileMan field #9.64,222.8 SITE'S DATA,
+// send-options piece 8): "a"=ADD ONLY IF NEW FILE, "m"=MERGE, "o"=OVERWRITE,
+// "r"=REPLACE. The records ship under ("DATA",<file>,<ien>,<node>) — the raw record
+// storage subtree DATAIN^DIFROMS (EN^DIFROMS4) loops and files via I^DITR.
+type FileData struct {
+	Action  string // single send-options letter: a | m | o | r (validated upstream)
+	Records []FileRecord
+}
+
+// FileRecord is one data record to ship: its IEN and its storage nodes packed by
+// node->piece->value (the .01 NAME is node 0 piece 1). The emitter caret-joins each
+// node's pieces into the record's global node value, exactly as the live record
+// would sit at <GlobalRoot><ien>,<node>).
+type FileRecord struct {
+	IEN   int64
+	Nodes map[int]map[int]string
 }
 
 // Field type names — the five scalar shapes a multi-field DD emitter grounds
@@ -99,18 +119,36 @@ func emitFileManifest(b *Build, files []FileDD) {
 	for _, f := range files {
 		b.Set(sub(intSub(f.Number), intSub(0)), strconv.FormatInt(f.Number, 10))
 		// #9.64 field 222 (SEND FULL/PARTIAL DD …) — the same options string as the
-		// FIA node; "y^n^p^^^^n^^n" = send DD, no security, no data.
-		b.Set(sub(intSub(f.Number), intSub(222)), fileSendOpts)
+		// FIA node; piece 7/8 carry the data switch + action (DD only when no data).
+		b.Set(sub(intSub(f.Number), intSub(222)), fileSendOpts(dataAction(f)))
 		b.Set(sub(strSub("B"), intSub(f.Number), intSub(f.Number)), "")
 	}
 }
 
-// fileSendOpts is the DD-only send-options string (FIA …,0,1 and BLD #9.64 222):
-// piece 1 "y" = install/update the DD; piece 2 "n" = no security code; piece 3
-// "f" = FULL definition (DIFROMS2 reads piece 3: "f"=full new-file DD, "p"=partial
-// field update — a new file MUST be "f" or DDIN errors "Partial DD/File does not
-// exist"); piece 7 "n" = do not send data.
-const fileSendOpts = "y^n^f^^^^n^^n"
+// fileSendOpts builds the 9-piece send-options string (FIA …,0,1 and BLD #9.64 222).
+// Pieces (each a #9.64 field): 1 "y" = install/update the DD (222.1); 2 "n" = no
+// security code (222.2); 3 "f" = FULL definition (222.3 — DIFROMS2 reads it: "f"=full
+// new-file DD, "p"=partial field update; a new file MUST be "f" or DDIN errors); 5
+// = RESOLVE POINTERS (222.5); 7 = DATA COMES WITH FILE (222.7, "y"/"n"); 8 = SITE'S
+// DATA action (222.8, a/m/o/r); 9 "n" = MAY USER OVERRIDE (222.9). With no data,
+// piece 7 = "n" and piece 8 = "" (the DD-only string "y^n^f^^^^n^^n"). With data,
+// piece 7 = "y" and piece 8 = the action letter — exactly what EN^DIFROMS4 reads.
+func fileSendOpts(action string) string {
+	p7, p8 := "n", ""
+	if action != "" {
+		p7, p8 = "y", action
+	}
+	return "y^n^f^^^^" + p7 + "^" + p8 + "^n"
+}
+
+// dataAction returns a file's data-install action letter, or "" when the file ships
+// no data (a DD-only file).
+func dataAction(f FileDD) string {
+	if f.Data == nil {
+		return ""
+	}
+	return f.Data.Action
+}
 
 // emitFileData writes the FIA section + the ^DD/^DIC image for each file — the
 // half FIA^XPDIK actually installs. version/namespace stamp the FIA VR node.
@@ -127,7 +165,7 @@ func emitFileData(b *Build, files []FileDD, version, namespace string) {
 		b.Set(Subs{strSub("FIA"), fnum}, f.Name)
 		b.Set(Subs{strSub("FIA"), fnum, intSub(0)}, gl)
 		b.Set(Subs{strSub("FIA"), fnum, intSub(0), intSub(0)}, num+"I") // DIFROM internal-format tag
-		b.Set(Subs{strSub("FIA"), fnum, intSub(0), intSub(1)}, fileSendOpts)
+		b.Set(Subs{strSub("FIA"), fnum, intSub(0), intSub(1)}, fileSendOpts(dataAction(f)))
 		b.Set(Subs{strSub("FIA"), fnum, intSub(0), strSub("VR")}, version+"^"+namespace)
 
 		// --- ^DD image: the attribute dictionary for a single free-text .01 NAME. ---
@@ -177,6 +215,31 @@ func emitFileData(b *Build, files []FileDD, version, namespace string) {
 		b.Set(Subs{strSub("^DIC"), fnum, fnum, intSub(0)}, f.Name+"^"+num)
 		b.Set(Subs{strSub("^DIC"), fnum, fnum, intSub(0), strSub("GL")}, gl)
 		b.Set(Subs{strSub("^DIC"), fnum, strSub("B"), strSub(f.Name), fnum}, "")
+
+		// --- DATA section: the records EN^DIFROMS4 loops (("DATA",<file>,<ien>,<node>)).
+		// Each record ships as its raw storage subtree — the node values are the
+		// caret-joined field pieces, exactly as the record sits in the file's data
+		// global. The install re-files them with the action set in send-options p8.
+		emitFileRecords(b, fnum, f.Data)
+	}
+}
+
+// emitFileRecords writes a file's data records under ("DATA",<file>,<ien>,<node>).
+// Records and nodes are emitted in numeric order for a deterministic transport.
+func emitFileRecords(b *Build, fnum Sub, data *FileData) {
+	if data == nil {
+		return
+	}
+	for _, rec := range data.Records {
+		ien := intSub(rec.IEN)
+		nodes := make([]int, 0, len(rec.Nodes))
+		for n := range rec.Nodes {
+			nodes = append(nodes, n)
+		}
+		sort.Ints(nodes)
+		for _, n := range nodes {
+			b.Set(Subs{strSub("DATA"), fnum, ien, intSub(int64(n))}, caretJoin(rec.Nodes[n]))
+		}
 	}
 }
 

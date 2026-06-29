@@ -168,15 +168,15 @@ line-items and must not become spec.)
 |---|---|---|---|
 | ROUTINE | **FULL** | `internal/kids/buildkids.go:56`; install `installspec/script.go:74` | deterministic checksums; live-proven |
 | PARAMETER DEFINITION #8989.51 | **FULL** | `internal/kids/krncomp.go:53` | the only entry type emitted |
-| FILE — DD | **PARTIAL (toy)** | `internal/kids/filecomp.go:67`; `buildspec.go:290` | single `.01` NAME, #999000–999999 only, **DD-only never data** |
-| FILE — DATA | **NONE** | `filecomp.go:24` | no data; no action codes |
+| FILE — DD | **FULL** | `internal/kids/filecomp.go`; `buildspec.go` | `.01` + 5 typed fields (B.2-a); any positive file # (out-of-range needs explicit globalRoot) — live-proven both engines |
+| FILE — DATA | **FULL** | `filecomp.go` `emitFileRecords` | records ship under `("DATA",file,ien,node)`; the 4 action codes a/m/o/r (B.2-b) — live-proven both engines |
 | OPTION/KEY/PROTOCOL/RPC/TEMPLATE/MAILGROUP/HL7 | **NONE** | `buildspec.go:60–71` accepts, `build.go` ignores | **silently dropped** — see F1 |
 | Required Builds | **PARTIAL** | manifest `krncomp.go:120`; install path runs no check | declared, **not enforced** — F4 |
 | Package #9.4 link / patch history | **NONE** | (no PKG emit) | F6 |
 | Environment Check | **NONE** | `buildspec.go:44` accepted, never emitted/run | F2 |
 | Pre / Post-Install routine | **NONE** | not emitted; `EN^XPDIJ` runs whatever is staged | F2 |
 | Install questions (DIFQ/`XPDQUES`) | **PARTIAL (modeled, unwired)** | `installspec/installspec.go:36` defined, `lifecycle.go` doesn't consume it | F2 |
-| Data action codes / SEND-DELETE / DD-update gates | **NONE** | hardcoded `filecomp.go:58` | F2/F3 |
+| Data action codes (a/m/o/r) | **FULL** | `filecomp.go` `fileSendOpts`; `buildspec.go` `DataActionCode` | send-opts p7/p8 per #9.64,222.7/222.8 (B.2-b) |
 | Version/patch + already-installed guard | **PARTIAL** | `script.go:82` | refuses re-install; no patch-sequence check |
 | Uninstall / reversibility | **PARTIAL (good, routine-centric)** | `reversibility.go`, `lifecycle.go:611` | strong static class model; pre-image = routines only |
 | **Round-trip** any existing `.KID` | **FULL (opaque)** | `decompose.go` / `assemble.go` | carries *all* types as ZWR — but authors nothing |
@@ -605,9 +605,26 @@ not the populate-and-`EN^XPDIJ` shortcut.
     `FIA^XPDIK` NULSUBSC → status 2, file half-registered). Minor open gap: the
     pointed-to back-ref `^DD(200,"PT",…)` is not shipped (records still file fine).
     ([[multi-field-dd-emitter]])
-  - **B.2-b (remaining) — file DATA + the 4 action codes** (ADD-IF-NEW / MERGE /
-    OVERWRITE / REPLACE), **and relaxing the test-range file-number restriction**
-    (permanent-number namespace policy needs org coordination).
+  - **B.2-b ✅ DONE + LIVE-PROVEN 2026-06-28 — file DATA + the 4 action codes +
+    permanent file numbers (both engines).** Data records ship under
+    **`("DATA",<file>,<ien>,<node>)`** (the raw record storage subtree, value =
+    caret-joined field pieces). The send-options string is **9 pieces**: **p7 = DATA
+    COMES WITH FILE (`y`/`n`, the data switch)** and **p8 = SITE'S DATA action** — the
+    four letters **`a`/`m`/`o`/`r`** straight off `^DD(9.64,222.8,0)` (= ADD ONLY IF
+    NEW FILE / MERGE / OVERWRITE / REPLACE). Install: `FIA^XPDIK` runs the data loop
+    when p7=`y`, calling **`DATAIN^DIFROMS` → `EN^DIFROMS4`** (reads p8: `o`→overwrite,
+    `r`→replace, else merge) then `I^DITR` files + **REINDEX rebuilds the xrefs** — so
+    the emitter ships data nodes only (the "B" index is rebuilt live). **Permanent
+    file numbers:** the hard 999000–999999 gate relaxed to any positive canonical
+    integer, but an out-of-range file MUST declare an explicit `globalRoot` (the
+    `^DIZ` scratch default applies only in-range); namespace *governance* stays an
+    org-registry concern (code permits, policy governs). Live proof: #999002 with 3
+    records under MERGE installed byte-identically on vehu (YDB) + foia-t12 (IRIS) —
+    every piece exact, "B" xref rebuilt, clean uninstall (DIZ+DIC+DD gone). Pointer
+    *data values* remain out of scope (no pointer-resolution name nodes). TDD;
+    lint/race/contract green; corpus DRIFT=0; golden `testdata/zzdata`
+    (`TestBuild_ZZDATA_Deterministic`). `internal/kids/filecomp.go`,
+    `internal/buildspec/buildspec.go`, `pkgcli/build.go`. ([[multi-field-dd-emitter]])
 - **B.3 Install-time code authoring.** Let a build declare and ship Environment
   Check / Pre / Post-Install routines (the spec already has `envCheck`; wire it to
   emit + register), so authored packages can gate and migrate.

@@ -1,0 +1,24 @@
+{
+  "package": "ZZDATA",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "files": [
+      {
+        "number": 999002, "name": "ZZ DATA DEMO", "globalRoot": "^DIZ(999002,",
+        "fields": [
+          { "number": 1, "label": "COUNT", "type": "numeric", "node": 0, "piece": 2, "width": 6, "decimals": 0 },
+          { "number": 2, "label": "NOTE", "type": "free text", "node": 1, "piece": 1, "maxLen": 60 }
+        ],
+        "data": {
+          "action": "merge",
+          "records": [
+            { "ien": 1, "values": { ".01": "ALPHA", "1": "42", "2": "first note" } },
+            { "ien": 2, "values": { ".01": "BRAVO" } },
+            { "ien": 3, "values": { ".01": "CHARLIE", "1": "7" } }
+          ]
+        }
+      }
+    ]
+  }
+}

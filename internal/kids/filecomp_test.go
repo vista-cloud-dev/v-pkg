@@ -138,6 +138,73 @@ func TestMakeBuildPairs_File_MultiField(t *testing.T) {
 	}
 }
 
+// dataInput ships a new file (#999000) with a free-text .01 NAME, a numeric field
+// at node 0 piece 2, and a free-text field at node 1 piece 1, plus two data records
+// under a MERGE action. The data ships as the raw record storage subtree under
+// ("DATA",<file>,<ien>,<node>) — exactly what DATAIN^DIFROMS (EN^DIFROMS4) installs.
+func dataInput() BuildInput {
+	return BuildInput{
+		InstallName: "ZZVSLDATA*1.0*1",
+		Namespace:   "ZZVSLDATA",
+		Files: []FileDD{{
+			Number:     999000,
+			Name:       "ZZVSLDATA",
+			GlobalRoot: "^DIZ(999000,",
+			Fields: []FileField{
+				{Number: 1, Label: "COUNT", Type: FieldNumeric, Node: 0, Piece: 2, Width: 6, Decimals: 0},
+				{Number: 2, Label: "NOTE", Type: FieldFreeText, Node: 1, Piece: 1, MaxLen: 60},
+			},
+			Data: &FileData{
+				Action: "m", // MERGE
+				Records: []FileRecord{
+					{IEN: 1, Nodes: map[int]map[int]string{0: {1: "ALPHA", 2: "42"}, 1: {1: "hello"}}},
+					{IEN: 2, Nodes: map[int]map[int]string{0: {1: "BRAVO"}}},
+				},
+			},
+		}},
+	}
+}
+
+func TestMakeBuildPairs_File_Data(t *testing.T) {
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(dataInput()) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	want := map[string]string{
+		// send-options now carry the data switch (piece 7 = y) + action (piece 8 = m).
+		`"FIA",999000,0,1)`:     "y^n^f^^^^y^m^n",
+		`"BLD",1,4,999000,222)`: "y^n^f^^^^y^m^n",
+		// data records — the raw storage subtree per IEN, packed by node;piece.
+		`"DATA",999000,1,0)`: "ALPHA^42",
+		`"DATA",999000,1,1)`: "hello",
+		`"DATA",999000,2,0)`: "BRAVO",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+	// A DD-only file must NOT leak any DATA node.
+	for _, p := range MakeBuildPairs(fileInput()) {
+		if p.Subs.Section() == "DATA" {
+			t.Errorf("DD-only build leaked a DATA node: %s", formatSubscript(p.Subs))
+		}
+	}
+}
+
+func TestMakeBuildPairs_File_Data_Deterministic(t *testing.T) {
+	a := MakeBuildPairs(dataInput())
+	b := MakeBuildPairs(dataInput())
+	if len(a) != len(b) {
+		t.Fatalf("length differs: %d vs %d", len(a), len(b))
+	}
+	for i := range a {
+		if formatSubscript(a[i].Subs) != formatSubscript(b[i].Subs) || a[i].Value != b[i].Value {
+			t.Fatalf("non-deterministic at %d", i)
+		}
+	}
+}
+
 func TestMakeBuildPairs_File_MultiField_Deterministic(t *testing.T) {
 	a := MakeBuildPairs(multiFieldInput())
 	b := MakeBuildPairs(multiFieldInput())

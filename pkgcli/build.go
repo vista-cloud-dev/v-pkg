@@ -162,9 +162,41 @@ func resolveFiles(files []buildspec.FileComp) []kids.FileDD {
 			Name:       f.Name,
 			GlobalRoot: f.GlobalRoot,
 			Fields:     resolveFields(f.Fields),
+			Data:       resolveFileData(f),
 		})
 	}
 	return out
+}
+
+// resolveFileData maps a file's data block onto the kids emit shape: the action name
+// becomes its #9.64,222.8 send-options letter, and each record's field→value map is
+// packed into storage nodes by (node;piece) using the field definitions (the .01
+// NAME is node 0 piece 1). The spec is already validated (known action, fields
+// declared, no pointer-field values), so the lookups are guaranteed.
+func resolveFileData(f buildspec.FileComp) *kids.FileData {
+	if f.Data == nil {
+		return nil
+	}
+	// Field key (".01" / "<number>") → storage (node, piece).
+	type loc struct{ node, piece int }
+	where := map[string]loc{".01": {0, 1}}
+	for _, fld := range f.Fields {
+		key := strings.TrimPrefix(strconv.FormatFloat(fld.Number, 'f', -1, 64), "0")
+		where[key] = loc{fld.Node, fld.Piece}
+	}
+	recs := make([]kids.FileRecord, 0, len(f.Data.Records))
+	for _, r := range f.Data.Records {
+		nodes := map[int]map[int]string{}
+		for key, val := range r.Values {
+			l := where[key]
+			if nodes[l.node] == nil {
+				nodes[l.node] = map[int]string{}
+			}
+			nodes[l.node][l.piece] = val
+		}
+		recs = append(recs, kids.FileRecord{IEN: r.IEN, Nodes: nodes})
+	}
+	return &kids.FileData{Action: buildspec.DataActionCode[f.Data.Action], Records: recs}
 }
 
 // resolveFields maps a spec's field declarations onto the kids emit shape. The

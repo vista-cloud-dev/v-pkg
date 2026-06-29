@@ -1,6 +1,6 @@
 ---
 name: multi-field-dd-emitter
-description: "2026-06-28: v-pkg AUTHORS a multi-field FileMan FILE DD (5 grounded scalar field types beyond .01) — coverage-analysis B.2-a. LIVE-INSTALL-PROVEN on both engines (a pointer-piece caret bug was found+fixed). Unblocks v-stdlib R3 (the VSL AUDIT file)."
+description: "2026-06-28: v-pkg AUTHORS a multi-field FileMan FILE DD (5 grounded scalar field types beyond .01) — coverage-analysis B.2-a — plus B.2-b file DATA (the 4 action codes a/m/o/r) + permanent file numbers. All LIVE-INSTALL-PROVEN on both engines. Unblocks v-stdlib R3 (the VSL AUDIT file)."
 metadata:
   type: project
 ---
@@ -17,10 +17,9 @@ file.
 - **DOES:** emit a new file's DD with the `.01` free-text NAME **plus N typed
   fields**. Five grounded scalar types: **free text / numeric / date / set of
   codes / pointer**, each with `required` and an optional reader-help (`,N,3)`).
-- **DOES NOT (still open):** ship file **DATA** + the 4 action codes
-  (ADD-IF-NEW/MERGE/OVERWRITE/REPLACE) — the rest of B.2 (B.2-b); relax the
-  test-range file-number restriction (permanent-number namespace policy needs org
-  coordination).
+- **B.2-b DONE (2026-06-28, below):** ships file **DATA** + the 4 action codes and
+  relaxes the test-range file-number restriction. Pointer-field *data values* remain
+  out of scope (no pointer-resolution name nodes shipped).
 
 ## LIVE-INSTALL-PROVEN on both engines (2026-06-28)
 Built via `v pkg build`, installed via `v pkg install` on vehu (YDB) + foia-t12
@@ -45,6 +44,45 @@ with the DD present is the tell-tale of a malformed field def in this path.
 file's DD, not a modification to #200's). Records with pointer values file fine;
 the missing PT xref affects reverse-navigation / delete-protection only. A future
 item if full pointer fidelity is needed (would ship the PT node for the target).
+
+## B.2-b — file DATA + the 4 action codes + permanent file numbers (2026-06-28, LIVE-PROVEN both engines)
+
+**The KIDS data-transport mechanism (ground-truthed from FIA^XPDIK + EN^DIFROMS4 live):**
+- Data records ship under **`("DATA",<file>,<ien>,<node>)`** — the **raw record storage
+  subtree**, value = the caret-joined field pieces exactly as the record sits in the
+  file's data global. A sibling section to `"FIA"`/`"^DD"`/`"^DIC"`.
+- The **send-options string is 9 pieces** (FIA `…,0,1)` and BLD `#9.64,222`), each a
+  #9.64 field: **p7 = DATA COMES WITH FILE (222.7, `y`/`n`)** = the data switch;
+  **p8 = SITE'S DATA action (222.8)** = the 4 action **letters** —
+  **`a`=ADD ONLY IF NEW FILE / `m`=MERGE / `o`=OVERWRITE / `r`=REPLACE`** (definitive:
+  read straight off `^DD(9.64,222.8,0)` piece-3 set-of-codes). DD-only =
+  `y^n^f^^^^n^^n` (p7=n,p8=""); with data = `y^n^f^^^^y^<a|m|o|r>^n`.
+- **Install path:** XPDIK runs the data loop only when `$P(opts,U,7)="y"`, calling
+  **`DATAIN^DIFROMS` → `EN^DIFROMS4`** then `RP^DIFROMSR` (pointer resolution).
+  DIFROMS4 reads p8: `o`→DKP=0 (overwrite), `r`→Replace mode (delete old xrefs +
+  reinstall), else keep (merge); **`I^DITR` files each record and `REINDEX` rebuilds
+  the cross-references** — so the emitter ships data nodes only, NOT xrefs (the "B"
+  index is rebuilt live, same verbatim-vs-refile split as the entry components).
+- **Live proof (vehu YDB + foia-t12 IRIS, byte-identical):** #999002 with 3 records
+  under MERGE installed → `^DIZ(999002,1,0)="ALPHA^42"`, `…,1,1)="first note"`,
+  `…,2,0)="BRAVO"`, `…,3,0)="CHARLIE^7"` (every piece exact), and the "B" xref rebuilt
+  (ALPHA→1/BRAVO→2/CHARLIE→3). `v pkg uninstall --force` removes DIZ+DIC+DD cleanly.
+
+**Permanent (non-test-range) file numbers — bounded relaxation, NOT a free-for-all.**
+The hard `999000–999999` gate dropped to: any **positive canonical integer**, but a
+file **outside** the test range MUST declare an explicit `globalRoot` (the `^DIZ`
+scratch default applies only in-range — a permanent file states where it lives). The
+*governance* (which numbers a package owns) stays an **org namespace-registry**
+concern, deliberately NOT enforced in code (coverage-analysis: "coordinate rather than
+mint ad hoc"). So the code *permits*, the policy *governs*.
+
+**Where (B.2-b additions):** `filecomp.go` `FileData`/`FileRecord` + `fileSendOpts(action)`
+(const→fn) + `emitFileRecords`; `buildspec.go` `FileDataSpec`/`FileRecordSpec` +
+`DataActionCode` map + `validateFileData` (every record must set `.01`; pointer-field
+values rejected) + relaxed `validateFiles`; `build.go` `resolveFileData` (packs
+field→value into node;piece using the field defs). Golden `testdata/zzdata`
+(`TestBuild_ZZDATA_Deterministic`), unit `TestMakeBuildPairs_File_Data`. Corpus
+DRIFT=0, lint/race/contract green.
 
 ## Grounded grammar (verbatim from a real new-file full DD: #8992.7 LOG4M CONFIG, Log4M_2p4.KID)
 - **Header** `^DD(F,F,0)` = `FIELD^^<highest-field#>^<field-count>` — piece 1 is the

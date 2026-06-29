@@ -138,11 +138,72 @@ func TestParse_Files_DefaultGlobalRoot(t *testing.T) {
 
 func TestParse_Files_Invalid(t *testing.T) {
 	cases := map[string]string{
-		"number too low":  `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":200,"name":"ZZVSLFS"}]}}`,
-		"number too high": `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":1000000,"name":"ZZVSLFS"}]}}`,
-		"no name":         `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":999000}]}}`,
-		"lower-case name": `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":999000,"name":"lower"}]}}`,
-		"bad global root": `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":999000,"name":"ZZVSLFS","globalRoot":"DIZ999000"}]}}`,
+		"zero number":       `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":0,"name":"ZZVSLFS","globalRoot":"^DIZ(0,"}]}}`,
+		"non-integer":       `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":1.5,"name":"ZZVSLFS","globalRoot":"^DIZ(1,"}]}}`,
+		"permanent no root": `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":662001,"name":"ZZVSLFS"}]}}`,
+		"no name":           `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":999000}]}}`,
+		"lower-case name":   `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":999000,"name":"lower"}]}}`,
+		"bad global root":   `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":999000,"name":"ZZVSLFS","globalRoot":"DIZ999000"}]}}`,
+	}
+	for name, js := range cases {
+		if _, err := Parse([]byte(js)); err == nil {
+			t.Errorf("%s: expected an error, got nil", name)
+		}
+	}
+}
+
+// A permanent (non-test-range) file number is allowed when the spec supplies an
+// explicit global root — the test-range ^DIZ default never applies to a permanent
+// file (it must declare where it lives; the namespace governance is an org concern).
+func TestParse_Files_PermanentNumber(t *testing.T) {
+	s, err := Parse([]byte(`{"package":"ZZVSLFS","version":"1.0","components":{"files":[{"number":662001,"name":"ZZVSLFS","globalRoot":"^ZZVSL(662001,"}]}}`))
+	if err != nil {
+		t.Fatalf("permanent file number with explicit root should parse: %v", err)
+	}
+	if got := s.Components.Files[0].GlobalRoot; got != "^ZZVSL(662001," {
+		t.Errorf("globalRoot = %q", got)
+	}
+}
+
+// A data-bearing FILE component carries an action + records; the action name maps
+// to the #9.64,222.8 SITE'S DATA send-options letter.
+func TestParse_Files_Data(t *testing.T) {
+	js := `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{
+		"number":999000,"name":"ZZVSLFS","globalRoot":"^DIZ(999000,",
+		"fields":[{"number":1,"label":"COUNT","type":"numeric","node":0,"piece":2,"width":6}],
+		"data":{"action":"merge","records":[
+			{"ien":1,"values":{".01":"ALPHA","1":"42"}},
+			{"ien":2,"values":{".01":"BRAVO"}}
+		]}
+	}]}}`
+	s, err := Parse([]byte(js))
+	if err != nil {
+		t.Fatalf("parse data-bearing file: %v", err)
+	}
+	d := s.Components.Files[0].Data
+	if d == nil || d.Action != "merge" || len(d.Records) != 2 {
+		t.Fatalf("data = %+v", d)
+	}
+	if DataActionCode[d.Action] != "m" {
+		t.Errorf("action %q → code %q, want m", d.Action, DataActionCode[d.Action])
+	}
+}
+
+func TestParse_Files_Data_Invalid(t *testing.T) {
+	base := func(data string) string {
+		return `{"package":"ZZVSLFS","version":"1.0","components":{"files":[{` +
+			`"number":999000,"name":"ZZVSLFS","globalRoot":"^DIZ(999000,",` +
+			`"fields":[{"number":1,"label":"COUNT","type":"numeric","node":0,"piece":2,"width":6},` +
+			`{"number":2,"label":"WHO","type":"pointer","node":0,"piece":3,"pointTo":200,"pointRoot":"^VA(200,"}],` +
+			`"data":` + data + `}]}}`
+	}
+	cases := map[string]string{
+		"unknown action":    base(`{"action":"clobber","records":[{"ien":1,"values":{".01":"A"}}]}`),
+		"no records":        base(`{"action":"merge","records":[]}`),
+		"bad ien":           base(`{"action":"merge","records":[{"ien":0,"values":{".01":"A"}}]}`),
+		"unknown field":     base(`{"action":"merge","records":[{"ien":1,"values":{"7":"A"}}]}`),
+		"missing dot01":     base(`{"action":"merge","records":[{"ien":1,"values":{"1":"42"}}]}`),
+		"pointer-field val": base(`{"action":"merge","records":[{"ien":1,"values":{".01":"A","2":"5"}}]}`),
 	}
 	for name, js := range cases {
 		if _, err := Parse([]byte(js)); err == nil {

@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -385,10 +386,36 @@ var ParamEntityIEN = map[string]string{
 // local/test file number (999000-999999) and GlobalRoot is its data global
 // (defaulting to ^DIZ(<file>,).
 type FileComp struct {
-	Number     float64     `json:"number"`
-	Name       string      `json:"name,omitempty"`
-	GlobalRoot string      `json:"globalRoot,omitempty"` // data global, e.g. "^DIZ(999000,"; default derived from Number
-	Fields     []FieldSpec `json:"fields,omitempty"`     // fields beyond the implicit .01 NAME (empty = single-.01 file)
+	Number     float64       `json:"number"`
+	Name       string        `json:"name,omitempty"`
+	GlobalRoot string        `json:"globalRoot,omitempty"` // data global, e.g. "^DIZ(999000,"; default derived from Number
+	Fields     []FieldSpec   `json:"fields,omitempty"`     // fields beyond the implicit .01 NAME (empty = single-.01 file)
+	Data       *FileDataSpec `json:"data,omitempty"`       // optional data records shipped with the file
+}
+
+// FileDataSpec declares data records shipped with a file plus the install action
+// that governs how they merge with any site data. Action is a human name mapped to
+// the #9.64,222.8 SITE'S DATA send-options letter via DataActionCode.
+type FileDataSpec struct {
+	Action  string           `json:"action"` // add only if new | merge | overwrite | replace
+	Records []FileRecordSpec `json:"records"`
+}
+
+// FileRecordSpec is one data record: its IEN and a map of field number (as a string,
+// ".01" for the NAME) to the record's internal value for that field.
+type FileRecordSpec struct {
+	IEN    int64             `json:"ien"`
+	Values map[string]string `json:"values"`
+}
+
+// DataActionCode maps a FileDataSpec action name to its FileMan #9.64,222.8 SITE'S
+// DATA send-options letter (piece 8): "a"=ADD ONLY IF NEW FILE, "m"=MERGE,
+// "o"=OVERWRITE, "r"=REPLACE — the letters EN^DIFROMS4 reads at install.
+var DataActionCode = map[string]string{
+	"add only if new": "a",
+	"merge":           "m",
+	"overwrite":       "o",
+	"replace":         "r",
 }
 
 // FieldSpec is one FileMan field beyond the implicit free-text .01 NAME, declared
@@ -917,8 +944,8 @@ func validateFiles(files []FileComp) error {
 	for i := range files {
 		f := &files[i]
 		n := int64(f.Number)
-		if float64(n) != f.Number || n < LocalFileMin || n > LocalFileMax {
-			return fmt.Errorf("buildspec: file number %v must be an integer in the local range %d-%d", f.Number, LocalFileMin, LocalFileMax)
+		if float64(n) != f.Number || n < 1 {
+			return fmt.Errorf("buildspec: file number %v must be a positive integer", f.Number)
 		}
 		if f.Name == "" {
 			return fmt.Errorf("buildspec: file #%d is missing its name", n)
@@ -926,7 +953,14 @@ func validateFiles(files []FileComp) error {
 		if len(f.Name) > 30 || !reFileName.MatchString(f.Name) {
 			return fmt.Errorf("buildspec: file name %q must be uppercase ≤30 chars (FileMan FILE name)", f.Name)
 		}
+		// A test-range (#999000-999999) file defaults to the ^DIZ scratch global; a
+		// permanent (non-test-range) file MUST declare its own data global — the
+		// developer states where it lives (namespace governance is an org concern, not
+		// auto-minted here). See coverage-analysis §"Permanent file numbers".
 		if f.GlobalRoot == "" {
+			if n < LocalFileMin || n > LocalFileMax {
+				return fmt.Errorf("buildspec: permanent file #%d (outside the test range %d-%d) must declare an explicit globalRoot", n, LocalFileMin, LocalFileMax)
+			}
 			f.GlobalRoot = fmt.Sprintf("^DIZ(%d,", n)
 		}
 		if !reGlobalRt.MatchString(f.GlobalRoot) {
@@ -935,8 +969,63 @@ func validateFiles(files []FileComp) error {
 		if err := validateFields(n, f.Fields); err != nil {
 			return err
 		}
+		if err := validateFileData(n, f); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// validateFileData checks a file's optional data block: a known action, at least one
+// record, a positive integer IEN per record, and values that reference only the .01
+// NAME or a declared non-pointer field. Pointer-field data is out of scope (B.2-b
+// ships no pointer-resolution name nodes), and every record must set the .01 NAME.
+func validateFileData(fileNum int64, f *FileComp) error {
+	if f.Data == nil {
+		return nil
+	}
+	if _, ok := DataActionCode[f.Data.Action]; !ok {
+		return fmt.Errorf("buildspec: file #%d data action %q must be one of: add only if new, merge, overwrite, replace", fileNum, f.Data.Action)
+	}
+	if len(f.Data.Records) == 0 {
+		return fmt.Errorf("buildspec: file #%d data block must ship at least one record", fileNum)
+	}
+	// Index the declared fields by their string key (".01" plus each field number).
+	pointerField := map[string]bool{}
+	known := map[string]bool{".01": true}
+	for i := range f.Fields {
+		key := trimZero(strconv.FormatFloat(f.Fields[i].Number, 'f', -1, 64))
+		known[key] = true
+		if f.Fields[i].Type == "pointer" {
+			pointerField[key] = true
+		}
+	}
+	for _, rec := range f.Data.Records {
+		if rec.IEN < 1 {
+			return fmt.Errorf("buildspec: file #%d data record IEN %d must be a positive integer", fileNum, rec.IEN)
+		}
+		if _, ok := rec.Values[".01"]; !ok {
+			return fmt.Errorf("buildspec: file #%d data record %d must set the .01 NAME value", fileNum, rec.IEN)
+		}
+		for key := range rec.Values {
+			if !known[key] {
+				return fmt.Errorf("buildspec: file #%d data record %d references undeclared field %q", fileNum, rec.IEN, key)
+			}
+			if pointerField[key] {
+				return fmt.Errorf("buildspec: file #%d data record %d sets pointer field %q — pointer data is not supported", fileNum, rec.IEN, key)
+			}
+		}
+	}
+	return nil
+}
+
+// trimZero strips a leading "0" from a fractional field key ("0.01" → ".01") so a
+// data record's field keys match the way fields are written in the spec.
+func trimZero(s string) string {
+	if strings.HasPrefix(s, "0.") {
+		return s[1:]
+	}
+	return s
 }
 
 // validateFields checks each field beyond the .01 NAME: a field number above .01
