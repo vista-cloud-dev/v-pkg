@@ -36,7 +36,7 @@
   "ok": true,
   "exit": 0,
   "data": {
-    "outputDir": "/tmp/tmp.IwBTWyztN5/tree",
+    "outputDir": "/tmp/tmp.8lpGY1HlKL/tree",
     "builds": [
       "XU*8.0*504"
     ]
@@ -88,7 +88,7 @@ POST ;Post-install entry point to add Application Proxy
   "ok": true,
   "exit": 0,
   "data": {
-    "outputKid": "/tmp/tmp.IwBTWyztN5/rebuilt.KID",
+    "outputKid": "/tmp/tmp.8lpGY1HlKL/rebuilt.KID",
     "installNames": [
       "XU*8.0*504"
     ]
@@ -96,7 +96,7 @@ POST ;Post-install entry point to add Application Proxy
 }
 --- rebuilt header ---
 KIDS Distribution saved by v-pkg
-m-kids reassembled output
+v-pkg reassembled output
 **KIDS**:XU*8.0*504^
 
 === 5. RE-PARSE — the rebuilt .KID carries the same build & subscripts ===

@@ -203,7 +203,7 @@ func WriteKID(installNames []string, buildsPairs map[string][]Pair, outPath stri
 	var lines []string
 	lines = append(lines,
 		"KIDS Distribution saved by v-pkg",
-		"m-kids reassembled output",
+		"v-pkg reassembled output",
 		"**KIDS**:"+strings.Join(installNames, "^")+"^",
 		"",
 	)
