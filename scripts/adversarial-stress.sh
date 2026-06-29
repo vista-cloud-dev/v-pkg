@@ -147,13 +147,12 @@ expect 0 "verify VSL (content)"     verify  "$VSL"
 note "ADVERSARIAL: re-installing an already-filed install-name must REFUSE (idempotency guard, even with --allow-overwrite)"
 expect 4 "install VSL again (already filed in #9.7) → refused" install "$VSL" --allow-overwrite
 
-# OBSERVATION (not asserted): verify --drift on VSL currently FALSE-POSITIVES because
-# the v-stdlib routines are TAB-indented and the engine flattens leading TAB->SPACE on
-# install, so the live source diverges from the shipped source on every line. MSL
-# (space-indented) drifts clean. Logged here, reported as a finding — promote to an
-# assertion once the drift normalization (or v-stdlib detab) lands.
-dr="$(rc verify "$VSL" "${conn[@]}" --drift --output json)"
-note "OBSERVE: verify --drift VSL exit=$dr (expected 3 today — KNOWN tab-indentation false-drift, see findings)"
+# Regression guard for the tab-indentation false-drift (found by this harness,
+# 2026-06-29): v-stdlib's routines were TAB-indented and an engine flattens a
+# leading TAB->SPACE on install, so the live source diverged from the shipped
+# source on every line and drift false-positived. Fixed by detabbing v-stdlib
+# (spaces only) + m-cli lint M-MOD-039; VSL now drifts clean like MSL.
+expect 0 "verify --drift VSL (applied; no tab false-drift)" verify "$VSL" --drift
 
 note "ADVERSARIAL: VSL is side-effecting — bare uninstall must REFUSE (don't orphan file/param data)"
 expect 4 "uninstall VSL, no flags → refused" uninstall "$VSL"

@@ -1,6 +1,6 @@
 ---
 name: adversarial-stress-gate
-description: scripts/adversarial-stress.sh + `make stress` — the live-gate's harder sibling; full MSL+VSL lifecycle (assembly→disassembly→install→verify+drift→back-out) with adversarial refusal probes. 36/36 both engines 2026-06-29. Surfaced the verify --drift TAB-indentation false-positive.
+description: scripts/adversarial-stress.sh + `make stress` — the live-gate's harder sibling; full MSL+VSL lifecycle (assembly→disassembly→install→verify+drift→back-out) with adversarial refusal probes. 37/37 both engines 2026-06-29. Surfaced AND fixed the verify --drift TAB-indentation false-positive.
 metadata:
   type: project
 ---
@@ -19,7 +19,7 @@ disassembly** · component-lossless (reassembled section counts == original) ·
 **tamper-faithfulness** (mutate a routine in the decomposed tree → reassembled
 .KID must differ from original; packaging may not silently swallow a content change).
 
-**Phase 2 — LIVE (14 asserts/engine), adversarial refusal probes:**
+**Phase 2 — LIVE (15 asserts/engine), adversarial refusal probes:**
 - install MSL --register → verify content → verify --drift = applied.
 - **no-clobber:** `install MSL` with no `--allow-overwrite` over existing routines → REFUSE exit 4.
 - install VSL (Required-Build MSL present) → verify content.
@@ -33,22 +33,27 @@ disassembly** · component-lossless (reassembled section counts == original) ·
 - back out MSL → verify-clean. **negative dependency:** `install VSL` alone, MSL
   deregistered → REFUSE exit 1.
 
-**KEY FINDING — `verify --drift` FALSE-POSITIVES on TAB-indented routines (both
-engines).** All 6 v-stdlib (VSL) routines report `drifted` immediately after a CLEAN
-install, with NO tampering; all 40 m-stdlib (MSL) routines verify `applied`. Root
-cause: **v-stdlib routines are authored with leading TAB indentation; m-stdlib with
-leading SPACES.** The engine flattens a **leading TAB → a single SPACE** on install
-(proven on vehu: shipped `'\t; doc...'` → live `' ; doc...'`; same on foia-t12), so the
-live routine source diverges from the shipped `.KID` source on *every* line.
-`RoutineDriftMatch` (`internal/kids/buildkids.go:141`) compares each line verbatim
-except the canonicalized 2nd line, so a uniform TAB→SPACE difference trips drift on
-all lines. **Content `verify` (no `--drift`) is unaffected** — it checks entry-record
-content, not routine line bytes — which is why the false-drift hid until now.
-Implication: `verify --drift` is structurally unreliable for any tab-indented package,
-including the org's own VSL. **Fix is pending a direction decision** (drift-normalize
-leading whitespace in v-pkg / detab in `v pkg build` / detab the v-stdlib source).
-The harness logs VSL drift as a non-asserting OBSERVATION (expects exit 3 today) so it
-stays green; promote it to an assertion once the fix lands.
+**KEY FINDING (FOUND HERE, NOW FIXED) — `verify --drift` FALSE-POSITIVES on
+TAB-indented routines (both engines).** All 6 v-stdlib (VSL) routines reported
+`drifted` immediately after a CLEAN install, NO tampering; all 40 m-stdlib (MSL)
+routines verified `applied`. Root cause: **v-stdlib was authored with leading TAB
+indentation; m-stdlib with leading SPACES**, and an engine flattens a **leading TAB →
+a single SPACE** on install (proven on vehu: shipped `'\t; doc...'` → live `' ; doc...'`;
+same on foia-t12), so the live routine source diverged from the shipped `.KID` source
+on *every* line. `RoutineDriftMatch` (`internal/kids/buildkids.go:141`) byte-compares
+each line (except the canonicalized 2nd), so a uniform TAB→SPACE difference tripped
+drift on all lines. **Content `verify` (no `--drift`) was unaffected** (it checks
+entry-record content, not routine line bytes) — which is why this hid until the
+adversarial gate ran drift on a clean install.
+
+**FIX LANDED 2026-06-29 (both layers):** (1) **m-cli lint M-MOD-039** (`feat(lint)`,
+m-cli `023d030`) — bans tabs in M source (Error, default profile) + an `m fmt`
+canonical detab; closes the gate gap that documented "spaces only" but never enforced
+it. (2) **v-stdlib detab** (`c830b48`) — the 6 `VSL*.m` (+ test routines) converted to
+spaces, whitespace-only. With the shipped source now space-indented it matches what the
+engine stores, so **VSL drifts `applied` on both engines**. The harness now ASSERTS
+`verify --drift VSL` exit 0 (was a non-asserting observation) as the regression guard —
+**37/37 both engines.**
 
 **Why/how to apply:** run `make stress` (+ `ENGINE=iris TRANSPORT=remote`) after any
 change to the lifecycle verbs, the class-aware decision logic, or the emitters — it's
