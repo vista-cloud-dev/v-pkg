@@ -565,6 +565,46 @@ func TestMakeBuildPairs_DescriptionWP(t *testing.T) {
 	}
 }
 
+// A build shipping MULTIPLE HLO applications (#779.2) packs each as its own KRN
+// record (seq 1, 2, …) with an independent #779.21 multiple that numbers from 1, and
+// the C-XOR-D xref selection is per-entry: a versioned entry → B+D, a versionless
+// entry → B+C. Locks the multi-record batch path for a computed-xref type.
+func TestMakeBuildPairs_HLOApp_MultiApp(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZHO*1.0*1", Namespace: "ZZHO",
+		HLOApps: []HLOApp{
+			{Name: "ZZHO ONE", MessageTypes: []HLOMsgType{{MessageType: "ORU", Event: "R01", Version: "2.4"}}},
+			{Name: "ZZHO TWO", MessageTypes: []HLOMsgType{{MessageType: "ADT", Event: "A01"}}},
+		},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	want := map[string]string{
+		`"KRN",779.2,1,0)`:                       "ZZHO ONE",
+		`"KRN",779.2,1,1,"D","ORU","R01",2.4,1)`: "", // app 1 entry: versioned → D
+		`"KRN",779.2,2,0)`:                       "ZZHO TWO",
+		`"KRN",779.2,2,1,"C","ADT","A01",1)`:     "", // app 2 entry: versionless → C
+		`"BLD",1,"KRN",779.2,"NM",1,0)`:          "ZZHO ONE^^0",
+		`"BLD",1,"KRN",779.2,"NM",2,0)`:          "ZZHO TWO^^0",
+	}
+	for k, v := range want {
+		if _, ok := got[k]; !ok {
+			t.Errorf("missing node %s", k)
+		} else if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+	// App 1 must not carry a C xref, app 2 must not carry a D xref.
+	if _, ok := got[`"KRN",779.2,1,1,"C","ORU","R01",1)`]; ok {
+		t.Error("versioned app 1 must ship no C xref")
+	}
+	if _, ok := got[`"KRN",779.2,2,1,"D","ADT","A01",1)`]; ok {
+		t.Error("versionless app 2 must ship no D xref")
+	}
+}
+
 // TestMakeBuildPairs_MixedEntryTypes proves the unified KRN manifest header spans
 // multiple entry types in one build (B.1 next step): an OPTION (#19) AND a
 // PARAMETER DEFINITION (#8989.51) share one "BLD",1,"KRN",0) header

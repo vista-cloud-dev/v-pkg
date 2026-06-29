@@ -511,9 +511,11 @@ not the populate-and-`EN^XPDIJ` shortcut.
     DRIFT=0; golden `testdata/zzho/ZZHO.kids`. **Live install→verify→`--force`
     uninstall→verify-clean** on vehu (IEN 34) + foia-t12 (IEN 35): the full subtree
     (0-node, #779.21 entry, B + D xrefs) byte-identical to the shipped image on both,
-    B-index gone after back-out. **This closes the HL7 family** (#771 + #779.2 + #870);
-    remaining HL follow-ups are #870 DESCRIPTION WP (#870.02) and #779.2 multi-app
-    batches. ([[option-entry-component]])
+    B-index gone after back-out. **This closes the HL7 family** (#771 + #779.2 + #870).
+    (#779.2 multi-app batches: proven to work unchanged — the generic emitter packs N
+    records with independent per-app #779.21 seq + per-entry C/D xref selection;
+    regression-locked by `TestMakeBuildPairs_HLOApp_MultiApp` + a 2-app live install on
+    both engines.) ([[option-entry-component]])
   - **B.1-l ✅ DONE + LIVE-PROVEN 2026-06-28 — optional DESCRIPTION WP for KEY #19.1,
     MAIL GROUP #3.8, HL LOGICAL LINK #870, both engines.** Closed the three deferred
     DESCRIPTION word-processing fields (B.1-c / B.1-f / B.1-j) with the date-less WP
