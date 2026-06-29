@@ -343,11 +343,22 @@ var protocolEntryType = entryType{number: protocolFile, name: protocolFileName, 
 // action, M menu, E event driver, …). The #101.01 ITEM multiple (menu items) and
 // the extended menu-actions are a follow-up — this authors a base protocol.
 type Protocol struct {
-	Name        string // #101 .01 NAME (0;1)
-	ItemText    string // #101 field 1 ITEM TEXT (0;2)
-	TypeCode    string // #101 field 4 TYPE set-of-codes value
-	EntryAction string // #101 field 20 ENTRY ACTION (M code); node 20
-	ExitAction  string // #101 field 15 EXIT ACTION (M code); node 15
+	Name        string         // #101 .01 NAME (0;1)
+	ItemText    string         // #101 field 1 ITEM TEXT (0;2)
+	TypeCode    string         // #101 field 4 TYPE set-of-codes value
+	EntryAction string         // #101 field 20 ENTRY ACTION (M code); node 20
+	ExitAction  string         // #101 field 15 EXIT ACTION (M code); node 15
+	Items       []ProtocolItem // #101.01 ITEM multiple (node 10), optional — menu children
+}
+
+// ProtocolItem is one ITEM (#101.01 subfile) of a menu protocol: the name of the
+// child PROTOCOL it points to, and the child's display sequence. The .01 ITEM is a
+// #101 pointer; KIDS transports it as the source IEN in the data node PLUS a "^"
+// resolver node carrying the child's NAME, which the install re-points at the
+// target site.
+type ProtocolItem struct {
+	Name     string // child PROTOCOL .01 NAME (the #101 pointer target)
+	Sequence string // #101.01 field 3 SEQUENCE (0;3)
 }
 
 // protocolRecords packs each Protocol into the generic entry-record shape: the
@@ -364,6 +375,24 @@ func protocolRecords(protos []Protocol) []entryRec {
 		}
 		if p.EntryAction != "" {
 			img = append(img, imageNode{Subs{intSub(20)}, p.EntryAction})
+		}
+		if n := len(p.Items); n > 0 {
+			ns := strconv.Itoa(n)
+			img = append(img, imageNode{Subs{intSub(10), intSub(0)}, "^101.01PA^" + ns + "^" + ns})
+			for i, it := range p.Items {
+				seq := int64(i + 1)
+				itemSeq := it.Sequence
+				if itemSeq == "" {
+					itemSeq = strconv.FormatInt(seq, 10)
+				}
+				// Data node: <pointer>^^<sequence>^ — the pointer slot carries the
+				// build-local seq as a placeholder; the install re-points it from the
+				// "^" resolver node (the child's NAME).
+				img = append(img,
+					imageNode{Subs{intSub(10), intSub(seq), intSub(0)}, strconv.FormatInt(seq, 10) + "^^" + itemSeq + "^"},
+					imageNode{Subs{intSub(10), intSub(seq), strSub("^")}, it.Name},
+				)
+			}
 		}
 		recs = append(recs, entryRec{name: p.Name, xpdfl: "0^1", image: img})
 	}

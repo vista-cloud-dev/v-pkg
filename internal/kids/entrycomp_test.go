@@ -146,6 +146,37 @@ func TestMakeBuildPairs_Protocol_KRN(t *testing.T) {
 	}
 }
 
+// A menu PROTOCOL with ITEMs (#101.01) ships the item multiple at node 10: a header
+// (^101.01PA^n^n) and, per item, a data node <placeholder>^^<sequence>^ plus the "^"
+// resolver node carrying the child's NAME. The install re-points the .01 pointer
+// from the "^" node (live-proven: a placeholder piece-1 becomes the child's real
+// IEN), so the data-node pointer is a build-local placeholder.
+func TestMakeBuildPairs_Protocol_Items(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZPROTO*1.0*1", Namespace: "ZZPROTO",
+		Protocols: []Protocol{
+			{Name: "ZZPROTO ACTION", ItemText: "act", TypeCode: "A", EntryAction: "Q"},
+			{Name: "ZZPROTO MENU", ItemText: "menu", TypeCode: "M", Items: []ProtocolItem{{Name: "ZZPROTO ACTION", Sequence: "5"}}},
+		},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	// ZZPROTO MENU sorts after ACTION (build order) → record seq 2.
+	want := map[string]string{
+		`"KRN",101,2,0)`:        "ZZPROTO MENU^menu^^M",
+		`"KRN",101,2,10,0)`:     "^101.01PA^1^1",
+		`"KRN",101,2,10,1,0)`:   "1^^5^", // placeholder pointer ^^ sequence
+		`"KRN",101,2,10,1,"^")`: "ZZPROTO ACTION",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+}
+
 // TestMakeBuildPairs_RPC_KRN locks the transport shape for a REMOTE PROCEDURE
 // (#8994) shipped as a KRN component — the fifth type on the generic emitter. The
 // record is a single 0-node NAME^TAG^ROUTINE^RETURN VALUE TYPE (the three required

@@ -10,6 +10,14 @@
         "itemText": "ZZPROTO Action Demo",
         "type": "action",
         "entryAction": "Q"
+      },
+      {
+        "name": "ZZPROTO MENU",
+        "itemText": "ZZPROTO Menu Demo",
+        "type": "menu",
+        "items": [
+          { "name": "ZZPROTO ACTION", "sequence": 5 }
+        ]
       }
     ]
   }

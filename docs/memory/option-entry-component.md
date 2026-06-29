@@ -192,6 +192,30 @@ back-out. Fixture `testdata/zzhf`. Verify probes `^DIC(9.2,"B",<name>)`, uninsta
 HL7 APPLICATION PARAMETER #771 + HL LOGICAL LINK #870 + HLO APPLICATION REGISTRY
 #779.2 done (below). Templates (#.4/.402/…) still parked on read-live capture (below).
 
+## PROTOCOL ITEM multiple — #101.01 + the KIDS "^" pointer-resolver convention (2026-06-28)
+Added the #101.01 ITEM multiple to PROTOCOL #101 (field 10, subfile **101.01PA** @
+node **10**) — a menu protocol's child list. Per item: data node
+`10,<seq>,0)=<placeholder>^^<sequence>^` + a `10,<seq>,"^")=<CHILD NAME>` node.
+`ProtocolItem{Name, Sequence}`; `ProtocolItemComp{Name, Sequence}`.
+
+**The durable, broadly-reusable finding (live-proven, decisive experiment):** KIDS
+transports a POINTER field in a KRN record as **two parallel nodes** — the pointer
+slot carries a (source-system) IEN, and a sibling **`"^"` subscript node carries the
+target's external NAME**. On install, a **re-filing** entry type (one whose ORD tail
+has pre/post action routines — #101 runs PROF1/PROE1) **re-points the pointer from
+the `"^"` name node**, so the IEN slot is a build-local DON'T-CARE. Proof: shipped
+`10,1,0)=1^^5^` (placeholder `1`) + `10,1,"^")=ZZPROTO ACTION`; the live item became
+`7054^^5^` on vehu and `5649^^5^` on foia-t12 — re-pointed to the sibling ACTION
+protocol's real (engine-specific) IEN, filed in the SAME build (intra-build name
+resolution). So v-pkg authors menu items by name without knowing target IENs. This
+convention generalizes to ANY pointer field in a re-filing type (contrast the #771
+COUNTRY / #870 LLP TYPE external-value resolution, which is the *input-transform*
+path; this is the explicit `"^"`-node path KIDS uses for #101-pointer-to-#101 etc.).
+Fixture `testdata/zzproto` is now self-contained (ACTION + MENU→ACTION). Basic
+attach needs NO extended action (the menu attached cleanly without USE-AS-LINK/
+MERGE/ATTACH/DISABLE — those remain a minor follow-up, as do OPTION #19.01 menu
+items via the same `"^"` convention).
+
 ## RPC INPUT PARAMETERS — #8994.02 multiple (2026-06-28)
 Extended RPC #8994 with the optional INPUT PARAMETER multiple (field 2, subfile
 **8994.02A**, stored at node **2**). Per param: data `2,<seq>,0)=

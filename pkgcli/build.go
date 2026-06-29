@@ -234,12 +234,21 @@ func resolveKeys(keys []buildspec.KeyComp) []kids.SecurityKey {
 func resolveProtocols(protos []buildspec.ProtocolComp) []kids.Protocol {
 	out := make([]kids.Protocol, 0, len(protos))
 	for _, p := range protos {
+		items := make([]kids.ProtocolItem, 0, len(p.Items))
+		for _, it := range p.Items {
+			seq := ""
+			if it.Sequence > 0 {
+				seq = strconv.Itoa(it.Sequence)
+			}
+			items = append(items, kids.ProtocolItem{Name: it.Name, Sequence: seq})
+		}
 		out = append(out, kids.Protocol{
 			Name:        p.Name,
 			ItemText:    p.ItemText,
 			TypeCode:    buildspec.ProtocolTypeCode[p.Type],
 			EntryAction: p.EntryAction,
 			ExitAction:  p.ExitAction,
+			Items:       items,
 		})
 	}
 	return out

@@ -730,11 +730,26 @@ func TestParse_Protocols_Invalid(t *testing.T) {
 		"no name":  `{"package":"ZZP","version":"1.0","components":{"protocols":[{"type":"action"}]}}`,
 		"bad name": `{"package":"ZZP","version":"1.0","components":{"protocols":[{"name":"lower case","type":"action"}]}}`,
 		"bad type": `{"package":"ZZP","version":"1.0","components":{"protocols":[{"name":"ZZP A","type":"bogus"}]}}`,
+		"bad item": `{"package":"ZZP","version":"1.0","components":{"protocols":[{"name":"ZZP M","type":"menu","items":[{"name":"lower"}]}]}}`,
 	}
 	for name, js := range cases {
 		if _, err := Parse([]byte(js)); err == nil {
 			t.Errorf("%s: expected an error, got nil", name)
 		}
+	}
+}
+
+// A menu PROTOCOL's ITEMs parse with name + sequence.
+func TestParse_Protocols_Items(t *testing.T) {
+	js := `{"package":"ZZP","version":"1.0","components":{"protocols":[
+	  {"name":"ZZP MENU","type":"menu","items":[{"name":"ZZP ACTION","sequence":5}]}]}}`
+	s, err := Parse([]byte(js))
+	if err != nil {
+		t.Fatalf("Parse protocol items: %v", err)
+	}
+	its := s.Components.Protocols[0].Items
+	if len(its) != 1 || its[0].Name != "ZZP ACTION" || its[0].Sequence != 5 {
+		t.Errorf("items = %+v", its)
 	}
 }
 

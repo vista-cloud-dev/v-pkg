@@ -187,11 +187,20 @@ var RPCReturnTypeCode = map[string]string{
 // ProtocolTypeCode. The build files a base protocol (the #101.01 ITEM multiple +
 // extended menu-actions are a follow-up).
 type ProtocolComp struct {
-	Name        string `json:"name"`                  // #101 .01 NAME (uppercase, e.g. "ZZPROTO ACTION")
-	ItemText    string `json:"itemText,omitempty"`    // #101 field 1 ITEM TEXT
-	Type        string `json:"type"`                  // protocol type: action | extended action | menu | event driver | ...
-	EntryAction string `json:"entryAction,omitempty"` // #101 field 20 ENTRY ACTION (M code)
-	ExitAction  string `json:"exitAction,omitempty"`  // #101 field 15 EXIT ACTION (M code)
+	Name        string             `json:"name"`                  // #101 .01 NAME (uppercase, e.g. "ZZPROTO ACTION")
+	ItemText    string             `json:"itemText,omitempty"`    // #101 field 1 ITEM TEXT
+	Type        string             `json:"type"`                  // protocol type: action | extended action | menu | event driver | ...
+	EntryAction string             `json:"entryAction,omitempty"` // #101 field 20 ENTRY ACTION (M code)
+	ExitAction  string             `json:"exitAction,omitempty"`  // #101 field 15 EXIT ACTION (M code)
+	Items       []ProtocolItemComp `json:"items,omitempty"`       // #101.01 ITEM multiple — child protocols of a menu
+}
+
+// ProtocolItemComp is one ITEM of a menu PROTOCOL (#101.01): the NAME of the child
+// protocol to attach and its display sequence. The install re-points the child by
+// name (KIDS "^" resolver node), so cross-build references work.
+type ProtocolItemComp struct {
+	Name     string `json:"name"`               // child PROTOCOL .01 NAME (#101 pointer target)
+	Sequence int    `json:"sequence,omitempty"` // #101.01 .03 SEQUENCE (default = position)
 }
 
 // ProtocolTypeCode maps a human protocol-type name to its #101 field 4 (TYPE)
@@ -733,6 +742,14 @@ func validateProtocols(protos []ProtocolComp) error {
 		}
 		if _, ok := ProtocolTypeCode[p.Type]; !ok {
 			return fmt.Errorf("buildspec: protocol %s type %q is not a known protocol type (action, extended action, menu, …)", p.Name, p.Type)
+		}
+		for _, it := range p.Items {
+			if len(it.Name) > 30 || !reEntryName.MatchString(it.Name) {
+				return fmt.Errorf("buildspec: protocol %s item %q must be an uppercase ≤30-char #101 PROTOCOL name", p.Name, it.Name)
+			}
+			if it.Sequence < 0 {
+				return fmt.Errorf("buildspec: protocol %s item %s sequence must be non-negative", p.Name, it.Name)
+			}
 		}
 	}
 	return nil

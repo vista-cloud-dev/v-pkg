@@ -401,8 +401,8 @@ not the populate-and-`EN^XPDIJ` shortcut.
     …, distinct from #19's), and **no "U" xref node**. ORD action-routine tail
     (57 corpus builds): `;;PRO^XPDTA;PROF1^XPDIA;PROE1^XPDIA;PROF2^XPDIA;;PRODEL^XPDIA`.
     Authored a **base protocol** (NAME + ITEM TEXT + TYPE + ENTRY ACTION); the #101.01
-    ITEM multiple + extended menu-actions (USE-AS-LINK / MERGE-ITEMS / ATTACH /
-    DISABLE) are a follow-up. TDD; lint/race/contract green; corpus DRIFT=0; golden
+    ITEM multiple landed in B.1-n (extended menu-actions USE-AS-LINK / MERGE-ITEMS /
+    ATTACH / DISABLE remain a minor follow-up). TDD; lint/race/contract green; corpus DRIFT=0; golden
     `testdata/zzproto/ZZPROTO.kids`. **Live install→verify→`--force` uninstall→clean**
     on vehu (YDB, `^ORD(101,…,0)=ZZPROTO ACTION^…^^A`, node 20=`Q`) + foia-t12 (IRIS).
     Next: **RPC #8994**. ([[option-entry-component]])
@@ -542,6 +542,22 @@ not the populate-and-`EN^XPDIJ` shortcut.
     install→verify→`--force` uninstall→clean on vehu + foia-t12: the full param subtree
     (header, data nodes, date-less description WP, B + PARAMSEQ xrefs) **byte-identical**
     to the shipped image on both, B-index gone after back-out. ([[option-entry-component]])
+  - **B.1-n ✅ DONE + LIVE-PROVEN 2026-06-28 — PROTOCOL ITEM multiple (#101.01), both
+    engines.** Closed the deferred menu-item authoring (from B.1-d). Added the #101.01
+    ITEM multiple (field 10, subfile 101.01PA @ node 10): per item a data node
+    `10,<seq>,0)=<placeholder>^^<sequence>^` + a `10,<seq>,"^")=<CHILD NAME>` resolver
+    node. **Decisive finding (broadly reusable):** KIDS transports a #101-pointer as
+    the IEN slot + a parallel `"^"` NAME node, and a re-filing type (#101 runs
+    PROF1/PROE1) **re-points from the name node** — the IEN slot is a build-local
+    don't-care. Live-proven: shipped `1^^5^` + `"^")=ZZPROTO ACTION` became `7054^^5^`
+    (vehu) / `5649^^5^` (foia-t12), re-pointed to the sibling ACTION's real
+    engine-specific IEN filed in the SAME build. So menu items author by name with no
+    target-IEN knowledge. `ProtocolItem{Name,Sequence}` + `ProtocolItemComp`. Fixture
+    `testdata/zzproto` now self-contained (ACTION + MENU→ACTION). TDD; lint/race/contract
+    green; corpus DRIFT=0; golden regenerated. Live install→verify→`--force` uninstall→
+    clean both engines. Basic attach needs no extended action (USE-AS-LINK / MERGE /
+    ATTACH / DISABLE + OPTION #19.01 menu items via the same `"^"` convention remain
+    minor follow-ups). ([[option-entry-component]])
 - **B.2 Real FILE DD + DATA (F3; the R3 enabler).** Extend `FileComp` to a
   multi-field DD (see §8 for the grounded node-set) and add **DATA** export with
   the four action codes (ADD-IF-NEW / MERGE / OVERWRITE / REPLACE) and FULL/PARTIAL
