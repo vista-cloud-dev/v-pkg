@@ -25,7 +25,7 @@ append any new `§ Lessons learned`, and log directional decisions in `§ Q&A`.
 | P4.1 | — Phase 1: inventory only (`#9.4`/`#9.6`/`#9.7` → `inventory.json`, zero writes, no PHI) | ☐ | — | [§P4](#p4) |
 | P4.2 | — Phase 2: definition extraction (S2/S3) behind the PIKS airlock | ☐ | — | [§P4](#p4) |
 | P4.3 | — Phase 3: S1 re-export → real `.KID` for `m-kids` round-trip | 🔒 | needs gold doc (P6) | [§P4](#p4) |
-| **P5** | KIDS install automation (silent/non-interactive install of a `.KID`) | ◑ built — `v pkg install/verify/uninstall` over the driver; **install now streams the transport global in size-bounded chunks → staging global → MERGE + `EN^XPDIJ`** (2026-06-12), fixing a silent partial-install of large packages (one-mega-routine staging truncated). YDB live-proven incl. the full 15-routine MSL base (test-in-place 15/15 suites); IRIS live-validation of the chunked path owed (T0b.2 IRIS leg). **(2026-06-16) Non-routine components: `v pkg build`/`install`/`verify`/`uninstall` now handle a #8989.51 PARAMETER DEFINITION as a KIDS KRN component + Required Builds (#9.611) — the VSL T1.3 enabler. Key fix: the direct-populate install seeds `^XPD(9.7,XPDA,"KRN")` from the build manifest, else `KRN^XPDIK` GVUNDEFs (status stuck at 2). Install→verify→uninstall→verify-clean proven on BOTH engines (vehu YDB + foia-t12 IRIS); `testdata/zzparam` golden + roundtrip-clean. See `docs/memory/krn-param-def-component.md`.** | `pkgcli/lifecycle.go`, `internal/installspec/*`, `internal/kids/krncomp.go`, `internal/buildspec/*`, `docs/design/kids-installation-automation.md §7` | [§P5](#p5) |
+| **P5** | KIDS install automation (silent/non-interactive install of a `.KID`) | ◑ built — `v pkg install/verify/uninstall` over the driver; **install now streams the transport global in size-bounded chunks → staging global → MERGE + `EN^XPDIJ`** (2026-06-12), fixing a silent partial-install of large packages (one-mega-routine staging truncated). YDB live-proven incl. the full 15-routine MSL base (test-in-place 15/15 suites); **IRIS chunked-path live-validation DONE 2026-06-29** (the MSL+VSL live-package-gate runs 11/11 on foia-t12). **(2026-06-16) Non-routine components: `v pkg build`/`install`/`verify`/`uninstall` now handle a #8989.51 PARAMETER DEFINITION as a KIDS KRN component + Required Builds (#9.611) — the VSL T1.3 enabler. Key fix: the direct-populate install seeds `^XPD(9.7,XPDA,"KRN")` from the build manifest, else `KRN^XPDIK` GVUNDEFs (status stuck at 2). Install→verify→uninstall→verify-clean proven on BOTH engines (vehu YDB + foia-t12 IRIS); `testdata/zzparam` golden + roundtrip-clean. See `docs/memory/krn-param-def-component.md`.** | `pkgcli/lifecycle.go`, `internal/installspec/*`, `internal/kids/krncomp.go`, `internal/buildspec/*`, `docs/design/kids-installation-automation.md §7` | [§P5](#p5) |
 | **P6** | Gold-doc gap — *Kernel 8.0 Developer's Guide: KIDS Developer Tools User Guide* (silent-install APIs + `XPD*` answer vars + re-export entry points) | ☐ | VDL fetch pending | [§P6](#p6) |
 | **P7** | Engine parity for extraction + install (`^XTMP`/`XINDEX`/KIDS identical under YottaDB & IRIS) | 🔒 | depends on `m-ydb`/`m-iris` real-engine spikes | [§P7](#p7) |
 
@@ -163,7 +163,7 @@ definition walk / S3 component dump); recommended architecture runs over the
 engine-neutral driver contract (P7). **Phase 1 (inventory-only) is zero-write,
 no-PHI — ship first.** Open items tracked in `§ Q&A` (Q2, Q5).
 
-### P5 — KIDS install automation (built; IRIS-live pending) {#p5}
+### P5 — KIDS install automation (built; live-proven both engines) {#p5}
 Per `docs/design/kids-installation-automation.md`: drive the authoritative 3-phase KIDS
 install (load distribution → install build → post-install) non-interactively.
 Two tiers: **Tier A** = native silent-install APIs + `XPD*` answer variables
@@ -182,10 +182,16 @@ engine goes through the shared `mdriver.Client` (m-driver-sdk v0.3.0) — each v
 stages its script as a scratch routine (`ZVPKG*`) via `exec load` and runs `EN^…`
 via `exec run` (one process = one symbol table, so `XPDA` survives the SETs).
 Markers are read off captured device output. **Live-proven on the YDB FOIA engine
-(T0a.3/T0a.4).** Remaining: **T0a.5** — the same lifecycle live on the **IRIS
-FOIA** engine (`foia` container) is the M0a exit gate (three invariants green on
-both engines). `v pkg <verb>` takes the built `.KID` + `--engine ydb|iris`
-`--transport local|docker|remote`.
+(T0a.3/T0a.4).** **T0a.5 DONE (2026-06-29):** the same lifecycle is now live on the
+**IRIS FOIA** engine (`foia-t12`) via the remote/Atelier transport — the
+`scripts/live-package-gate.sh` MSL+VSL gate runs **11/11 (NEG=1) on BOTH engines**,
+so the M0a exit gate (three invariants green on both engines) is met. The IRIS leg
+was unblocked by landing the `M_IRIS_*` creds in the environment (org `auth.env` +
+`source_up` in `.envrc`, `dfa72db`); run it with `ENGINE=iris TRANSPORT=remote make
+live-gate`. This also closes the owed **streamed-install IRIS chunked-path
+validation** (MSL's 15-routine install exercises the `^XTMP("VPKGI")`
+chunk→MERGE→`EN^XPDIJ` path on IRIS). `v pkg <verb>` takes the built `.KID` +
+`--engine ydb|iris` `--transport local|docker|remote`.
 
 **Install fidelity (coverage-analysis Track A.1) — SCOPED 2026-06-28:**
 `docs/proposals/v-pkg-install-fidelity-spike.md`. The direct-populate path is

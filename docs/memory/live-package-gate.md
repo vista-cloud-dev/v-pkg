@@ -1,6 +1,6 @@
 ---
 name: live-package-gate
-description: The live "ship the real package" gate (scripts/live-package-gate.sh + make live-gate) — builds MSL+VSL and drives install→content-verify→backout→verify-clean against a live engine. YDB/vehu proven 10/10 2026-06-29. Surfaced the #9.4-deregister gap.
+description: The live "ship the real package" gate (scripts/live-package-gate.sh + make live-gate) — builds MSL+VSL and drives install→content-verify→backout→verify-clean against a live engine. YDB/vehu AND IRIS/foia-t12 both proven 11/11 (NEG=1) 2026-06-29. Surfaced the #9.4-deregister gap.
 metadata:
   type: project
 ---
@@ -49,8 +49,20 @@ param-def → class `side-effecting`. `uninstall --force` does a full delete
 instead (reverts routines, LEAVES #9.7/param/file) — so a *clean* gate cycle must
 install with `--allow-overwrite` (no sidecar), not `--auto-snapshot`.
 
-**Status:** YDB proven; **IRIS (foia-t12) not run this session** (needs M_IRIS_*
-creds) — same driver-abstracted path, per-type IRIS parity already proven
-elsewhere. **Why/how to apply:** run `make live-gate` after any change to the
-install/verify/uninstall path or the entry-component emitters — it's the
-regression net that exercises the real packages end-to-end, which CI cannot.
+**IRIS/foia-t12: 11/11 PASS (NEG=1, 2026-06-29)** — same gate, same assertions, now
+run on IRIS via the **remote/Atelier transport** once the M_IRIS_* creds landed in
+the environment (org `auth.env` + `source_up` in `v-pkg/.envrc`, commit dfa72db).
+Invocation: `ENGINE=iris TRANSPORT=remote NEG=1 scripts/live-package-gate.sh` —
+the gate defaults `TRANSPORT=docker` (vehu) so **IRIS must pass `TRANSPORT=remote`
+explicitly** (the Atelier path is the credentialed login; docker-transport IRIS is
+a separate thing). No IRIS-specific defaults are hardcoded in the gate — it reads
+`M_IRIS_*` from the env. This also retires the owed **streamed-install IRIS
+chunked-path validation**: MSL's full 15-routine install drives the size-bounded
+`^XTMP("VPKGI")` chunk→MERGE→`EN^XPDIJ` path on IRIS and content-verified `ok`.
+
+**Status:** BOTH engines proven 11/11 — the M0a "three invariants green on both
+engines" gate is met for the live-package lifecycle. **Why/how to apply:** run
+`make live-gate` (YDB) and `ENGINE=iris TRANSPORT=remote make live-gate` (IRIS)
+after any change to the install/verify/uninstall path or the entry-component
+emitters — it's the regression net that exercises the real packages end-to-end,
+which CI cannot.
