@@ -2,14 +2,15 @@
 title: "v-pkg adversarial coverage analysis — what it takes to build and install any of the ~2,400 real KIDS distributions"
 status: proposed
 created: 2026-06-28
-last_modified: 2026-06-28
-revisions: 1
+last_modified: 2026-06-29
+revisions: 2
 doc_type: [PROPOSAL, ANALYSIS]
 grounding:
   - "vdocs GOLD corpus — Kernel 8.0 KIDS Developer's Guide (XU/krn_8_0_dg_kids_ug) + Systems Management KIDS UG (XU/krn_8_0_sm_kids_ug) + VistA Build Analyzer UG (XU/vista_build_analyzer_ug)"
   - "WorldVistA/VistA KIDS corpus — 2,404 .KID/.KIDS distributions across 157 packages (~/data/kids-patches/), re-tallied with corrected node probes"
   - "real VistA code — ^DD/^DIC node grammar extracted from real KIDS file exports (FileMan #1.008, #8992.7, #.114) under ~/data/kids-patches/"
-  - "v-pkg source — internal/buildspec, internal/kids, pkgcli, internal/installspec (HEAD 2026-06-28)"
+  - "MSL / VSL builds — m-stdlib/kids/std.build.json (MSL*0.1*1, 39 routines) + v-stdlib/kids/vsl.build.json (VSL*1.0*15: routines + #999001 VSL AUDIT + param-def + MSL required build)"
+  - "v-pkg source — internal/buildspec, internal/kids, pkgcli, internal/installspec, pkgcli/commands.go verb surface (HEAD 2026-06-29)"
 related:
   - kids-corpus-findings.md
   - patch-existing-routines-proposal.md
@@ -41,6 +42,8 @@ is the fourth.
 - [What v-pkg authors today](#what-v-pkg-authors-today)
 - [Adversarial findings (F1–F8)](#adversarial-findings-f1f8)
 - [Corrected corpus frequencies](#corrected-corpus-frequencies)
+- [Coverage matrix — the corpus, MSL, and VSL](#coverage-matrix--the-corpus-msl-and-vsl)
+- [Lifecycle coverage — the full KIDS build lifecycle](#lifecycle-coverage--the-full-kids-build-lifecycle)
 - [Recommendations — two tracks to 100%](#recommendations--two-tracks-to-100)
 - [The R3 case: a real multi-field DD](#the-r3-case-a-real-multi-field-dd)
 - [Coverage accounting](#coverage-accounting)
@@ -300,6 +303,104 @@ side-effecting **1,730 (72%)** — *lower* than the 35%/64% first reported, sinc
 half the corpus ships an entry. (The committed `reversibility.go` classifier
 still uses the older top-level-`KRN` probe → ~36% routine-only; aligning it is a
 follow-up, not changed here.)
+
+---
+
+## Coverage matrix — the corpus, MSL, and VSL
+
+Two questions, one matrix: **can v-pkg _author_ this from source (Track B)** and
+**can v-pkg _install_ an existing `.KID` of it faithfully (Track A)**. Authoring
+is per component type; install fidelity is per the build's phases (and applies to
+*any* reconstructed transport, so it tracks Track A landing, not the type).
+
+### Against the 2,404-distribution corpus, by component type
+
+Frequencies from the corrected re-tally above; the two right columns are v-pkg's
+state as of the work to date (B.1-a…o, B.2-a/b, B.3, A.1–A.4 all landed
+2026-06-28).
+
+| File # | Component | % dists | Authors (Track B) | Installs (Track A) |
+|---|---|---:|---|---|
+| 9.8     | ROUTINE              | 95%  | ✅ FULL                       | ✅ |
+| 19      | OPTION               | 39%  | ✅ B.1-a (+menu B.1-o)        | ✅ |
+| .4      | PRINT TEMPLATE       | 20%  | ⏳ deferred → `--from-engine` | ✅ |
+| 19.1    | SECURITY KEY         | 20%  | ✅ B.1-c                      | ✅ |
+| 101     | PROTOCOL             | 18%  | ✅ B.1-d (+item B.1-n)        | ✅ |
+| .402    | INPUT TEMPLATE       | 10%  | ⏳ deferred → `--from-engine` | ✅ |
+| 8994    | REMOTE PROCEDURE     | 9%   | ✅ B.1-e (+params B.1-m)      | ✅ |
+| 409.61  | LIST TEMPLATE        | 8%   | ✅ B.1-g                      | ✅ |
+| 8989.51 | PARAMETER DEFINITION | 7%   | ✅ FULL (B.1-b)               | ✅ |
+| 771     | HL7 APPLICATION      | 5.5% | ✅ B.1-i                      | ✅ |
+| .401    | SORT TEMPLATE        | 4.7% | ⏳ deferred → `--from-engine` | ✅ |
+| 3.8     | MAIL GROUP           | 4.5% | ✅ B.1-f                      | ✅ |
+| 870     | HL LOGICAL LINK      | 4.3% | ✅ B.1-j                      | ✅ |
+| .403    | FORM / BLOCK (.404)  | 3.2% | ⏳ deferred → `--from-engine` | ✅ |
+| 8989.52 | PARAMETER TEMPLATE   | 3.1% | ✖ not yet (declarative, small) | ✅ |
+| 779.2   | HLO APP REGISTRY     | 2.5% | ✅ B.1-k                      | ✅ |
+| 9.2     | HELP FRAME           | 2.2% | ✅ B.1-h                      | ✅ |
+| .84     | DIALOG               | 2.2% | ⏳ deferred → `--from-engine` | ✅ |
+| 3.6     | BULLETIN             | 2.1% | ⏳ deferred (likely declarative) | ✅ |
+| .5      | FUNCTION             | 1.4% | ⏳ deferred → `--from-engine` | ✅ |
+| any     | FILE (DD ± data)     | 24%  | ✅ B.2-a (DD) + B.2-b (data)  | ✅ |
+
+Legend: ✅ done + live-proven both engines · ⏳ deferred (scoped, blocked on a
+named follow-up) · ✖ unbuilt, unscoped. The **Installs** column is uniformly ✅
+because Track A drives the *real* KIDS phases against any reconstructed transport
+— it does not depend on v-pkg being able to author the type (F8). The authoring
+gap is now exactly the **compiled-FileMan family** (templates / form / dialog /
+function), all routed to
+[`v-pkg-from-engine-capture.md`](v-pkg-from-engine-capture.md); plus PARAMETER
+TEMPLATE #8989.52 (a small declarative addition, not yet built) and BULLETIN
+(pending the declarative-vs-capture call).
+
+### Against the two libraries that motivated this effort — MSL and VSL
+
+These are the in-org packages v-pkg must build+install end-to-end. Both are
+**100% covered today** — every component each ships is an authored, live-proven
+type.
+
+| Library | Build / spec | Components shipped | Authors | Installs |
+|---|---|---|---|---|
+| **MSL** (m-stdlib) | `MSL*0.1*1` — `m-stdlib/kids/std.build.json` | **39 routines** (STDARGS…STDXML); no entries, no files | ✅ FULL | ✅ FULL — live both engines |
+| **VSL** (v-stdlib) | `VSL*1.0*15` — `v-stdlib/kids/vsl.build.json` | **6 routines** (VSLCFG/FS/IO/LOG/SEC/TASK) · **FILE #999001 `VSL AUDIT`** (`.01` + 4 typed fields: date / numeric / 2× free text) · **PARAMETER DEFINITION** `VPNG GREETING` (#8989.51, SYS entity) · **Required Build** `MSL*0.1*1` (DON'T INSTALL, LEAVE GLOBAL) | ✅ FULL | ✅ FULL |
+
+VSL exercises four covered capabilities at once: routines, a **multi-field DD**
+(B.2-a — the original R3 trigger, now a shipped reality), a parameter definition
+(B.1-b), and a **required-build dependency** on MSL that Track A's enforcement
+(A.2) honors at install. The `MSL → VSL` dependency direction matches the org
+waterline (`v → m`); v-pkg installs MSL first, then VSL with its prerequisite
+satisfied. Nothing either library needs is on the deferred list.
+
+---
+
+## Lifecycle coverage — the full KIDS build lifecycle
+
+Component-type coverage (above) answers *what* v-pkg can carry. This answers
+*which stages of a build's life* it can drive. v-pkg's 13 verbs
+(`pkgcli/commands.go`) cover the whole arc; the engine-touching stages all go
+through `mdriver.Client` (waterline rule 3).
+
+| Stage | Verb(s) | What's covered | Residual gap | Status |
+|---|---|---|---|---|
+| **Assembly** (spec → transport) | `build` | Deterministic, normalized `.KID` from a declarative spec: routines, ~15 entry types, multi-field DD + data (4 action codes), install-time hooks (B.3); golden + corpus DRIFT=0 | compiled-template family (`--from-engine`); PARAMETER TEMPLATE #8989.52 | ◐ broad, one family deferred |
+| **Disassembly** (transport → VC tree) | `decompose` · `assemble` · `roundtrip` · `canonicalize` | `.KID` ⇄ `KIDComponents/` tree, **all 2,404 corpus dists round-trip losslessly (DRIFT=0)** carrying every type opaquely as ZWR; semantic round-trip (line-2 canonicalized); IEN canonicalization for diff | round-trip is opaque (carries types it cannot author) | ✅ FULL (100% corpus) |
+| **Inspection** | `parse` · `classify` · `lint` | Build/section summary; **reversibility class** derived statically (no engine); **PIKS data-class gate** (refuses PHI/Institution-class data into VC) | — | ✅ FULL |
+| **Installation** | `install` | Real KIDS phases via route (c): load → `#9.7` entry → env-check → **Required-Build enforcement (A.2)** → seeded questions (`--answer`) → disable options → **pre-install routine** → file components → **post-install routine** (B.3 / A.1.1) → **#9.4 footprint (A.3)** → **multi-build header-order, stop-on-failure (A.4)**; class-aware overwrite guard + auto-snapshot | device/queue prompts not driven (headless `EN^XPDI` rejected); checkpoint *resume* (`XPD RESTART`) not modeled; custom (non-boilerplate) questions only pre-answered, not discovered | ◐ faithful filing + major phases |
+| **Verification** | `verify` (`--drift`) | `#9.7` status-3 confirmation + **per-component presence** probe for every authored type (routines, all entry types, files); **routine drift** vs build source | non-routine verification is presence-only (not field-by-field content compare) | ◐ presence + routine-drift |
+| **Back-out** | `uninstall` · `snapshot` · `restore` | **Class-aware** uninstall (routine + entry `DIK` delete; side-effecting **refused** without `--force`); **routine pre-image** capture (`snapshot`) + preview-gated `restore`; pre-image pairing (`--auto-snapshot` ↔ auto-detect); verify-clean | non-routine reversal is **by-design** the authored back-out's job (no generic inverse — VA back-out is forward-only); `snapshot` itemizes uncaptured components rather than faking capture | ◐ routine-centric, honest about limits |
+
+Legend: ✅ complete · ◐ substantial, with a documented residual.
+
+**Reading the arc.** Disassembly and inspection are **complete and corpus-wide**
+— v-pkg version-controls and classifies *any* of the 2,404 distributions today.
+Assembly is broad with one deferred family. Installation drives the real KIDS
+engine for the phases that matter (the F2 "bypass" is closed); the residuals are
+interactive-device handling and restart-resume, neither on the path for
+non-interactive package install. Back-out is routine-complete and, crucially,
+**honest** about the side-effecting class it cannot generically reverse —
+deferring that to an authored back-out rather than over-claiming
+([[bespoke-installer-forbidden]]). No stage is a stub; every gap is named and
+either scoped (templates) or a deliberate design boundary (non-routine reversal).
 
 ---
 
