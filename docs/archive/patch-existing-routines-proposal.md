@@ -99,7 +99,7 @@ So reversibility is **not a capability v-pkg can assume**; it is a property of t
 ### Reversibility taxonomy (classify, then gate)
 
 > **Corpus-measured shares** (all 2,404 WorldVistA KIDS distributions — see
-> [kids-corpus-findings.md](kids-corpus-findings.md)): class 1 = **35%**, class
+> [kids-corpus-findings.md](../design/kids-corpus-findings.md)): class 1 = **35%**, class
 > 2/3 = **64%**. The pure-overwrite class is the *minority*; generalizing
 > snapshot/restore as the undo model would be wrong for ~2 of every 3 real
 > patches. 51% run install-time code, 23% file FileMan entries, 23% ship DD/data,

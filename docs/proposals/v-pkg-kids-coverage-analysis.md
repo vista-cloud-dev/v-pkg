@@ -426,7 +426,7 @@ fix.
 The goal: take any reconstructed transport global and run it through *real* KIDS,
 not the populate-and-`EN^XPDIJ` shortcut.
 - **A.1 Drive the real load + phases (F2). ✅ SCOPED 2026-06-28 —
-  [`v-pkg-install-fidelity-spike.md`](v-pkg-install-fidelity-spike.md).** The spike
+  [`v-pkg-install-fidelity-spike.md`](../archive/v-pkg-install-fidelity-spike.md).** The spike
   ground-truthed the KIDS phase boundary against real `XPD*` source: `EN^XPDIJ` is
   only the *filing* engine; env-check + required-builds (`ENV`/`REQB^XPDIL1`) and
   question-prompting (`EN^XPDI`) run earlier, and pre/post-install routines fire in

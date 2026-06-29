@@ -5,7 +5,7 @@ entry points, each setting a sentinel global node (`^ZZA1OUT("PRE"/"POST")=1`),
 and declares them as the build's pre/post-install routines via the top-level
 transport nodes `"INI")=PRE^ZZA1P` and `"INIT")=POST^ZZA1P`.
 
-It exists to live-prove **install-fidelity A.1.1** (`docs/proposals/v-pkg-install-fidelity-spike.md`):
+It exists to live-prove **install-fidelity A.1.1** (`docs/archive/v-pkg-install-fidelity-spike.md`):
 that `v pkg install` now creates the `#9.7` `INI`/`INIT` checkpoints (via the real
 `$$NEWCP^XPDUTL`) so `EN^XPDIJ`'s `PRE^/POST^XPDIJ1` loops actually run the build's
 pre/post-install routines.

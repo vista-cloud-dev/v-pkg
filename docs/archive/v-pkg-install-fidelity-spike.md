@@ -1,9 +1,9 @@
 ---
 title: "v-pkg install-fidelity spike (Track A.1) — driving real KIDS phases non-interactively"
-status: proposed
+status: completed
 created: 2026-06-28
-last_modified: 2026-06-28
-revisions: 1
+last_modified: 2026-06-29
+revisions: 2
 doc_type: [PROPOSAL, SPIKE]
 grounding:
   - "Real XPD* routine source (WorldVistA/VistA-M, Kernel/Routines): XPDIJ, XPDIJ1, XPDI, XPDI1, XPDIL, XPDIL1, XPDIP, XPDIQ, XPDID — fetched verbatim, control flow traced"
@@ -11,9 +11,9 @@ grounding:
   - "v-pkg source — internal/installspec/script.go, pkgcli/lifecycle.go (HEAD 2026-06-28)"
   - "prior live ground truth — kids-installation-automation.md §7.1 (ZZSKEL on YDB FOIA vehu, 2026-06-12)"
 related:
-  - kids-installation-automation.md
-  - v-pkg-kids-coverage-analysis.md
-  - ../archive/implementation-plan.md (P5/P6)
+  - ../design/kids-installation-automation.md
+  - ../proposals/v-pkg-kids-coverage-analysis.md
+  - implementation-plan.md (P5/P6)
 ---
 
 # v-pkg install-fidelity spike (coverage-analysis Track A.1)

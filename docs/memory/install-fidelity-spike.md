@@ -8,7 +8,7 @@ metadata:
 # v-pkg Track A.1 install-fidelity spike (2026-06-28)
 
 Scoping spike for coverage-analysis F2 (the install bypasses real KIDS load).
-Deliverable: `docs/proposals/v-pkg-install-fidelity-spike.md`. Grounded in **real
+Deliverable: `docs/archive/v-pkg-install-fidelity-spike.md`. Grounded in **real
 `XPD*` routine source** (WorldVistA/VistA-M `Packages/Kernel/Routines/`: XPDIJ,
 XPDIJ1, XPDI, XPDIL1, XPDIP, XPDIQ, XPDID) + the gold corpus
 `krn_8_0_dg_kids_ug`.

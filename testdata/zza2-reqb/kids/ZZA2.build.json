@@ -1,3 +1,0 @@
-{ "package": "ZZA2", "version": "1.0", "patch": "1",
-  "components": { "routines": ["ZZA2"] },
-  "requiredBuilds": [ { "name": "ZZNOPE*1.0*1", "action": "DON'T INSTALL, LEAVE GLOBAL" } ] }

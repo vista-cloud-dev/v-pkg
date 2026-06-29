@@ -43,7 +43,7 @@ P4.1 has no dependency on P6 and is the safe first build.
 ## 1b. Coverage-analysis workstreams (T0 / Track A / Track B)
 
 Source of truth for the two-track effort opened by
-[`docs/proposals/v-pkg-kids-coverage-analysis.md`](proposals/v-pkg-kids-coverage-analysis.md)
+[`docs/proposals/v-pkg-kids-coverage-analysis.md`](../proposals/v-pkg-kids-coverage-analysis.md)
 ("build+install any of the ~2,400 real KIDS distributions"). That proposal
 carries the per-item narrative + live-proof detail; this table is the rolled-up
 status. **Track A** = install the existing corpus through real KIDS phases;
@@ -58,7 +58,7 @@ status. **Track A** = install the existing corpus through real KIDS phases;
 | **A.3** | PACKAGE #9.4 footprint — VERSION + PATCH APPLICATION HISTORY via `$$PKGVER`/`$$PKGPAT^XPDIP` (F6) | ☑ live both engines | `5ce08f4` (`--register-package`) |
 | **A.4** | Multi-build distributions install in `**KIDS**`-header order, stop-on-failure (F7) | ☑ live both engines | `e1e9cd7` |
 | **B.1-a…o** | Generic KRN entry-component emitter + **15 types** live-proven: OPTION #19 · PARAMETER DEFINITION #8989.51 · SECURITY KEY #19.1 · PROTOCOL #101 (+ITEM #101.01) · RPC #8994 (+INPUT #8994.02) · MAIL GROUP #3.8 · LIST TEMPLATE #409.61 · HELP FRAME #9.2 · HL7 APP #771 · HL LOGICAL LINK #870 · HLO REGISTRY #779.2 · OPTION MENU #19.01 · DESCRIPTION WP | ☑ live both engines | `70ac995`→`2b2e8ca` (B.1-a…o); `12603fe` (#779.2 multi-app regression) |
-| **B.1 templates** | PRINT/SORT/INPUT TEMPLATE #.4/.401/.402, FORM/BLOCK #.403/.404, FUNCTION #.5, DIALOG #.84, BULLETIN #3.6 | ☐ **DEFERRED** | needs read-live capture → [`proposals/v-pkg-from-engine-capture.md`](proposals/v-pkg-from-engine-capture.md) |
+| **B.1 templates** | PRINT/SORT/INPUT TEMPLATE #.4/.401/.402, FORM/BLOCK #.403/.404, FUNCTION #.5, DIALOG #.84, BULLETIN #3.6 | ☐ **DEFERRED** | needs read-live capture → [`proposals/v-pkg-from-engine-capture.md`](../proposals/v-pkg-from-engine-capture.md) |
 | **B.1 ext-actions** | USE-AS-LINK / MERGE / ATTACH / DISABLE menu-actions | — scoped out | `3b1e8a5` — install-time menu mgmt, not authoring |
 | **B.2-a** | Multi-field DD authoring (the R3 unblock) — `.01` + 5 typed scalar fields | ☑ live both engines | `internal/kids/filecomp.go`; `294a46b` (pointer piece-3 fix) |
 | **B.2-b** | File DATA + 4 action codes (a/m/o/r) + permanent file numbers | ☑ live both engines | `4d182e8` |
@@ -66,7 +66,7 @@ status. **Track A** = install the existing corpus through real KIDS phases;
 
 **Open / remaining:** only **B.1 templates** (the compiled-FileMan family —
 blocked on read-live capture, now scoped in
-[`proposals/v-pkg-from-engine-capture.md`](proposals/v-pkg-from-engine-capture.md))
+[`proposals/v-pkg-from-engine-capture.md`](../proposals/v-pkg-from-engine-capture.md))
 plus documented minor gaps (pointer *data values* in B.2-b; `^DD(200,"PT")`
 back-ref in B.2-a). R3 (v-stdlib's `VSL AUDIT` multi-field file) is **unblocked**
 by B.2-a.
@@ -205,7 +205,7 @@ chunk→MERGE→`EN^XPDIJ` path on IRIS). `v pkg <verb>` takes the built `.KID` 
 `--engine ydb|iris` `--transport local|docker|remote`.
 
 **Install fidelity (coverage-analysis Track A.1) — SCOPED 2026-06-28:**
-`docs/proposals/v-pkg-install-fidelity-spike.md`. The direct-populate path is
+`docs/archive/v-pkg-install-fidelity-spike.md`. The direct-populate path is
 faithful for component *filing* but silently omits the build's env-check,
 required-builds, and **pre/post-install routines** (the load-phase `INI`/`INIT`
 checkpoints it never creates). Recommended **route (c) augmented direct-populate**:
@@ -301,13 +301,13 @@ Format: **Q<n> (date, STATUS):** question — *recommendation*. **A:** answer.
   back-out, VSLTAPBO-style · 3 forward-only=refuse, scaffold a forward back-out
   patch), add `snapshot`/`restore`, make `install`/`uninstall` class-aware, add
   patch-drift `verify`, and never over-claim reversibility. Full design:
-  [`patch-existing-routines-proposal.md`](archive/patch-existing-routines-proposal.md).
+  [`patch-existing-routines-proposal.md`](patch-existing-routines-proposal.md).
   **Now corpus-grounded** (2026-06-25): a static parse of all **2,404** WorldVistA
   KIDS distributions shows the pure-overwrite class is the **minority — 35%**;
   **64%** are side-effecting (51% run install code, 23% file FileMan entries, 23%
   ship DD/data, 96% declare required builds). So class-aware `uninstall` and the
   authored-back-out contract are the *common* path, not an edge case — see
-  [`kids-corpus-findings.md`](design/kids-corpus-findings.md).*
+  [`kids-corpus-findings.md`](../design/kids-corpus-findings.md).*
   **A (partial, 2026-06-25):** keystone landed — `internal/kids/reversibility.go`
   + `v pkg classify` statically derive the reversibility class (no engine),
   corpus-validated (36%/63%). `make corpus` round-trips ALL 2,404 local KIDS

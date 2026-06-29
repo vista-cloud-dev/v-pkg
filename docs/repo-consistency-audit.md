@@ -48,7 +48,11 @@ move, one wrong license tag, and three orphan test fixtures.
 These change file location or delete content; per the house caution on doc moves
 they want an explicit OK rather than a silent rewrite.
 
-### B1 — Archive the completed install-fidelity spike  ⟵ highest-value
+### B1 — Archive the completed install-fidelity spike — ✅ DONE 2026-06-29
+`git mv`'d `v-pkg-install-fidelity-spike.md` → `docs/archive/` (status →
+`completed`); repointed all inbound links (`README.md`, `from-engine-capture`,
+`coverage-analysis`, `implementation-plan`, the two memory refs + the zza1
+fixture README). Original recommendation:
 `docs/proposals/v-pkg-install-fidelity-spike.md` is front-matter
 `status: proposed` but its body has **A.1.1 / A.1.2 / A.1.3 / B.3 all "DONE +
 live-proven both engines"** and closes "the A.1 install-fidelity track … are
@@ -59,7 +63,17 @@ convention says must `git mv` to `docs/archive/` on landing.
   link to it as a same-dir sibling → `../archive/…`) and the `docs/README.md`
   line.
 
-### B2 — Resolve the implementation-plan archive (possible premature archive)
+### B2 — Resolve the implementation-plan archive — ✅ RESOLVED (stays archived)
+**Decision 2026-06-29: leave it archived; nothing is orphaned.** P6 is an
+*illusory* gap (the "missing" KIDS Developer Tools UG is a section of
+`krn_8_0_dg_kids_ug`, already in the corpus). P7 (engine parity) is substantially
+**proven** by the both-engine live gates (install-fidelity + live-package-gate on
+vehu YDB + foia-t12 IRIS). P4 (live-VistA → filesystem extraction) is the only
+genuinely-open item, and it is a **net-new capability** with its own live home —
+`proposals/package-extraction-design.md` — not a deficiency in shipped v-pkg. So
+no new tracker was carved. The 6 broken outbound links the move introduced are
+**fixed** (repointed to `../proposals/`, `../design/`, archive-siblings). Original
+note:
 `docs/archive/implementation-plan.md` was archived today, but it still carries
 **OPEN** items with no other live home: **P4** package-extraction (☐ design
 only), **P6** gold-doc (☐), **P7** engine-parity (🔒), and Q&A Q1/Q3/Q4/Q5. Its
@@ -72,7 +86,10 @@ they resolve from `docs/` root, not from inside `docs/archive/`.
   way, **repoint the 4 broken links** to `../proposals/…` / `../design/…` (or drop
   them — frozen docs may keep dead links, but these broke *today*).
 
-### B3 — Trim or delete the wrap-rpc tombstone
+### B3 — Trim the wrap-rpc tombstone — ✅ DONE 2026-06-29
+Trimmed `fu5b2-xwbbrk-wrapsplice.md` from 12 KB to a ~20-line stub (points at
+`bespoke-installer-forbidden` + git history); shrank its bloated `MEMORY.md`
+index line to one line. Original note:
 `docs/memory/fu5b2-xwbbrk-wrapsplice.md` is a **12 KB** memory file wholly
 describing the **DELETED** `internal/wrapsplice`/`wrap-rpc`/`VSLRPCWRAP` patcher.
 It self-labels "⛔ REMOVED 2026-06-25 … historical record only." Its one durable
@@ -82,7 +99,11 @@ exists (git + the proposal hold it). Fails keep-test (b).
 - **Action:** delete, or trim to a ~3-line tombstone stub that points at
   `bespoke-installer-forbidden.md` + the git SHA.
 
-### B4 — Three orphan test fixtures
+### B4 — Three orphan test fixtures — ✅ DONE 2026-06-29 (`git rm`)
+`git rm`'d `testdata/zza2-reqb/`, `testdata/zza3-hooks/`, `testdata/zza4-ques/`
+(confirmed referenced by no Go test, no gate script, no Makefile target). The
+install-fidelity behaviours they once scaffolded are already live-proven (memory
+keeps the historical record). Original note:
 `testdata/zza2-reqb/`, `testdata/zza3-hooks/`, `testdata/zza4-ques/` are
 referenced by **no** Go test and **no** gate script (their feature commits built
 the specs inline instead). They carry real Required-Build / hooks / questions

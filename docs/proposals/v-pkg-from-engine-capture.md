@@ -10,7 +10,7 @@ grounding:
   - "KIDS DIFROM behaviour — Kernel 8.0 Developer's Guide: KIDS UG (XU/krn_8_0_dg_kids_ug)"
 related:
   - v-pkg-kids-coverage-analysis.md
-  - v-pkg-install-fidelity-spike.md
+  - ../archive/v-pkg-install-fidelity-spike.md
   - ../archive/implementation-plan.md
 ---
 
