@@ -383,6 +383,72 @@ func TestMakeBuildPairs_HL7App_Minimal(t *testing.T) {
 	}
 }
 
+// A #870 HL LOGICAL LINK ships the sparse 0-node (NODE ^ ^ LLP TYPE) and, when a
+// TCP param is set, the 400-node (^ PORT ^ SERVICE TYPE). LLP TYPE ships as the
+// external #869.1 value ("TCP") — KIDS resolves it to the live IEN at install (like
+// #771 COUNTRY). The network endpoint (IP/DNS) is intentionally not shipped: the
+// #870 install drops it as site config (live-proven), so v-pkg ships only what
+// lands.
+func TestMakeBuildPairs_LogicalLink_KRN(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZLL*1.0*1",
+		Namespace:   "ZZLL",
+		Routines:    []RoutineSrc{{Name: "ZZLLRT", Lines: []string{"ZZLLRT ;x", " quit"}}},
+		LogicalLinks: []LogicalLink{{
+			Name: "ZZLINK", LLPType: "TCP", Port: "5000", ServiceType: "C",
+		}},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	want := map[string]string{
+		`"KRN",870,1,-1)`: "0^1",
+		// 0-node: .01 NODE ^ ^ 2 LLP TYPE (trailing trimmed).
+		`"KRN",870,1,0)`: "ZZLINK^^TCP",
+		// 400-node: ^ 400.02 PORT ^ 400.03 SERVICE TYPE (piece 1 IP omitted — site config).
+		`"KRN",870,1,400)`:                       "^5000^C",
+		`"ORD",1,870)`:                           "870;1;1;;HLLL^XPDTA1;;HLLLE^XPDIA1;;;HLLLDEL^XPDIA1(%)",
+		`"ORD",1,870,0)`:                         "HL LOGICAL LINK",
+		`"BLD",1,"KRN",0)`:                       "^9.67PA^870^1",
+		`"BLD",1,"KRN",870,0)`:                   "870",
+		`"BLD",1,"KRN",870,"NM",1,0)`:            "ZZLINK^^0",
+		`"BLD",1,"KRN",870,"NM","B","ZZLINK",1)`: "",
+		`"BLD",1,"KRN","B",870,870)`:             "",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q", k, got[k], v)
+		}
+	}
+	b := newBuild()
+	for _, p := range MakeBuildPairs(in) {
+		b.Set(p.Subs, p.Value)
+	}
+	if ls := b.LogicalLinkNames(); len(ls) != 1 || ls[0] != "ZZLINK" {
+		t.Errorf("LogicalLinkNames = %v, want [ZZLINK]", ls)
+	}
+}
+
+// A skeleton link (just a name + LLP type, no TCP params) ships only the 0-node —
+// no 400-node — and trims trailing empty pieces.
+func TestMakeBuildPairs_LogicalLink_Skeleton(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZLL*1.0*1", Namespace: "ZZLL",
+		LogicalLinks: []LogicalLink{{Name: "ZZBARE", LLPType: "TCP"}},
+	}
+	got := map[string]string{}
+	for _, p := range MakeBuildPairs(in) {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	if v := got[`"KRN",870,1,0)`]; v != "ZZBARE^^TCP" {
+		t.Errorf(`"KRN",870,1,0) = %q, want "ZZBARE^^TCP"`, v)
+	}
+	if _, ok := got[`"KRN",870,1,400)`]; ok {
+		t.Errorf("skeleton link should ship no 400-node, got %q", got[`"KRN",870,1,400)`])
+	}
+}
+
 // TestMakeBuildPairs_MixedEntryTypes proves the unified KRN manifest header spans
 // multiple entry types in one build (B.1 next step): an OPTION (#19) AND a
 // PARAMETER DEFINITION (#8989.51) share one "BLD",1,"KRN",0) header

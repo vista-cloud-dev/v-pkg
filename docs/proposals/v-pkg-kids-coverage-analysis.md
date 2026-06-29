@@ -478,6 +478,24 @@ not the populate-and-`EN^XPDIJ` shortcut.
     `1`), B-index gone after `DIK` on `^HL(771,` back-out. HL7 follow-ups remain: #779.2
     (HLO message registry, multiples + xrefs) and #870 (logical link, hardcoded
     IP/hostname — site-specific, NOT portable). ([[option-entry-component]])
+  - **B.1-j ✅ DONE + LIVE-PROVEN 2026-06-28 — HL LOGICAL LINK (#870), both engines.**
+    The tenth type; the HL7 communication-endpoint. Stored in `^HLCS(870,`. Record:
+    `-1)=0^1`, sparse `0)=NODE^^LLPTYPE` + optional `400)=^PORT^SVC`. ORD tail
+    `1;;HLLL^XPDTA1;;HLLLE^XPDIA1;;;HLLLDEL^XPDIA1(%)` (piece 3 = `1`, the data-ships
+    flag). Added a generic `caretJoin` sparse-node helper. **Two findings (live):**
+    (1) the #870 install RE-FILES through FileMan (not a verbatim merge) — LLP TYPE
+    ships external `"TCP"` and resolves to its `#869.1` IEN **4** at install (TCP=4 on
+    BOTH engines, nationally controlled); (2) the network endpoint (DNS DOMAIN,
+    TCP/IP ADDRESS) is **site config the install DROPS** (DNS input transform resolves
+    the host and clears itself + the coupled IP; a bare IP is dropped too), so v-pkg
+    ships only what lands — name, LLP type, PORT, SERVICE TYPE. This realizes the
+    earlier "#870 is site-specific" note: the link *structure* is portable, the
+    *endpoint* is not. TDD; lint/race/contract green; corpus DRIFT=0; golden
+    `testdata/zzll/ZZLL.kids`. **Live install→verify→`--force` uninstall→verify-clean**
+    on vehu (YDB, IEN 52) + foia-t12 (IRIS, IEN 103): live `ZZLINK^^4` + `^5000^C`
+    identical on both, B-index gone after `DIK` on `^HLCS(870,`. Remaining HL7
+    follow-ups: #779.2 (HLO registry — multiple #779.21 with computed `B`/`D` xref
+    nodes) and #870 DESCRIPTION WP (#870.02). ([[option-entry-component]])
 - **B.2 Real FILE DD + DATA (F3; the R3 enabler).** Extend `FileComp` to a
   multi-field DD (see §8 for the grounded node-set) and add **DATA** export with
   the four action codes (ADD-IF-NEW / MERGE / OVERWRITE / REPLACE) and FULL/PARTIAL

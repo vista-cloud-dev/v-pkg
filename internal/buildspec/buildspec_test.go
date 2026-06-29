@@ -603,6 +603,47 @@ func TestParse_HL7Applications_Invalid(t *testing.T) {
 	}
 }
 
+func TestParse_LogicalLinks(t *testing.T) {
+	js := `{"package":"ZZLL","version":"1.0","patch":"1","components":{
+	  "routines":["ZZLLRT"],
+	  "logicalLinks":[{"name":"ZZLINK","llpType":"TCP","port":"5000","serviceType":"C"}]
+	}}`
+	s, err := Parse([]byte(js))
+	if err != nil {
+		t.Fatalf("Parse logicalLinks spec: %v", err)
+	}
+	if len(s.Components.LogicalLinks) != 1 {
+		t.Fatalf("logicalLinks = %+v", s.Components.LogicalLinks)
+	}
+	l := s.Components.LogicalLinks[0]
+	if l.Name != "ZZLINK" || l.LLPType != "TCP" || l.Port != "5000" || l.ServiceType != "C" {
+		t.Errorf("logicalLink = %+v", l)
+	}
+	// A skeleton link (just a name) is a non-empty spec.
+	d, err := Parse([]byte(`{"package":"ZZLL","version":"1.0","components":{"logicalLinks":[{"name":"ZZBARE"}]}}`))
+	if err != nil {
+		t.Fatalf("Parse minimal logical link: %v", err)
+	}
+	if d.Components.empty() {
+		t.Error("spec with a logical link must not be empty")
+	}
+}
+
+func TestParse_LogicalLinks_Invalid(t *testing.T) {
+	cases := map[string]string{
+		"no name":      `{"package":"ZZLL","version":"1.0","components":{"logicalLinks":[{"llpType":"TCP"}]}}`,
+		"too short":    `{"package":"ZZLL","version":"1.0","components":{"logicalLinks":[{"name":"ZZ"}]}}`,
+		"too long":     `{"package":"ZZLL","version":"1.0","components":{"logicalLinks":[{"name":"ZZLINKTOOLONG"}]}}`,
+		"lead punct":   `{"package":"ZZLL","version":"1.0","components":{"logicalLinks":[{"name":"-ZZLINK"}]}}`,
+		"bad svc type": `{"package":"ZZLL","version":"1.0","components":{"logicalLinks":[{"name":"ZZLINK","serviceType":"X"}]}}`,
+	}
+	for name, js := range cases {
+		if _, err := Parse([]byte(js)); err == nil {
+			t.Errorf("%s: expected an error, got nil", name)
+		}
+	}
+}
+
 func TestParse_Protocols(t *testing.T) {
 	js := `{"package":"ZZPROTO","version":"1.0","patch":"1","components":{
 	  "routines":["ZZPRORT"],

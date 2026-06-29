@@ -480,6 +480,7 @@ type verifyResult struct {
 	ListTemplates map[string]bool `json:"listTemplates,omitempty"`   // #409.61 LIST TEMPLATEs present
 	HelpFrames    map[string]bool `json:"helpFrames,omitempty"`      // #9.2 HELP FRAMEs present
 	HL7Apps       map[string]bool `json:"hl7Applications,omitempty"` // #771 HL7 APPLICATION PARAMETERs present
+	LogicalLinks  map[string]bool `json:"logicalLinks,omitempty"`    // #870 HL LOGICAL LINKs present
 	Files         map[string]bool `json:"files,omitempty"`           // FileMan FILE data dictionaries present
 	// Drift maps each routine -> "applied" | "drifted" | "absent" when --drift is
 	// requested: does the LIVE routine still match the source this patch shipped?
@@ -544,6 +545,11 @@ func (r verifyResult) ok() bool {
 			return false
 		}
 	}
+	for _, present := range r.LogicalLinks {
+		if !present {
+			return false
+		}
+	}
 	for _, present := range r.Files {
 		if !present {
 			return false
@@ -580,12 +586,12 @@ func checkDrift(ctx context.Context, cl *mdriver.Client, b *kids.Build) (map[str
 	return drift, nil
 }
 
-func runVerify(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, files []string) (verifyResult, error) {
-	markers, _, err := runMScript(ctx, cl, rtnVerify, installspec.VerifyScript(name, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, files))
+func runVerify(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, logicalLinks, files []string) (verifyResult, error) {
+	markers, _, err := runMScript(ctx, cl, rtnVerify, installspec.VerifyScript(name, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, logicalLinks, files))
 	if err != nil {
 		return verifyResult{Name: name}, err
 	}
-	r := verifyResult{Name: name, Routines: map[string]bool{}, Params: map[string]bool{}, Options: map[string]bool{}, Keys: map[string]bool{}, Protocols: map[string]bool{}, RPCs: map[string]bool{}, MailGroups: map[string]bool{}, ListTemplates: map[string]bool{}, HelpFrames: map[string]bool{}, HL7Apps: map[string]bool{}, Files: map[string]bool{}}
+	r := verifyResult{Name: name, Routines: map[string]bool{}, Params: map[string]bool{}, Options: map[string]bool{}, Keys: map[string]bool{}, Protocols: map[string]bool{}, RPCs: map[string]bool{}, MailGroups: map[string]bool{}, ListTemplates: map[string]bool{}, HelpFrames: map[string]bool{}, HL7Apps: map[string]bool{}, LogicalLinks: map[string]bool{}, Files: map[string]bool{}}
 	r.Installed = strings.TrimSpace(markers["installed"]) == "1"
 	r.Status, _ = strconv.Atoi(strings.TrimSpace(markers["status"]))
 	for _, rt := range routines {
@@ -618,6 +624,9 @@ func runVerify(ctx context.Context, cl *mdriver.Client, name string, routines, p
 	for _, ha := range hl7Apps {
 		r.HL7Apps[ha] = strings.TrimSpace(markers["hl7app:"+ha]) == "1"
 	}
+	for _, ll := range logicalLinks {
+		r.LogicalLinks[ll] = strings.TrimSpace(markers["logicallink:"+ll]) == "1"
+	}
 	for _, f := range files {
 		r.Files[f] = strings.TrimSpace(markers["file:"+f]) == "1"
 	}
@@ -640,7 +649,7 @@ func (c *verifyCmd) Run(cc *clikit.Context) error {
 		return c.noDriver(err)
 	}
 	ctx := context.Background()
-	res, err := runVerify(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), b.RPCNames(), b.MailGroupNames(), b.ListTemplateNames(), b.HelpFrameNames(), b.HL7AppNames(), fileNumStrings(b))
+	res, err := runVerify(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), b.RPCNames(), b.MailGroupNames(), b.ListTemplateNames(), b.HelpFrameNames(), b.HL7AppNames(), b.LogicalLinkNames(), fileNumStrings(b))
 	if err != nil {
 		return clikit.Fail(clikit.ExitRuntime, "VERIFY_FAILED", err.Error(), "")
 	}
@@ -727,6 +736,13 @@ func (c *verifyCmd) Run(cc *clikit.Context) error {
 			}
 			fmt.Fprintf(cc.Stdout, "  hl7 app %s %s\n", ha, mark)
 		}
+		for ll, present := range res.LogicalLinks {
+			mark := cc.Success("ok")
+			if !present {
+				mark = cc.Failure("missing")
+			}
+			fmt.Fprintf(cc.Stdout, "  logical link %s %s\n", ll, mark)
+		}
 		for f, present := range res.Files {
 			mark := cc.Success("ok")
 			if !present {
@@ -768,8 +784,8 @@ type uninstallResult struct {
 	Uninstalled bool   `json:"uninstalled"`
 }
 
-func runUninstall(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, files []string) (uninstallResult, error) {
-	markers, _, err := runMScript(ctx, cl, rtnUninstall, installspec.UninstallScript(name, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, files))
+func runUninstall(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, logicalLinks, files []string) (uninstallResult, error) {
+	markers, _, err := runMScript(ctx, cl, rtnUninstall, installspec.UninstallScript(name, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, logicalLinks, files))
 	if err != nil {
 		return uninstallResult{Name: name}, err
 	}
@@ -927,7 +943,7 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 			}
 		}
 	default: // actDelete
-		ur, uerr := runUninstall(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), b.RPCNames(), b.MailGroupNames(), b.ListTemplateNames(), b.HelpFrameNames(), b.HL7AppNames(), fileNumStrings(b))
+		ur, uerr := runUninstall(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), b.RPCNames(), b.MailGroupNames(), b.ListTemplateNames(), b.HelpFrameNames(), b.HL7AppNames(), b.LogicalLinkNames(), fileNumStrings(b))
 		if uerr != nil {
 			return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", uerr.Error(), "")
 		}

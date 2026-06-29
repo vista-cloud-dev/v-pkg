@@ -1,0 +1,44 @@
+KIDS Distribution saved by v-pkg
+m-kids reassembled output
+**KIDS**:ZZLL*1.0*1^
+
+**INSTALL NAME**
+ZZLL*1.0*1
+"BLD",1,0)
+ZZLL*1.0*1^ZZLL^0^0
+"BLD",1,"KRN",0)
+^9.67PA^870^1
+"BLD",1,"KRN",870,0)
+870
+"BLD",1,"KRN",870,"NM",0)
+^9.68A^1^1
+"BLD",1,"KRN",870,"NM",1,0)
+ZZLINK^^0
+"BLD",1,"KRN",870,"NM","B","ZZLINK",1)
+
+"BLD",1,"KRN","B",870,870)
+
+"RTN")
+1
+"RTN","ZZLLRT")
+0^3^0^0
+"RTN","ZZLLRT",1,0)
+ZZLLRT ;VCD/VSL - throwaway test package (KRN hl logical link component) ;1.0
+"RTN","ZZLLRT",2,0)
+ ;;1.0;ZZLL;;
+"RTN","ZZLLRT",3,0)
+ quit
+"ORD",1,870)
+870;1;1;;HLLL^XPDTA1;;HLLLE^XPDIA1;;;HLLLDEL^XPDIA1(%)
+"ORD",1,870,0)
+HL LOGICAL LINK
+"KRN",870,1,-1)
+0^1
+"KRN",870,1,0)
+ZZLINK^^TCP
+"KRN",870,1,400)
+^5000^C
+"VER")
+8.0^22.2
+**END**
+**END**

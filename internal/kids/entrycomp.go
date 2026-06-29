@@ -60,8 +60,11 @@ type entryGroup struct {
 // types, so the shared "BLD",1,"KRN",0) header and the ORD ordering are computed
 // once across all of them. PARAMETER DEFINITION (#8989.51) and OPTION (#19) ride
 // the same path; new SEND/DELETE types append here.
-func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey, protos []Protocol, rpcs []RPC, mgs []MailGroup, lts []ListTemplate, hfs []HelpFrame, h7s []HL7App) []entryGroup {
+func buildEntryGroups(defs []ParamDef, opts []Option, keys []SecurityKey, protos []Protocol, rpcs []RPC, mgs []MailGroup, lts []ListTemplate, hfs []HelpFrame, h7s []HL7App, lls []LogicalLink) []entryGroup {
 	var groups []entryGroup
+	if len(lls) > 0 {
+		groups = append(groups, entryGroup{logicalLinkEntryType, logicalLinkRecords(lls)})
+	}
 	if len(mgs) > 0 {
 		groups = append(groups, entryGroup{mailGroupEntryType, mailGroupRecords(mgs)})
 	}
@@ -651,3 +654,77 @@ func hl7AppRecords(apps []HL7App) []entryRec {
 // HL7AppNames returns the #771 HL7 APPLICATION PARAMETER component names in build
 // order — what `v pkg verify`/`uninstall` probe and back out.
 func (b *Build) HL7AppNames() []string { return b.entryNames(hl7AppFile) }
+
+// --- HL LOGICAL LINK (#870) — the tenth type on the generic core --------------
+
+const (
+	logicalLinkFile     = 870
+	logicalLinkFileName = "HL LOGICAL LINK"
+	// logicalLinkOrdTail is the national-constant tail of the #870 ORD install line
+	// (pieces after "<file>;<ord>;"): piece 3 = 1 (this file's data ships with the
+	// build), then the SEND/DELETE action routines KRN^XPDIK runs to file/relink/
+	// delete a logical link. Lifted verbatim from real exports (e.g. PRC*5.1*167).
+	logicalLinkOrdTail = "1;;HLLL^XPDTA1;;HLLLE^XPDIA1;;;HLLLDEL^XPDIA1(%)"
+)
+
+var logicalLinkEntryType = entryType{number: logicalLinkFile, name: logicalLinkFileName, ordTail: logicalLinkOrdTail}
+
+// LogicalLink is one #870 HL LOGICAL LINK record to ship as a KIDS KRN component —
+// an HL7 communication endpoint. Stored in ^HLCS(870,. The record is the sparse
+// 0-node (NODE name ^ ^ LLP TYPE) plus, when a TCP param is set, the 400-node
+// (^ PORT ^ SERVICE TYPE). LLP TYPE ships as the external #869.1 value ("TCP") and
+// KIDS resolves it to the live IEN at install (the same external-pointer mechanism
+// #771's COUNTRY CODE uses).
+//
+// Deliberately NO DNS DOMAIN / TCP/IP ADDRESS: the #870 install routine (HLLL/
+// HLLLE^XPDIA1) re-files the record through FileMan, and those two fields are
+// site-specific network config that the install does NOT carry — DNS DOMAIN's
+// input transform DNS-resolves the host ($$ADDRESS^XLFNSLK) and drops itself (plus
+// the coupled TCP/IP ADDRESS) when it can't, and a bare TCP/IP ADDRESS is dropped
+// outright (live-proven on vehu). v-pkg ships only what actually lands — the link
+// definition (name, protocol, port, role); the receiving site configures the
+// endpoint. (The DESCRIPTION word-processing field #870.02 is a follow-up.)
+type LogicalLink struct {
+	Name        string // #870 .01 NODE (0;1) — 3..10 chars, no leading punctuation
+	LLPType     string // #870 field 2 LLP TYPE (0;3) — #869.1 pointer, external e.g. "TCP"
+	Port        string // #870 400.02 TCP/IP PORT (400;2)
+	ServiceType string // #870 400.03 TCP/IP SERVICE TYPE (400;3) — C/S/M
+}
+
+// logicalLinkRecords packs each LogicalLink into the generic entry-record shape:
+// the SEND XPDFL flag, the sparse 0-node, and (when a TCP param is set) the
+// 400-node. Trailing empty caret-pieces are trimmed so identical input yields a
+// byte-identical export.
+func logicalLinkRecords(lls []LogicalLink) []entryRec {
+	recs := make([]entryRec, 0, len(lls))
+	for _, l := range lls {
+		img := []imageNode{{Subs{intSub(0)}, caretJoin(map[int]string{1: l.Name, 3: l.LLPType})}}
+		if l.Port != "" || l.ServiceType != "" {
+			img = append(img, imageNode{Subs{intSub(400)}, caretJoin(map[int]string{2: l.Port, 3: l.ServiceType})})
+		}
+		recs = append(recs, entryRec{name: l.Name, xpdfl: "0^1", image: img})
+	}
+	return recs
+}
+
+// LogicalLinkNames returns the #870 HL LOGICAL LINK component names in build order
+// — what `v pkg verify`/`uninstall` probe and back out.
+func (b *Build) LogicalLinkNames() []string { return b.entryNames(logicalLinkFile) }
+
+// caretJoin builds a ^-delimited FileMan node from a sparse 1-based piece map,
+// trimming trailing empty pieces so the result is minimal and deterministic.
+func caretJoin(pieces map[int]string) string {
+	hi := 0
+	for p, v := range pieces {
+		if v != "" && p > hi {
+			hi = p
+		}
+	}
+	out := make([]string, hi)
+	for p, v := range pieces {
+		if p >= 1 && p <= hi {
+			out[p-1] = v
+		}
+	}
+	return strings.Join(out, "^")
+}

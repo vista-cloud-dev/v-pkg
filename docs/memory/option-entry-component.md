@@ -189,8 +189,37 @@ install→verify→`--force` uninstall→verify-clean on vehu (YDB) + foia-t12 (
 back-out. Fixture `testdata/zzhf`. Verify probes `^DIC(9.2,"B",<name>)`, uninstall is
 `DIK` on `^DIC(9.2,`.
 
-HL7 APPLICATION PARAMETER #771 done (below). Templates (#.4/.402/…) still parked on
-read-live capture (below).
+HL7 APPLICATION PARAMETER #771 + HL LOGICAL LINK #870 done (below). Templates
+(#.4/.402/…) still parked on read-live capture (below).
+
+## HL LOGICAL LINK #870 (tenth type, 2026-06-28)
+The HL7 communication-endpoint type. Global `^HLCS(870,`. Record: `-1)=0^1`, sparse
+`0)=NODE^^LLPTYPE` (.01 NODE 0;1, field 2 LLP TYPE 0;3) + optional `400)=^PORT^SVC`
+(400.02 PORT 400;2, 400.03 SERVICE TYPE 400;3). ORD tail
+`1;;HLLL^XPDTA1;;HLLLE^XPDIA1;;;HLLLDEL^XPDIA1(%)` (piece 3 = 1, the data-ships flag,
+unlike #771's empty piece). NODE name 3–10 chars, no leading punctuation
+(`reLinkName`); SERVICE TYPE set `C`/`S`/`M` (`reSvcType`). Added a generic
+`caretJoin(map[int]string)` helper (entrycomp.go) that builds a sparse `^`-node and
+trims trailing empties — reused for both the 0-node and 400-node.
+
+**Two durable findings (live-proven on vehu, byte-identical on foia-t12):**
+1. **#870 install RE-FILES through FileMan, not a verbatim KRN merge.** Proof: LLP
+   TYPE shipped external `"TCP"` lands as IEN **4** — a `#869.1` pointer resolved at
+   install (the same external-pointer behavior as #771 COUNTRY `USA→1`). `#869.1`
+   (`^HLCS(869.1,`) is nationally controlled — TCP=4 on BOTH engines.
+2. **The network endpoint (DNS DOMAIN .08, TCP/IP ADDRESS 400.01) is NOT
+   transported — it is site config the install DROPS.** DNS DOMAIN's input transform
+   DNS-resolves the host (`$$ADDRESS^XLFNSLK`) and kills itself + the coupled IP
+   (`$$IP^HLMA3`) when it can't; a bare TCP/IP ADDRESS is dropped outright too
+   (verified IP-only — still dropped). So v-pkg ships ONLY what lands: name, LLP
+   type, PORT, SERVICE TYPE (the link definition); the receiving site configures the
+   endpoint. **Faithful-transport rule:** never emit a field the install silently
+   drops — it would make the build lie. This is the concrete realization of the
+   original "#870 is site-specific" deferral note: the link STRUCTURE is portable,
+   the ENDPOINT is not. Pure-data type → bare uninstall OK (DIK on `^HLCS(870,`),
+   like #771. Fixture `testdata/zzll`; verify probes `^HLCS(870,"B",<node>)`.
+   Follow-ups: DESCRIPTION WP (#870.02); HLO registry #779.2 (multiple #779.21 WITH
+   computed `"B"`/`"D"` xref nodes — genuinely new emitter capability).
 
 ## HL7 APPLICATION PARAMETER #771 (ninth type, 2026-06-28)
 The portable, fully spec-derivable member of the HL7 family — `v pkg` ships it

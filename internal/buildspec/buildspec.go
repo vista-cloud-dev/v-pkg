@@ -72,6 +72,7 @@ type Components struct {
 	ListTemplates        []ListTemplateComp `json:"listTemplates,omitempty"`   // #409.61 LIST TEMPLATE KRN components (B.1)
 	HelpFrames           []HelpFrameComp    `json:"helpFrames,omitempty"`      // #9.2 HELP FRAME KRN components (B.1)
 	HL7Applications      []HL7AppComp       `json:"hl7Applications,omitempty"` // #771 HL7 APPLICATION PARAMETER KRN components (B.1)
+	LogicalLinks         []LogicalLinkComp  `json:"logicalLinks,omitempty"`    // #870 HL LOGICAL LINK KRN components (B.1)
 }
 
 func (c Components) empty() bool {
@@ -79,7 +80,7 @@ func (c Components) empty() bool {
 		len(c.Keys) == 0 && len(c.Parameters) == 0 && len(c.ParameterDefinitions) == 0 &&
 		len(c.Protocols) == 0 && len(c.Templates) == 0 && len(c.RPCs) == 0 &&
 		len(c.MailGroups) == 0 && len(c.ListTemplates) == 0 && len(c.HelpFrames) == 0 &&
-		len(c.HL7Applications) == 0
+		len(c.HL7Applications) == 0 && len(c.LogicalLinks) == 0
 }
 
 // unsupported returns the JSON names of populated component slices the build
@@ -253,6 +254,23 @@ type HL7AppComp struct {
 	CountryCode string `json:"countryCode,omitempty"` // #771 field 7 COUNTRY CODE (default "USA")
 }
 
+// LogicalLinkComp is a #870 HL LOGICAL LINK shipped as a KIDS KRN component (B.1) —
+// an HL7 communication endpoint. LLPType defaults to "TCP" (shipped as the external
+// #869.1 value, resolved to its IEN at install). When Port (and/or ServiceType) is
+// present the build also files the 400-node; ServiceType defaults to "C"
+// (CLIENT/SENDER). A skeleton link with no TCP params is valid.
+//
+// There is intentionally NO DNS domain / IP address field: the #870 install does
+// not transport the network endpoint (it is site-specific config the install drops
+// — see kids.LogicalLink). v-pkg ships the link definition; the site configures the
+// endpoint. (The DESCRIPTION word-processing field is a follow-up.)
+type LogicalLinkComp struct {
+	Name        string `json:"name"`                  // #870 .01 NODE (3..10 chars)
+	LLPType     string `json:"llpType,omitempty"`     // #870 field 2 LLP TYPE (default "TCP")
+	Port        string `json:"port,omitempty"`        // #870 400.02 TCP/IP PORT
+	ServiceType string `json:"serviceType,omitempty"` // #870 400.03 TCP/IP SERVICE TYPE (C/S/M, default "C")
+}
+
 // OptionTypeCode maps a human option-type name to its #19 field 4 (TYPE)
 // set-of-codes value. Grounded in the live ^DD(19,4) set string (Kernel Menu
 // Manager). These codes are national constants — portable across YDB and IRIS.
@@ -408,6 +426,8 @@ var (
 	reEntryName = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // #19 OPTION .01 NAME (uppercase, internal spaces)
 	reHelpName  = regexp.MustCompile(`^[A-Z][A-Z0-9 -]*[A-Z0-9]$`)          // #9.2 HELP FRAME .01 NAME (uppercase, spaces AND hyphens)
 	reHL7Name   = regexp.MustCompile(`^[A-Z][A-Z0-9 _]*[A-Z0-9]$`)          // #771 HL7 APPLICATION .01 NAME (uppercase, spaces AND underscores)
+	reLinkName  = regexp.MustCompile(`^[A-Z][A-Z0-9 ._-]*$`)                // #870 HL LOGICAL LINK .01 NODE (no leading punctuation; spaces/dots/hyphens/underscores)
+	reSvcType   = regexp.MustCompile(`^[CSM]$`)                             // #870 400.03 SERVICE TYPE set code
 	reFileName  = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // FileMan FILE .01 name (uppercase, internal spaces)
 	reGlobalRt  = regexp.MustCompile(`^\^%?[A-Z][A-Z0-9]*\(.*,$`)           // open global root, e.g. ^DIZ(999000,
 	reLabel     = regexp.MustCompile(`^[A-Z][A-Z0-9]*$`)                    // M line label (entryref tag)
@@ -489,6 +509,9 @@ func (s *Spec) Validate() error {
 		return err
 	}
 	if err := validateHL7Applications(s.Components.HL7Applications); err != nil {
+		return err
+	}
+	if err := validateLogicalLinks(s.Components.LogicalLinks); err != nil {
 		return err
 	}
 	if err := validateFiles(s.Components.Files); err != nil {
@@ -736,6 +759,25 @@ func validateHL7Applications(apps []HL7AppComp) error {
 		}
 		if len(a.Name) > 30 || !reHL7Name.MatchString(a.Name) {
 			return fmt.Errorf("buildspec: hl7 application name %q must be uppercase ≤30 chars (spaces/underscores ok) (#771 HL7 APPLICATION PARAMETER NAME)", a.Name)
+		}
+	}
+	return nil
+}
+
+// validateLogicalLinks checks each HL LOGICAL LINK component: a valid #870 NODE
+// name (3–10 chars, no leading punctuation — matching the live .01 input transform)
+// and, when present, a valid SERVICE TYPE set code (C/S/M). LLP TYPE and the TCP
+// params are shipped verbatim and resolved/filed by KRN^XPDIK.
+func validateLogicalLinks(lls []LogicalLinkComp) error {
+	for _, l := range lls {
+		if l.Name == "" {
+			return fmt.Errorf("buildspec: a logical link is missing its name")
+		}
+		if n := len(l.Name); n < 3 || n > 10 || !reLinkName.MatchString(l.Name) {
+			return fmt.Errorf("buildspec: logical link name %q must be 3–10 chars, no leading punctuation (#870 HL LOGICAL LINK NODE)", l.Name)
+		}
+		if l.ServiceType != "" && !reSvcType.MatchString(l.ServiceType) {
+			return fmt.Errorf("buildspec: logical link %q service type %q must be C, S, or M (#870 400.03 TCP/IP SERVICE TYPE)", l.Name, l.ServiceType)
 		}
 	}
 	return nil

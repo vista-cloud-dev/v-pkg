@@ -1,0 +1,16 @@
+{
+  "package": "ZZLL",
+  "version": "1.0",
+  "patch": "1",
+  "components": {
+    "routines": ["ZZLLRT"],
+    "logicalLinks": [
+      {
+        "name": "ZZLINK",
+        "llpType": "TCP",
+        "port": "5000",
+        "serviceType": "C"
+      }
+    ]
+  }
+}
