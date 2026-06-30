@@ -2,21 +2,21 @@
 
 Live tracker (Tier D) for the four-part effort to make `v pkg` the most accurate,
 reliable, and *verifiably* safe KIDS installer. Motivated by the corpus reports
-[`docs/kids-classifee.md`](../../docs/kids-classifee.md) (the VA convention measured
+[`docs/kids-classifee.md`](../kids-classifee.md) (the VA convention measured
 over 12,955 installed builds) and
-[`docs/design/kids-convention-vs-v-pkg.md`](design/kids-convention-vs-v-pkg.md)
+[`docs/design/kids-convention-vs-v-pkg.md`](../design/kids-convention-vs-v-pkg.md)
 (how v-pkg compares). Sequenced by value / risk / dependency; each row is a
 verified increment (TDD + gates + commit), most needing dual-engine (vehu/foia)
 validation. Archive this doc to `docs/archive/` when all four land.
 
 **Kickoff prompts** (each bootstraps a fresh `~/vista-cloud-dev/v-pkg` session into
 one increment; archive the prompts folder with this tracker when the effort lands):
-[`#1`](proposals/verifiable-safety/prompts/increment-1-kickoff.md) (done) ·
-[`#2`](proposals/verifiable-safety/prompts/increment-2-kickoff.md) (done — pre-install
+[`#1`](verifiable-safety/prompts/increment-1-kickoff.md) (done) ·
+[`#2`](verifiable-safety/prompts/increment-2-kickoff.md) (done — pre-install
 dry-run / compare-to-current) ·
-[`#3`](proposals/verifiable-safety/prompts/increment-3-kickoff.md) (done — robustness
+[`#3`](verifiable-safety/prompts/increment-3-kickoff.md) (done — robustness
 hardening: half-install heal · transport-checksum · sidecar integrity) ·
-[`#4`](proposals/verifiable-safety/prompts/increment-4-kickoff.md) (next + FINAL —
+[`#4`](verifiable-safety/prompts/increment-4-kickoff.md) (next + FINAL —
 install attestation / audit record; its landing commit archives this tracker + the
 prompts folder).
 
@@ -25,7 +25,7 @@ prompts folder).
 | 1 | Component-type coverage 11 → all standard FileMan types (verify + uninstall) | reliability — no orphan-on-uninstall, complete verify | **done** (presence-verify + uninstall for all shipping types; content-verify follow-up below) |
 | 2 | Pre-install dry-run / compare-to-current | verifiable-in-advance | **done** (`install --dry-run` + `diff <kid>`; read-only no-op proven on vehu) |
 | 3 | Robustness: half-install heal · transport-checksum · sidecar integrity | reliability | **done** (3a `install --heal`, 3b transport-checksum warn/`--verify-checksums`, 3c sidecar hash; all live-proven on vehu) |
-| 4 | Install attestation / audit record | third-party-verifiable | planned (next) |
+| 4 | Install attestation / audit record | third-party-verifiable | **done** (`attest` ledger: prevHash chain + opt-in ed25519 sign; `v pkg attest verify [--replay --trust]`; all mutating ops attest; live-proven vehu) |
 
 ---
 
@@ -173,16 +173,30 @@ probes), `make corpus` DRIFT=0 (2404) + checksum sweep 1.62% mismatch.
 
 ## 4 — Install attestation / audit record
 
-**Design.** Each engine-mutating op appends a structured, signed-or-hashed
-attestation (op, build, timestamp, reversibility class, before/after routine
-checksums, components touched, REQB chain, snapshot ref, verify verdict, exit
-code). Append-only, independently auditable — turns "it installed" into provable
-provenance. Aligns with the org `source-tag → registry → red-gate` discipline (the
-attestation is the install's red-gate evidence). Best landed last so it records the
-richer change-set from #1–#3.
+**DONE 2026-06-30 — FINAL increment; this closes the effort.** Each engine-MUTATING
+op (install / uninstall / restore — never a read-only diff/verify) appends a
+structured record to a host-side append-only JSON Lines ledger (`<kid>.attest.jsonl`,
+`--attest <path>` override). The record carries op + sub-action, build name + class,
+engine/transport, BEFORE/AFTER routine `B` checksums, components touched, REQB chain,
+snapshot ref + #3c content hash, #9.7 status, verify verdict, exit code, timestamp.
+Two protections layered: a sha256 `prevHash` chain ALWAYS (tamper-evident,
+append-only) + an OPT-IN detached **ed25519** signature (`--sign`, key from
+`$VPKG_ATTEST_KEY`) for tamper-RESISTANCE. New read-only verb **`v pkg attest verify
+<ledger>`** validates the chain (+ `--trust <pubkey>` pinned signatures) and optionally
+`--replay`s each record's AFTER against the live engine. Core = engine-neutral
+`internal/attest`; emit at the one chokepoint each op funnels through. Durable lesson:
+`docs/memory/install-attestation.md`. Validation: `make stress` 51/51 (8 attestation
+probes) + `make live-gate` replay assertion, both on vehu; `make corpus` DRIFT=0.
+
+Design calls made (kickoff): host-side ledger (outside the engine it mutates,
+offline-auditable); hash-chain floor / signature ceiling; attestation ON by default
+for mutating ops (`--no-attest` suppresses, signing opt-in); a record is written only
+when the op actually mutated the engine. KEY decision: AFTER = checksum of the FILED
+source (no extra engine read) — the live read is the auditor's job (`--replay`), and
+replay checks NET per-routine state so a full lifecycle ledger replays clean.
 
 ---
 
-*Reports that motivate this: [`docs/kids-classifee.md`](../../docs/kids-classifee.md),
-[`docs/design/kids-convention-vs-v-pkg.md`](design/kids-convention-vs-v-pkg.md).
+*Reports that motivate this: [`docs/kids-classifee.md`](../kids-classifee.md),
+[`docs/design/kids-convention-vs-v-pkg.md`](../design/kids-convention-vs-v-pkg.md).
 Each increment follows the org Increment Protocol (TDD → gates → memory → commit).*
