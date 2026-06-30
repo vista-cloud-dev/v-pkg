@@ -83,6 +83,35 @@ func (e engineConn) noDriver(err error) *clikit.Error {
 		"build the m-"+e.Engine+" driver (make build) or set M_"+strings.ToUpper(e.Engine)+"_BIN")
 }
 
+// majorOf returns the major component of a SemVer-ish "major.minor" string.
+func majorOf(v string) string { return strings.SplitN(v, ".", 2)[0] }
+
+// checkDriver handshakes the located driver BEFORE v-pkg trusts its results for a
+// mutating op: it fetches the driver's capability document (meta caps) and refuses a
+// driver whose contract MAJOR differs from the SDK this v-pkg was built against, or
+// whose advertised engine is not the one requested. This catches an accidental
+// driver/contract version skew (a wrong or stale m-<engine> binary) up front with a
+// clear error, instead of a confusing mid-install failure downstream. (It is not a
+// defense against a maliciously-forged driver — that owns the seam by definition.)
+func (e engineConn) checkDriver(ctx context.Context, cl *mdriver.Client) *clikit.Error {
+	caps, err := cl.Caps(ctx)
+	if err != nil {
+		return clikit.Fail(clikit.ExitRuntime, "DRIVER_CAPS_FAILED", err.Error(),
+			"the m-"+e.Engine+" driver did not answer `meta caps` — rebuild it (make build)")
+	}
+	if got, want := majorOf(caps.Contract), majorOf(mdriver.ContractVersion); got != want {
+		return clikit.Fail(clikit.ExitRefused, "DRIVER_INCOMPAT",
+			fmt.Sprintf("m-%s driver speaks contract %s, but this v-pkg requires major %s — version skew", e.Engine, caps.Contract, want),
+			"rebuild the m-"+e.Engine+" driver against the SDK this v-pkg was built with")
+	}
+	if caps.Engine != "" && caps.Engine != e.Engine {
+		return clikit.Fail(clikit.ExitRefused, "DRIVER_WRONG_ENGINE",
+			fmt.Sprintf("requested --engine %s but the located driver reports engine %s", e.Engine, caps.Engine),
+			"check M_"+strings.ToUpper(e.Engine)+"_BIN / PATH points at the right driver")
+	}
+	return nil
+}
+
 // wrapRoutine turns a direct-mode M script body into a loadable routine: a
 // column-1 header + an EN label, every body line indented one space, and a
 // trailing quit. The generated scripts assume a single persistent symbol table,
@@ -616,6 +645,11 @@ func (c *installCmd) Run(cc *clikit.Context) error {
 	// exit 0). The same plan `v pkg diff` produces; covers single- and multi-build.
 	if c.DryRun {
 		return runDryRun(ctx, cc, cl, c.Engine, k)
+	}
+
+	// #4: handshake the driver before trusting its install results (version skew).
+	if cerr := c.checkDriver(ctx, cl); cerr != nil {
+		return cerr
 	}
 
 	answers, aerr := parseAnswers(c.Answer)
@@ -1281,12 +1315,15 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 	}
 
 	// F1: the build's OWN declaration (read offline from the .KID) of routines it
-	// overwrote that belong to another package. This is the no-pre-image brick-path
-	// signal — a declared-foreign routine must never be deleted without a pre-image
-	// to restore it. The greenfield subset (build routines that are NOT declared
-	// foreign) is what a forced delete may remove; for a declaration-free build it
-	// is simply every routine (backward compatible).
-	foreign := b.ForeignRoutines()
+	// overwrote that belong to another package — the no-pre-image brick-path signal: a
+	// foreign routine must never be deleted without a pre-image to restore it. This is
+	// UNIONed with the durable install-time overwrite set the attestation ledger
+	// recorded (routines that pre-existed when this build was installed), so an
+	// UNDECLARED national overwrite — installed via --allow-overwrite, which the build
+	// never self-declared foreign — is protected from a delete-on-uninstall brick too.
+	// Degrades to the declaration alone when no ledger is present. The greenfield subset
+	// (build routines NOT in the effective foreign set) is what a forced delete removes.
+	foreign := mergeForeign(b.ForeignRoutines(), installTimeOverwrites(c.attestFlags, c.KidFile, name))
 	_, greenfieldDelete := partitionRoutines(b.RoutineNames(), foreign)
 
 	// Wrong/incomplete-sidecar guard: with a pre-image in play, every declared
@@ -1317,6 +1354,10 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 		return c.noDriver(err)
 	}
 	ctx := context.Background()
+	// #4: handshake the driver before trusting its back-out results (version skew).
+	if cerr := c.checkDriver(ctx, cl); cerr != nil {
+		return cerr
+	}
 
 	switch action {
 	case actRestore, actBackout:

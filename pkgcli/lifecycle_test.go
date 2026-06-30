@@ -22,8 +22,10 @@ type fakeDriver struct {
 	loadArgs, runArgs []string
 	runStdout         string
 	loadEng, runEng   *mdriver.EngineError
-	loadEmpty         bool // driver stages nothing (no fault) — the silent no-op case
-	loads, runs       int  // call counts (the chunked install stages many times)
+	loadEmpty         bool   // driver stages nothing (no fault) — the silent no-op case
+	loads, runs       int    // call counts (the chunked install stages many times)
+	capsContract      string // what `meta caps` advertises as the contract version (#4 handshake)
+	capsEngine        string // …and as the engine
 }
 
 func (f *fakeDriver) run(_ context.Context, _ string, args []string) (stdout, stderr []byte, exit int, err error) {
@@ -38,6 +40,8 @@ func (f *fakeDriver) run(_ context.Context, _ string, args []string) (stdout, st
 	case len(args) >= 2 && args[0] == "exec" && args[1] == "run":
 		f.runArgs, f.runs = args, f.runs+1
 		return envBytes("exec run", mdriver.ExecResult{Stdout: f.runStdout}, f.runEng), nil, 0, nil
+	case len(args) >= 2 && args[0] == "meta" && args[1] == "caps":
+		return envBytes("meta caps", mdriver.Caps{Engine: f.capsEngine, Contract: f.capsContract}, nil), nil, 0, nil
 	}
 	return envBytes("?", nil, nil), nil, 0, nil
 }
@@ -449,5 +453,32 @@ func TestRunDeregister(t *testing.T) {
 	// A patchless reg has nothing to clear → false, no engine call.
 	if ok3, _ := runDeregister(context.Background(), fakeClient(f), &installspec.PkgReg{Prefix: "MSL", Version: "0.1"}); ok3 {
 		t.Error("want deregistered=false for patchless reg")
+	}
+}
+
+// TestCheckDriver_ContractHandshake is the #4 guard: v-pkg refuses a driver whose
+// advertised contract MAJOR differs from the SDK it was built against, or whose engine
+// is wrong — catching an accidental driver/version skew before trusting an install.
+func TestCheckDriver_ContractHandshake(t *testing.T) {
+	ec := engineConn{Engine: "ydb", Transport: "local"}
+	ctx := context.Background()
+	want := mdriver.ContractVersion // e.g. "1.0"
+
+	if e := ec.checkDriver(ctx, fakeClient(&fakeDriver{capsContract: want, capsEngine: "ydb"})); e != nil {
+		t.Errorf("matching contract %q + engine should pass, got %v", want, e)
+	}
+	if e := ec.checkDriver(ctx, fakeClient(&fakeDriver{capsContract: "99.0", capsEngine: "ydb"})); e == nil || e.Code != "DRIVER_INCOMPAT" {
+		t.Errorf("a major-version skew must refuse DRIVER_INCOMPAT, got %v", e)
+	}
+	if e := ec.checkDriver(ctx, fakeClient(&fakeDriver{capsContract: want, capsEngine: "iris"})); e == nil || e.Code != "DRIVER_WRONG_ENGINE" {
+		t.Errorf("a wrong-engine driver must refuse DRIVER_WRONG_ENGINE, got %v", e)
+	}
+}
+
+func TestMajorOf(t *testing.T) {
+	for in, want := range map[string]string{"1.0": "1", "2.3": "2", "1": "1", "": ""} {
+		if got := majorOf(in); got != want {
+			t.Errorf("majorOf(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

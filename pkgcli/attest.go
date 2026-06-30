@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -159,6 +160,52 @@ func uninstallVerifyVerdict(res uninstallReport) string {
 	default:
 		return res.VerifyClean
 	}
+}
+
+// installTimeOverwrites returns the routines this build OVERWROTE at install time —
+// routines that pre-existed on the engine, read from the attestation ledger's latest
+// install record (a Before entry that is neither "" nor "absent"). This is durable
+// install-time truth uninstall folds into the foreign set, so a national routine an
+// install clobbered (via --allow-overwrite) is protected from a delete-on-uninstall
+// brick even when the build did NOT self-declare it foreign. Empty when there is no
+// ledger or no matching install record — graceful degradation to the prior behavior.
+func installTimeOverwrites(flags attestFlags, kidFile, name string) []string {
+	recs, err := attest.Load(flags.ledgerPath(kidFile))
+	if err != nil || len(recs) == 0 {
+		return nil
+	}
+	var before map[string]string
+	for i := range recs {
+		if recs[i].Op == "install" && recs[i].Name == name && recs[i].Before != nil {
+			before = recs[i].Before // the latest install record for this build wins
+		}
+	}
+	var out []string
+	for rt, b := range before {
+		if b != "" && b != "absent" {
+			out = append(out, rt)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// mergeForeign unions the build's self-declared foreign routines with the install-time
+// overwrite set (deduped, sorted) — the effective set uninstall must never delete/brick.
+func mergeForeign(declared, overwrites []string) []string {
+	set := make(map[string]bool, len(declared)+len(overwrites))
+	for _, r := range declared {
+		set[r] = true
+	}
+	for _, r := range overwrites {
+		set[r] = true
+	}
+	out := make([]string, 0, len(set))
+	for r := range set {
+		out = append(out, r)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // componentKeys renders a build's non-routine components as "<file>:<name>" keys —

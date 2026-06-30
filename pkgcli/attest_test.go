@@ -1,10 +1,13 @@
 package pkgcli
 
 import (
+	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/vista-cloud-dev/clikit"
 	"github.com/vista-cloud-dev/v-pkg/internal/attest"
 	"github.com/vista-cloud-dev/v-pkg/internal/kids"
 )
@@ -109,4 +112,71 @@ func buildFromKID(t *testing.T, routines map[string][]string) *kids.Build {
 		t.Fatalf("load build: %v", err)
 	}
 	return b
+}
+
+func TestInstallTimeOverwrites_FromLedger(t *testing.T) {
+	dir := t.TempDir()
+	kid := filepath.Join(dir, "P.KID")
+	// Install record: overwrote X (pre-existed → checksum), added Y (greenfield → absent).
+	rec := newRecord(attestInput{Op: "install", Name: "P*1.0*1",
+		Before: map[string]string{"X": "B123", "Y": "absent"},
+		After:  map[string]string{"X": "B999", "Y": "B888"}})
+	if err := emitAttestation(attestFlags{}, kid, rec); err != nil {
+		t.Fatal(err)
+	}
+	got := installTimeOverwrites(attestFlags{}, kid, "P*1.0*1")
+	if len(got) != 1 || got[0] != "X" {
+		t.Errorf("installTimeOverwrites = %v, want [X] (only the pre-existing routine)", got)
+	}
+	if n := installTimeOverwrites(attestFlags{}, kid, "OTHER*1.0*1"); len(n) != 0 {
+		t.Errorf("a different build name must see no overwrites, got %v", n)
+	}
+	if n := installTimeOverwrites(attestFlags{}, filepath.Join(dir, "none.KID"), "P*1.0*1"); len(n) != 0 {
+		t.Errorf("a missing ledger must degrade to empty, got %v", n)
+	}
+}
+
+func TestMergeForeign_Union(t *testing.T) {
+	got := mergeForeign([]string{"A", "B"}, []string{"B", "C"})
+	if len(got) != 3 || got[0] != "A" || got[1] != "B" || got[2] != "C" {
+		t.Errorf("mergeForeign = %v, want [A B C]", got)
+	}
+}
+
+// TestUninstall_RefusesUndeclaredOverwrite is the #3 end-to-end proof (offline — the
+// refuse is decided before any engine call): a build that did NOT self-declare a
+// foreign overwrite, but whose attestation ledger records that a routine pre-existed
+// at install (an --allow-overwrite of a national routine), must REFUSE a bare uninstall
+// rather than delete (brick) that routine.
+func TestUninstall_RefusesUndeclaredOverwrite(t *testing.T) {
+	dir := t.TempDir()
+	kid := filepath.Join(dir, "ZZSKEL.KID")
+	pairs := kids.MakeBuildPairs(kids.BuildInput{InstallName: "ZZSKEL*1.0*1", Namespace: "ZZSKEL",
+		Routines: []kids.RoutineSrc{{Name: "ZZSKEL", Lines: []string{"ZZSKEL ;x", " Q"}}}})
+	if err := kids.WriteKID([]string{"ZZSKEL*1.0*1"}, map[string][]kids.Pair{"ZZSKEL*1.0*1": pairs}, kid); err != nil {
+		t.Fatal(err)
+	}
+	// Ledger records the install OVERWROTE the pre-existing ZZSKEL (Before != absent).
+	if err := emitAttestation(attestFlags{}, kid, newRecord(attestInput{
+		Op: "install", Name: "ZZSKEL*1.0*1", Before: map[string]string{"ZZSKEL": "B10838"},
+	})); err != nil {
+		t.Fatal(err)
+	}
+
+	cc := clikit.NewContext(&clikit.Globals{Output: "json"}, "uninstall")
+	cc.Stdout = &bytes.Buffer{}
+	cmd := &uninstallCmd{engineConn: engineConn{Engine: "ydb", Transport: "docker"}, KidFile: kid}
+	err := cmd.Run(cc)
+	var ce *clikit.Error
+	if !errors.As(err, &ce) || ce.Exit != clikit.ExitRefused {
+		t.Fatalf("bare uninstall of an undeclared overwrite: got %v, want a Refused (exit 4) error", err)
+	}
+
+	// With --force, the overwrite guard must NOT fire (it proceeds past the offline
+	// refuse toward the engine, then fails later on no-driver / handshake — a DIFFERENT
+	// error code). Assert only that it is not the UNINSTALL_REFUSED overwrite guard.
+	cmd.Force = true
+	if ferr := cmd.Run(cc); errors.As(ferr, &ce) && ce.Code == "UNINSTALL_REFUSED" {
+		t.Error("--force must not be refused by the overwrite guard")
+	}
 }

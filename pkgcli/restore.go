@@ -60,7 +60,12 @@ func (c *restoreCmd) Run(cc *clikit.Context) error {
 	if derr != nil {
 		return c.noDriver(derr)
 	}
-	ir, ierr := runInstall(context.Background(), cl, name, name+" via v pkg restore", b.Pairs(), false, nil, nil)
+	ctx := context.Background()
+	// #4: handshake the driver before trusting its restore results (version skew).
+	if cerr := c.checkDriver(ctx, cl); cerr != nil {
+		return cerr
+	}
+	ir, ierr := runInstall(ctx, cl, name, name+" via v pkg restore", b.Pairs(), false, nil, nil)
 	if ierr != nil {
 		return clikit.Fail(clikit.ExitRuntime, "RESTORE_FAILED", ierr.Error(), "")
 	}
