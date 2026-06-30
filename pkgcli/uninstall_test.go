@@ -19,6 +19,7 @@ func TestDecideUninstall(t *testing.T) {
 		backout    string
 		force      bool
 		greenfield bool // build adds routines beyond the pre-image (only meaningful with a pre-image)
+		foreign    bool // build declared a foreign overwrite (read offline from the .KID)
 		wantAction uninstallAction
 	}{
 		{name: "class-1, no flags -> greenfield delete", class: pure, wantAction: actDelete},
@@ -36,10 +37,18 @@ func TestDecideUninstall(t *testing.T) {
 		{name: "side-effecting with --restore AND greenfield adds -> PARTITION", class: side, restore: "pre.kids", greenfield: true, wantAction: actPartition},
 		{name: "greenfield flag without --restore is ignored -> delete", class: pure, greenfield: true, wantAction: actDelete},
 		{name: "--restore+--backout with greenfield still refuses (ambiguous)", class: pure, restore: "p.kids", backout: "b.kids", greenfield: true, wantAction: actRefuse},
+		// F1: a build that declared a foreign overwrite (read offline from the .KID)
+		// and has NO pre-image must be REFUSED — deleting would brick the foreign
+		// national routine, and there is no pre-image to restore it. This is the
+		// brick path BB1's pre-image-keyed partition could not close on its own.
+		{name: "F1: declared foreign + NO pre-image -> REFUSE (the brick-path fix)", class: pure, foreign: true, wantAction: actRefuse},
+		{name: "F1: declared foreign + NO pre-image + --force -> delete greenfield subset only", class: pure, foreign: true, force: true, wantAction: actDelete},
+		{name: "F1: declared foreign but --restore present -> partition (pre-image reverses it)", class: pure, restore: "pre.kids", greenfield: true, foreign: true, wantAction: actPartition},
+		{name: "F1: side-effecting + declared foreign + no flags -> REFUSE", class: side, foreign: true, wantAction: actRefuse},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, reason := decideUninstall(tc.class, tc.restore, tc.backout, tc.force, tc.greenfield)
+			got, reason := decideUninstall(tc.class, tc.restore, tc.backout, tc.force, tc.greenfield, tc.foreign)
 			if got != tc.wantAction {
 				t.Errorf("decideUninstall = %v (%q), want %v", got, reason, tc.wantAction)
 			}
@@ -102,6 +111,28 @@ func TestPartitionRoutines(t *testing.T) {
 			}
 			if !reflect.DeepEqual(del, tc.wantDelete) {
 				t.Errorf("delete = %v, want %v", del, tc.wantDelete)
+			}
+		})
+	}
+}
+
+// intersectRoutines drives the wrong-sidecar guard (F1): a declared foreign
+// routine that lands in the delete set is one the pre-image failed to capture.
+func TestIntersectRoutines(t *testing.T) {
+	cases := []struct {
+		name       string
+		want, have []string
+		out        []string
+	}{
+		{name: "foreign captured by pre-image -> empty (safe)", want: []string{"XWBPRS"}, have: []string{"VSLRTAP"}, out: nil},
+		{name: "foreign in delete set -> flagged (wrong sidecar)", want: []string{"XWBPRS"}, have: []string{"VSLRTAP", "XWBPRS"}, out: []string{"XWBPRS"}},
+		{name: "order follows want", want: []string{"AAA", "BBB", "CCC"}, have: []string{"CCC", "AAA"}, out: []string{"AAA", "CCC"}},
+		{name: "no declaration -> empty", want: nil, have: []string{"VSLRTAP"}, out: nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := intersectRoutines(tc.want, tc.have); !reflect.DeepEqual(got, tc.out) {
+				t.Errorf("intersectRoutines = %v, want %v", got, tc.out)
 			}
 		})
 	}

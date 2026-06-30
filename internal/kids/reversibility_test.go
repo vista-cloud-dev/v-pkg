@@ -13,6 +13,38 @@ func buildFrom(pairs ...[2]string) *Build {
 	return b
 }
 
+// D2 (F1): ClassifyBuild records the build's declared foreign overwrites (the
+// embedded ("VPKG","FOREIGN",<name>) nodes) so class-aware uninstall has the
+// offline signal to refuse deleting a foreign routine with no pre-image. The
+// declaration is read verbatim — NOT inferred from routine names.
+func TestClassifyBuild_ForeignOverwrites(t *testing.T) {
+	// The tap shape: VSLRT* greenfield + the declared foreign XWBPRS.
+	mixed := buildFrom(
+		[2]string{`"BLD",1,0)`, `VSLRT*1.0*1`},
+		[2]string{`"RTN","VSLRTAP")`, `0^1`},
+		[2]string{`"RTN","XWBPRS")`, `0^1`},
+		[2]string{`"VPKG","FOREIGN","XWBPRS")`, `1`},
+	)
+	br := ClassifyBuild("VSLRT*1.0*1", mixed)
+	if len(br.ForeignOverwrites) != 1 || br.ForeignOverwrites[0] != "XWBPRS" {
+		t.Errorf("ForeignOverwrites = %v, want [XWBPRS]", br.ForeignOverwrites)
+	}
+	// Class is still pure-overwrite (routine-only, no install code) — foreignness is
+	// orthogonal to the reversibility class.
+	if br.Class != ClassPureOverwrite {
+		t.Errorf("class = %v, want pure-overwrite", br.Class)
+	}
+
+	// A declaration-free build reports none (existing builds unaffected).
+	plain := buildFrom(
+		[2]string{`"BLD",1,0)`, `ZZSKEL*1.0*1`},
+		[2]string{`"RTN","ZZSKEL")`, `0^1`},
+	)
+	if got := ClassifyBuild("ZZSKEL*1.0*1", plain).ForeignOverwrites; len(got) != 0 {
+		t.Errorf("declaration-free build ForeignOverwrites = %v, want none", got)
+	}
+}
+
 func TestClassifyBuild(t *testing.T) {
 	cases := []struct {
 		name      string

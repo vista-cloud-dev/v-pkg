@@ -46,6 +46,13 @@ type BuildInput struct {
 	PreInstall     string         // pre-install routine entryref → top-level "INI"
 	PostInstall    string         // post-install routine entryref → top-level "INIT"
 	Platform       string         // VER node (Kernel^FileMan), default "8.0^22.2"
+	// ForeignRoutines names routines this build intentionally overwrites that are
+	// owned by another package (e.g. VSLRT splicing the national XWBPRS). Each is
+	// embedded as a private ("VPKG","FOREIGN",<name>) node so class-aware uninstall
+	// can read the declaration OFFLINE from the .KID and refuse to delete a foreign
+	// routine it cannot restore. EnginePairs strips these before engine staging, so
+	// they never reach KIDS filing — they are v-pkg metadata, not a KIDS component.
+	ForeignRoutines []string
 }
 
 // MakeBuildPairs constructs the ^XPD BUILD pairs for a routine-only KIDS package
@@ -91,7 +98,56 @@ func MakeBuildPairs(in BuildInput) []Pair {
 		plat = "8.0^22.2"
 	}
 	b.Set(Subs{strSub("VER")}, plat)
+
+	// F1: private foreign-overwrite declaration. Emitted only when the build
+	// declares one, so a declaration-free build stays byte-identical to the prior
+	// shape. Stripped from the engine transport by EnginePairs (v-pkg metadata, not
+	// a KIDS component) — its only consumer is offline class-aware uninstall.
+	for _, name := range in.ForeignRoutines {
+		b.Set(Subs{strSub(foreignSub0), strSub(foreignSub1), strSub(name)}, "1")
+	}
 	return b.Pairs()
+}
+
+// foreignSub0/foreignSub1 are the subscripts of the private foreign-overwrite
+// declaration node ("VPKG","FOREIGN",<routine>). VPKG is not a KIDS keyword, so
+// even if such a node ever reached an engine transport global it would be ignored
+// by KIDS filing — but EnginePairs strips it first, so it never does.
+const (
+	foreignSub0 = "VPKG"
+	foreignSub1 = "FOREIGN"
+)
+
+// ForeignRoutines returns the routines this build declared as foreign overwrites
+// (the embedded ("VPKG","FOREIGN",<name>) nodes), in transport order. This is the
+// OFFLINE signal class-aware uninstall reads from the .KID alone — with no
+// pre-image, a build with foreign overwrites must be REFUSED, never delete-all.
+func (b *Build) ForeignRoutines() []string {
+	var names []string
+	for _, p := range b.Pairs() {
+		s := p.Subs
+		if len(s) == 3 && s[0].IsStr() && s[0].Str() == foreignSub0 &&
+			s[1].IsStr() && s[1].Str() == foreignSub1 && s[2].IsStr() {
+			names = append(names, s[2].Str())
+		}
+	}
+	return names
+}
+
+// EnginePairs returns the transport pairs that may be staged to a live engine —
+// every pair EXCEPT v-pkg's private metadata nodes (the ("VPKG",…) foreign-
+// overwrite declaration). The install path filters through this so the .KID can
+// carry a declaration v-pkg reads offline without ever shipping a non-KIDS node
+// into the engine's transport global / KIDS filing.
+func EnginePairs(pairs []Pair) []Pair {
+	out := make([]Pair, 0, len(pairs))
+	for _, p := range pairs {
+		if len(p.Subs) > 0 && p.Subs[0].IsStr() && p.Subs[0].Str() == foreignSub0 {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 // RoutineNames returns the build's RTN component names in build order — the

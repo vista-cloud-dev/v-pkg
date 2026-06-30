@@ -336,6 +336,61 @@ func TestParse_Invalid(t *testing.T) {
 	}
 }
 
+// D1 (v-rpc-tap F1): foreignRoutines is the EXPLICIT, author-supplied declaration
+// that a build intentionally OVERWRITES a routine owned by another package (the
+// tap splices the national XWBPRS — owned by package XWB — from its own package
+// VSLRT). It is NOT inferred from names (a package's routine namespace need not
+// match its package name — e.g. m-stdlib's package MSL ships STD* routines), so
+// the guard only validates the declaration's internal consistency: each entry is
+// a valid routine name AND is actually shipped by this build. The declaration is
+// what class-aware uninstall reads (embedded in the .KID) to REFUSE deleting a
+// foreign routine it cannot restore; catching an UNDECLARED overwrite is the job
+// of the install-time clobber guard (decideInstall), not this build-time check.
+func TestParse_ForeignRoutines(t *testing.T) {
+	// A shipped routine declared foreign -> accepted, field decoded.
+	good := `{"package":"VSLRT","version":"1.0","allowLongNames":true,
+	  "components":{"routines":["VSLRTAP","VSLRTRP","XWBPRS"]},
+	  "foreignRoutines":["XWBPRS"]}`
+	s, err := Parse([]byte(good))
+	if err != nil {
+		t.Fatalf("a declared foreign routine must parse: %v", err)
+	}
+	if got := s.ForeignRoutines; len(got) != 1 || got[0] != "XWBPRS" {
+		t.Errorf("ForeignRoutines = %v, want [XWBPRS]", got)
+	}
+
+	bad := map[string]string{
+		// declared foreign routine the build does not actually ship -> meaningless
+		// declaration (you can only overwrite a routine you ship).
+		"declared-foreign not shipped": `{"package":"VSLRT","version":"1.0","allowLongNames":true,
+		  "components":{"routines":["VSLRTAP"]},"foreignRoutines":["XWBPRS"]}`,
+		// not a valid routine name.
+		"bad foreign name": `{"package":"VSLRT","version":"1.0","allowLongNames":true,
+		  "components":{"routines":["VSLRTAP","XWBPRS"]},"foreignRoutines":["not a routine"]}`,
+	}
+	for name, js := range bad {
+		if _, err := Parse([]byte(js)); err == nil {
+			t.Errorf("%s: expected an error, got nil", name)
+		}
+	}
+}
+
+// foreignRoutines is OPTIONAL and name-agnostic: a package whose routine namespace
+// differs from its package name (m-stdlib: package MSL, routines STD*) must parse
+// with no declaration — the guard must NOT assume routine names start with the
+// package name. This is the real-spec regression the design turns on.
+func TestParse_ForeignRoutines_NameAgnostic(t *testing.T) {
+	for name, js := range map[string]string{
+		"MSL ships STD* (no declaration needed)": `{"package":"MSL","version":"0.1","allowLongNames":true,
+		  "components":{"routines":["STDASSERT","STDJSON","STDLOG"]}}`,
+		"plain greenfield package": `{"package":"ZZSKEL","version":"1.0","components":{"routines":["ZZSKEL","ZZSKEL1"]}}`,
+	} {
+		if _, err := Parse([]byte(js)); err != nil {
+			t.Errorf("%s: must parse without a foreign declaration: %v", name, err)
+		}
+	}
+}
+
 func TestParse_NotJSON(t *testing.T) {
 	if _, err := Parse([]byte("nope")); err == nil || !strings.Contains(err.Error(), "buildspec") {
 		t.Errorf("want a buildspec parse error, got %v", err)

@@ -49,6 +49,64 @@ func TestMakeBuildPairs_NoInstallHooks(t *testing.T) {
 	}
 }
 
+// F1: a build that declares foreignRoutines embeds them as private ("VPKG",
+// "FOREIGN",<name>) transport nodes so a later `uninstall` can read the
+// declaration OFFLINE from the .KID alone (no sidecar) and refuse to delete a
+// foreign routine it cannot restore. Build.ForeignRoutines() reads them back, in
+// declaration order. EnginePairs strips them so they never reach KIDS filing.
+func TestMakeBuildPairs_ForeignRoutines(t *testing.T) {
+	in := BuildInput{
+		InstallName:     "VSLRT*1.0*1",
+		Namespace:       "VSLRT",
+		Routines:        []RoutineSrc{{Name: "VSLRTAP", Lines: []string{"VSLRTAP ;x", " quit"}}, {Name: "XWBPRS", Lines: []string{"XWBPRS ;x", " quit"}}},
+		ForeignRoutines: []string{"XWBPRS"},
+	}
+	pairs := MakeBuildPairs(in)
+
+	// The private node is present with the documented shape.
+	got := map[string]string{}
+	for _, p := range pairs {
+		got[formatSubscript(p.Subs)] = p.Value
+	}
+	if _, ok := got[`"VPKG","FOREIGN","XWBPRS")`]; !ok {
+		t.Errorf("missing embedded foreign node; pairs: %v", got)
+	}
+
+	// Round-trips through a Build (what ParseKID yields).
+	b := newBuild()
+	for _, p := range pairs {
+		b.Set(p.Subs, p.Value)
+	}
+	if fr := b.ForeignRoutines(); len(fr) != 1 || fr[0] != "XWBPRS" {
+		t.Errorf("Build.ForeignRoutines() = %v, want [XWBPRS]", fr)
+	}
+
+	// EnginePairs strips the VPKG node but keeps the real transport (RTN/VER/…).
+	eng := EnginePairs(pairs)
+	for _, p := range eng {
+		if len(p.Subs) > 0 && p.Subs[0].IsStr() && p.Subs[0].Str() == "VPKG" {
+			t.Errorf("EnginePairs leaked a private VPKG node to the engine: %s", formatSubscript(p.Subs))
+		}
+	}
+	if len(eng) != len(pairs)-1 {
+		t.Errorf("EnginePairs dropped %d nodes, want exactly 1 (the foreign node)", len(pairs)-len(eng))
+	}
+	// A build with no declaration emits no VPKG node and EnginePairs is a no-op.
+	plain := MakeBuildPairs(BuildInput{InstallName: "ZZSKEL*1.0*1", Namespace: "ZZSKEL", Routines: []RoutineSrc{{Name: "ZZSKEL", Lines: []string{"ZZSKEL ;x", " quit"}}}})
+	if eb := EnginePairs(plain); len(eb) != len(plain) {
+		t.Errorf("EnginePairs changed a declaration-free build (%d -> %d)", len(plain), len(eb))
+	}
+	if b2 := (func() *Build {
+		x := newBuild()
+		for _, p := range plain {
+			x.Set(p.Subs, p.Value)
+		}
+		return x
+	})(); len(b2.ForeignRoutines()) != 0 {
+		t.Errorf("declaration-free build reports foreign routines: %v", b2.ForeignRoutines())
+	}
+}
+
 func TestMakeBuildPairs_Deterministic_And_Shape(t *testing.T) {
 	in := BuildInput{
 		InstallName: "ZZSKEL*1.0*1",

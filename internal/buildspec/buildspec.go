@@ -47,6 +47,16 @@ type Spec struct {
 	PostInstall    string          `json:"postInstall,omitempty"` // post-install routine entryref (TAG^RTN), run after component filing
 	ICRs           []ICR           `json:"icrs,omitempty"`        // DBIA/ICR agreements the package relies on
 
+	// ForeignRoutines names the routines this build intentionally OVERWRITES that
+	// are NOT in the package namespace — the high-risk "splice a national routine"
+	// case (the v-rpc-tap build overwrites XWBPRS from package VSLRT). Every routine
+	// whose name does not start with Package must be declared here, or Validate
+	// fails: the one intentional national overwrite is made explicit, reviewable,
+	// and machine-checked, and it is the offline signal class-aware uninstall needs
+	// to REFUSE a bare delete that would brick the foreign routine (see the v-pkg
+	// mixed-build split-reversal proposal, D1).
+	ForeignRoutines []string `json:"foreignRoutines,omitempty"`
+
 	// AllowLongNames opts the build out of the legacy 8-char SAC routine-name
 	// convention, raising the cap to the M engine limit (RoutineNameMaxLong).
 	// The M-naming character rules still bind. This is a deliberate, committed
@@ -575,6 +585,9 @@ func (s *Spec) Validate() error {
 		maxName = RoutineNameMaxLong
 	}
 	if err := validateRoutines(s.Components.Routines, maxName); err != nil {
+		return err
+	}
+	if err := validateForeignRoutines(s.Components.Routines, s.ForeignRoutines, maxName); err != nil {
 		return err
 	}
 	if err := validateParamDefs(s.Components.ParameterDefinitions); err != nil {
@@ -1111,6 +1124,32 @@ func validateRoutines(rtns []string, maxLen int) error {
 	for _, r := range rtns {
 		if !isRoutineName(r, maxLen) {
 			return fmt.Errorf("buildspec: %q is not a valid routine name (≤%d chars, M naming)", r, maxLen)
+		}
+	}
+	return nil
+}
+
+// validateForeignRoutines validates the declared-foreign-overwrite list (D1): the
+// EXPLICIT author declaration that this build intentionally overwrites a routine
+// owned by another package (e.g. VSLRT splicing the national XWBPRS). It is
+// name-agnostic — a package's routine namespace need not match its package name
+// (m-stdlib's package MSL ships STD* routines), so foreignness is NEVER inferred
+// from a name prefix. The check is only internal consistency: every entry must be
+// a valid routine name AND actually shipped by this build (you can only overwrite
+// a routine you ship). The declaration is embedded in the .KID so class-aware
+// uninstall can REFUSE to delete a foreign routine it cannot restore; an
+// UNDECLARED overwrite is caught at install time by the clobber guard, not here.
+func validateForeignRoutines(rtns, foreign []string, maxLen int) error {
+	shipped := make(map[string]bool, len(rtns))
+	for _, r := range rtns {
+		shipped[r] = true
+	}
+	for _, f := range foreign {
+		if !isRoutineName(f, maxLen) {
+			return fmt.Errorf("buildspec: foreignRoutines entry %q is not a valid routine name (≤%d chars, M naming)", f, maxLen)
+		}
+		if !shipped[f] {
+			return fmt.Errorf("buildspec: foreignRoutines entry %q is not in this build's routines — declare only routines the build actually ships and overwrites", f)
 		}
 	}
 	return nil

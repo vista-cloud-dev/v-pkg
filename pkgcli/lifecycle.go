@@ -223,6 +223,11 @@ const stageChunkBytes = 40000
 // one process. The outcome is read from the #9.7 status marker (or the
 // already-installed guard). A staged-count mismatch is surfaced as an error.
 func runInstall(ctx context.Context, cl *mdriver.Client, name, header string, pairs []kids.Pair, runEnvCheck bool, ques []installspec.QuesAnswer, reg *installspec.PkgReg) (installResult, error) {
+	// Strip v-pkg's private metadata (the foreign-overwrite declaration) before it
+	// can reach the engine transport global — it is read offline by uninstall, never
+	// staged into KIDS filing (F1, waterline rule 3: only real KIDS content crosses
+	// the seam). A declaration-free build is unaffected (EnginePairs is a no-op).
+	pairs = kids.EnginePairs(pairs)
 	chunks := installspec.StageChunks(pairs, stageChunkBytes)
 	for i, body := range chunks {
 		if _, _, err := runMScript(ctx, cl, rtnInstall, body); err != nil {
@@ -1118,6 +1123,23 @@ func partitionRoutines(buildRoutines, preimageRoutines []string) (restore, del [
 	return restore, del
 }
 
+// intersectRoutines returns the names in `want` that also appear in `have`, in
+// `want` order. Used by the wrong-sidecar guard to find declared foreign routines
+// that a pre-image failed to capture (i.e. landed in the delete set).
+func intersectRoutines(want, have []string) []string {
+	set := make(map[string]bool, len(have))
+	for _, r := range have {
+		set[r] = true
+	}
+	var out []string
+	for _, r := range want {
+		if set[r] {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 // decideUninstall picks the back-out strategy from the patch's reversibility
 // class and the operator's flags. The rule (patch-existing-routines proposal):
 // NEVER silently delete a side-effecting patch (it orphans the data/side-effects
@@ -1130,7 +1152,13 @@ func partitionRoutines(buildRoutines, preimageRoutines []string) (restore, del [
 // the build adds routines the pre-image does not carry. When a --restore pre-image
 // is in play AND the build also adds greenfield routines, a plain restore would
 // orphan those adds, so we partition (restore the overwritten + delete the added).
-func decideUninstall(class kids.ReversibilityClass, restoreKid, backoutKid string, force, hasGreenfieldAdds bool) (uninstallAction, string) {
+//
+// hasForeignOverwrites (F1) is the build's OWN declaration (read offline from the
+// .KID) that it overwrote a routine owned by another package. With NO pre-image to
+// restore that routine, a delete would BRICK it — so the build is REFUSED, never
+// delete-all. This is checked BEFORE the side-effecting branch so a forced delete
+// of even a side-effecting build still spares the declared-foreign routines.
+func decideUninstall(class kids.ReversibilityClass, restoreKid, backoutKid string, force, hasGreenfieldAdds, hasForeignOverwrites bool) (uninstallAction, string) {
 	if restoreKid != "" && backoutKid != "" {
 		return actRefuse, "specify only one of --restore / --backout"
 	}
@@ -1142,6 +1170,12 @@ func decideUninstall(class kids.ReversibilityClass, restoreKid, backoutKid strin
 	}
 	if backoutKid != "" {
 		return actBackout, "install the provided authored back-out"
+	}
+	if hasForeignOverwrites {
+		if force {
+			return actDelete, "FORCED — deleting ONLY the greenfield-added routine(s); the declared foreign overwrite(s) are NOT reversed (no pre-image) and are LEFT exactly as this patch left them. Re-install with --auto-snapshot to make the overwrite reversible"
+		}
+		return actRefuse, "this build declares a foreign-routine overwrite and no pre-image is available — deleting would BRICK the foreign/national routine it cannot restore. Re-install with --auto-snapshot (or pass --restore <pre-image>) to enable a clean reversal; --force deletes ONLY the greenfield routines and leaves the overwrite in place"
 	}
 	if class == kids.ClassSideEffecting {
 		if force {
@@ -1210,7 +1244,30 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 		restoreSet, deleteSet = partitionRoutines(b.RoutineNames(), preBuild.RoutineNames())
 	}
 
-	action, reason := decideUninstall(rev.Class, restore, c.Backout, c.Force, len(deleteSet) > 0)
+	// F1: the build's OWN declaration (read offline from the .KID) of routines it
+	// overwrote that belong to another package. This is the no-pre-image brick-path
+	// signal — a declared-foreign routine must never be deleted without a pre-image
+	// to restore it. The greenfield subset (build routines that are NOT declared
+	// foreign) is what a forced delete may remove; for a declaration-free build it
+	// is simply every routine (backward compatible).
+	foreign := b.ForeignRoutines()
+	_, greenfieldDelete := partitionRoutines(b.RoutineNames(), foreign)
+
+	// Wrong/incomplete-sidecar guard: with a pre-image in play, every declared
+	// foreign routine MUST be in it (so the partition restores, not deletes, it). A
+	// foreign routine that falls into the delete set means the pre-image does not
+	// carry it — restoring would not reinstate it and the partition would BRICK it.
+	if restore != "" {
+		if missing := intersectRoutines(foreign, deleteSet); len(missing) > 0 {
+			return clikit.Fail(clikit.ExitRefused, "UNINSTALL_REFUSED",
+				fmt.Sprintf("refusing to uninstall %s: the pre-image %s does not contain declared foreign routine(s) %s — "+
+					"it is the wrong or an incomplete snapshot; restoring it would not reinstate them and the partition would delete (brick) them",
+					name, restore, strings.Join(missing, ", ")),
+				"capture a correct pre-image of the overwritten routine(s) with install --auto-snapshot")
+		}
+	}
+
+	action, reason := decideUninstall(rev.Class, restore, c.Backout, c.Force, len(deleteSet) > 0, len(foreign) > 0)
 	res := uninstallReport{Name: name, Class: rev.ClassName, Action: action.String(), Reason: reason, AutoDetected: autoDetected}
 
 	if action == actRefuse {
@@ -1311,11 +1368,18 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 			}
 		}
 	default: // actDelete
-		ur, uerr := runUninstall(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), b.RPCNames(), b.MailGroupNames(), b.ListTemplateNames(), b.HelpFrameNames(), b.HL7AppNames(), b.HLOAppNames(), b.LogicalLinkNames(), fileNumStrings(b))
+		// Delete the GREENFIELD subset only. For a declaration-free build that is
+		// every routine (the original behavior); for a FORCED delete of a build with
+		// declared foreign overwrites it EXCLUDES those — they are left in place, never
+		// bricked, even under --force.
+		ur, uerr := runUninstall(ctx, cl, name, greenfieldDelete, b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), b.RPCNames(), b.MailGroupNames(), b.ListTemplateNames(), b.HelpFrameNames(), b.HL7AppNames(), b.HLOAppNames(), b.LogicalLinkNames(), fileNumStrings(b))
 		if uerr != nil {
 			return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", uerr.Error(), "")
 		}
 		res.Done = ur.Uninstalled
+		if len(foreign) > 0 {
+			res.Deleted = greenfieldDelete // surface the partial-delete subset under --force
+		}
 	}
 
 	// --deregister: clear the #9.4 patch-history footprint a prior

@@ -74,6 +74,11 @@ type BuildReversibility struct {
 	FileManFiles        []string           `json:"fileManFiles,omitempty"` // file numbers with exported entries
 	ShipsFileDD         bool               `json:"shipsFileDD"`
 	FileDDFiles         []string           `json:"fileDDFiles,omitempty"` // file numbers shipped as a FILE (DD/data)
+	// ForeignOverwrites are the routines this build declared (in the .KID) as
+	// overwrites of routines owned by another package — the offline signal (F1)
+	// that class-aware uninstall must NOT delete them without a pre-image to
+	// restore. Read verbatim from the embedded declaration, never inferred.
+	ForeignOverwrites []string `json:"foreignOverwrites,omitempty"`
 }
 
 // Reversibility is the whole-distribution analysis: per-build plus the overall
@@ -149,6 +154,7 @@ func ClassifyBuild(name string, b *Build) BuildReversibility {
 	r.FileManFiles = sortedKeys(krnFiles)
 	r.ShipsFileDD = len(ddFiles) > 0
 	r.FileDDFiles = sortedKeys(ddFiles)
+	r.ForeignOverwrites = b.ForeignRoutines()
 	if len(r.InstallCode) == 0 {
 		r.InstallCode = nil
 	}

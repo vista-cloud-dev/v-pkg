@@ -47,6 +47,35 @@ returns BEFORE touching the engine (offline-decidable). `uninstallReport` JSON
 carries name/class/action/reason/done/status. Added flags Restore/Backout/Force →
 `make contract`. Single-build only (MULTI_BUILD guard).
 
+**Declared-foreign refuse (`F1`, 2026-06-30, closes the BB1 bare-uninstall hole).**
+`actPartition` triggers off a PRE-IMAGE, so the auto-snapshot workflow is safe — but a
+bare `uninstall <splice.kid>` with NO sidecar still fell through to `actDelete` and would
+DELETE the foreign national routine (brick). Closed by an EXPLICIT declaration carried in
+the build, not a name guess: the buildspec gains `foreignRoutines:[…]` (validated only as
+valid + shipped names — `internal/buildspec` `validateForeignRoutines`), `MakeBuildPairs`
+embeds it as a private `("VPKG","FOREIGN",<name>)` transport node, and `runInstall` strips
+all `VPKG` nodes via **`kids.EnginePairs`** so the declaration NEVER reaches KIDS filing
+(waterline rule 3 — only real KIDS content crosses the seam; it is v-pkg metadata that
+rides in the `.KID` purely for offline reasoning). `ClassifyBuild` exposes it as
+`ForeignOverwrites` (read verbatim from the node, via `Build.ForeignRoutines()`).
+`decideUninstall` gains `hasForeignOverwrites` (checked BEFORE the side-effecting branch):
+declared-foreign + NO pre-image → **`actRefuse`** (never delete); `--force` → `actDelete`
+of the GREENFIELD subset ONLY (`partitionRoutines(build, foreign)` second half) — the
+declared-foreign routine is excluded even under `--force`. Plus a wrong/incomplete-sidecar
+guard: with a pre-image present, a declared-foreign routine that lands in the delete set
+(not captured by the snapshot) → REFUSE (`intersectRoutines`). Dual-engine proven
+(`scripts/foreign-refuse-gate.sh` 17/17 vehu+foia: build-guard offline, refuse exit 4 with
+the engine byte-untouched, `--force` deletes greenfield-only). Implements D1+D2+D3 of
+`../proposals/v-pkg-mixed-build-split-reversal.md`.
+
+**GOTCHA — foreignness is NEVER inferred from routine names.** A package's routine
+namespace need not match its package name (m-stdlib's package is `MSL` but it ships `STD*`
+routines; v-stdlib's `VSL` ships `VSL*`). So the "routine whose name doesn't start with the
+package namespace = foreign" prefix-heuristic the original F1 plan proposed is **wrong** —
+it would fail the real `std.build.json`/`vsl.build.json` builds. Detection is by the
+explicit `foreignRoutines` declaration ONLY (embedded in the `.KID`), keeping v-pkg's
+name-agnostic robustness across the 2,000-package corpus. Do NOT re-propose a name guess.
+
 **Smoke-proven offline** against a real side-effecting corpus patch
 (OOPS*2.0*22): no flags → REFUSED exit 4 with guidance, engine untouched. Decision
 logic unit-tested (pkgcli/uninstall_test.go, TestDecideUninstall 11 cases +
