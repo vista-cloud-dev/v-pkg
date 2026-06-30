@@ -5,8 +5,16 @@ by `v pkg` (decompose / assemble / build / install / verify / uninstall /
 snapshot / restore / classify). Layout follows the org standard folder set
 (`~/vista-cloud-dev/CLAUDE.md`).
 
+## Start here
+
+- **[`guides/v-pkg-users-guide.md`](guides/v-pkg-users-guide.md)** — the comprehensive
+  **User's Guide**: background research (a live `#9.6`/`#9.7`/`#9.4` probe of vehu + foia,
+  the package/payload/reversibility taxonomy, and a stock-KIDS gap analysis with v-pkg's
+  remediation of each gap), plus the full command summary and day-to-day workflows.
+
 ## Folders
 
+- **`guides/`** — task-oriented how-to docs (start with the User's Guide above).
 - **`design/`** — this repo's own design + reference notes:
   - [`architecture.md`](design/architecture.md) — how `v pkg` assembles /
     disassembles a `.KID`, the data model, and the round-trip guarantee.

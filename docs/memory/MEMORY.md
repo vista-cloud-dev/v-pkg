@@ -2,6 +2,8 @@
 
 One line per memory file. Content lives in the files, not here.
 
+- User's Guide → **canon is `../guides/v-pkg-users-guide.md`** (comprehensive: background research + command summary + workflows). Durable live-probe inventory (2026-06-30, via driver stack): **vehu (YDB)** #9.6 BUILD=12,955 / #9.7 INSTALL=14,345 / #9.4 PACKAGE=470; **foia (IRIS)** 13,829 / 13,100 / 157. Confirms the 12,955-build vehu count the gap analysis classifies. Reversibility split (both corpora): pure-overwrite ≈ a third (28–39%), side-effecting majority (61–72%). Gap-analysis + remediation table synthesizes [[reversibility-classifier]] + the verifiable-safety increments [[half-install-heal]]/[[transport-checksum]]/[[sidecar-integrity]]/[[install-attestation]].
+
 - kids-coverage-analysis → **canon is the proposal** `../proposals/v-pkg-kids-coverage-analysis.md` (adversarial KIDS coverage analysis; Track A install-fidelity vs Track B authoring). Live gotchas: [[install-fidelity-spike]], [[reversibility-classifier]], [[fileman-dd-component]], [[krn-param-def-component]].
 - [clikit-grouped-help](clikit-grouped-help.md) — grouped help via `group:""` tags (KIDS-lifecycle categories) + the `explore` palette; mount `ExploreCmd` at the standalone root; v-cli must co-pin clikit + a v-pkg tag that carries the groups.
 - [bespoke-installer-forbidden](bespoke-installer-forbidden.md) — **⛔ HARD DIRECTIVE (owner 2026-06-25):** NEVER a bespoke installer/patcher; install + back-out is strictly `v pkg install` / `uninstall` of a real KIDS build.
