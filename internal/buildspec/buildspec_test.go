@@ -296,7 +296,7 @@ func TestParse_InstallHooks_Invalid(t *testing.T) {
 	cases := map[string]string{
 		"envCheck has a tag":   `"envCheck":"PRE^ZZA1P"`, // env-check must be a bare routine
 		"envCheck lowercase":   `"envCheck":"lower"`,
-		"preInstall bad tag":   `"preInstall":"lower^ZZA1P"`,
+		"preInstall bad tag":   `"preInstall":"bad-tag^ZZA1P"`, // hyphen is not an M label char (lowercase IS now valid)
 		"preInstall empty rtn": `"preInstall":"PRE^"`,
 		"postInstall 3 parts":  `"postInstall":"A^B^ZZA1P"`,
 	}
@@ -514,6 +514,32 @@ func TestParse_Options_Invalid(t *testing.T) {
 		if _, err := Parse([]byte(js)); err == nil {
 			t.Errorf("%s: expected an error, got nil", name)
 		}
+	}
+}
+
+// A modern lowercase entry tag (run^VSLRTRP) is a valid M line label — the reaper's
+// own TaskMan ZTRTN uses exactly this form and runs on the live engine — so a
+// run-routine OPTION (and pre/post-install hooks) must accept it. The ROUTINE half
+// stays uppercase (routine files are uppercase); only the tag is case-relaxed.
+func TestParse_Options_LowercaseEntryTagAccepted(t *testing.T) {
+	js := `{"package":"VSLRT","version":"1.0","allowLongNames":true,"components":{
+	  "routines":["VSLRTRP"],
+	  "options":[{"name":"VSLRT REAPER","menuText":"VSL RPC TAP reaper watchdog","type":"run routine","routine":"run^VSLRTRP"}]
+	}}`
+	s, err := Parse([]byte(js))
+	if err != nil {
+		t.Fatalf("lowercase entry tag run^VSLRTRP rejected: %v", err)
+	}
+	if got := s.Components.Options[0].Routine; got != "run^VSLRTRP" {
+		t.Errorf("routine = %q, want run^VSLRTRP", got)
+	}
+	// A lowercase tag on a pre/post-install hook is likewise valid.
+	if _, err := Parse([]byte(`{"package":"VSLRT","version":"1.0","components":{"routines":["VSLRTRP"]},"postInstall":"start^VSLRTRP"}`)); err != nil {
+		t.Errorf("lowercase postInstall tag start^VSLRTRP rejected: %v", err)
+	}
+	// A lowercase ROUTINE name stays invalid (routine files are uppercase).
+	if _, err := Parse([]byte(`{"package":"VSLRT","version":"1.0","components":{"options":[{"name":"VSLRT R","type":"run routine","routine":"run^vslrtrp"}]}}`)); err == nil {
+		t.Error("lowercase routine name run^vslrtrp should still be rejected")
 	}
 }
 

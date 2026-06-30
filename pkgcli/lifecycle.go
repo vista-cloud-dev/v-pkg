@@ -310,6 +310,16 @@ func decideInstall(hasExisting bool, snapshot string, allowOverwrite bool) (inst
 	return instRefuse, "would overwrite existing national routine(s) with no pre-image — pass --snapshot <out.kids> to capture one (enables uninstall --restore), or --allow-overwrite to clobber without one"
 }
 
+// snapshotShouldWrite reports whether to capture + write the pre-image sidecar.
+// Only when the install will actually overwrite existing routines (instSnapshotProceed)
+// AND the build is NOT already installed: a redundant install of an already-installed
+// build would snapshot the routines in their post-install (overwritten) state and
+// clobber the genuine pre-image — destroying the back-out for a foreign/national
+// overwrite. So a snapshot is captured exactly once, against the true pre-install state.
+func snapshotShouldWrite(action installAction, alreadyInstalled bool) bool {
+	return action == instSnapshotProceed && !alreadyInstalled
+}
+
 // liveInstallInput is the engine-write request for liveInstall — a named build's
 // transport pairs plus the routines it lands on and the snapshot policy.
 type liveInstallInput struct {
@@ -367,6 +377,22 @@ func liveInstall(ctx context.Context, cl *mdriver.Client, in liveInstallInput) (
 			"confirm the driver connection before installing")
 	}
 	action, reason := decideInstall(len(captured) > 0, in.snapshotPath, in.allowOverwrite)
+
+	// Pre-image protection: a redundant install of an already-installed build must
+	// NOT re-capture the snapshot — the live routines are now the post-install
+	// (overwritten) versions, so writing them as the "pre-image" would clobber the
+	// genuine one and destroy the foreign/national back-out. Probe install state
+	// when snapshotting; if already installed, skip the write (runInstall reports
+	// already-installed and changes nothing — the existing sidecar is preserved).
+	alreadyInstalled := false
+	if in.snapshotPath != "" {
+		state, herr := probeHeal(ctx, cl, in.name)
+		if herr != nil {
+			return installReport{Name: in.name, Heal: heal}, clikit.Fail(clikit.ExitRuntime, "INSTALL_PROBE_FAILED", herr.Error(),
+				"confirm the driver connection before installing")
+		}
+		alreadyInstalled = state == healHealthy
+	}
 	res := installReport{
 		Name: in.name, Class: in.className, Action: action.String(), Reason: reason,
 		Overwrites: routineNames(captured), Greenfield: greenfield, Heal: heal,
@@ -382,7 +408,7 @@ func liveInstall(ctx context.Context, cl *mdriver.Client, in liveInstallInput) (
 			fmt.Sprintf("refusing to install %s: %s", in.name, reason),
 			"pass --snapshot <out.kids> (or --auto-snapshot) to capture a pre-image first, or --allow-overwrite")
 	}
-	if action == instSnapshotProceed {
+	if snapshotShouldWrite(action, alreadyInstalled) {
 		snapName := snapshotName(in.name, "")
 		pairs := buildSnapshotPairs(snapName, snapshotNamespace(in.name), captured)
 		if werr := kids.WriteKID([]string{snapName}, map[string][]kids.Pair{snapName: pairs}, in.snapshotPath); werr != nil {

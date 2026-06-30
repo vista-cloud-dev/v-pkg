@@ -533,7 +533,7 @@ var (
 	reHL7Code   = regexp.MustCompile(`^[A-Z][A-Z0-9]*$`)                    // #779.21 HL7 MESSAGE TYPE / EVENT code (uppercase alnum)
 	reFileName  = regexp.MustCompile(`^[A-Z][A-Z0-9 ]*[A-Z0-9]$|^[A-Z]$`)   // FileMan FILE .01 name (uppercase, internal spaces)
 	reGlobalRt  = regexp.MustCompile(`^\^%?[A-Z][A-Z0-9]*\(.*,$`)           // open global root, e.g. ^DIZ(999000,
-	reLabel     = regexp.MustCompile(`^[A-Z][A-Z0-9]*$`)                    // M line label (entryref tag)
+	reLabel     = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*$`)              // M line label (entryref tag) — lowercase allowed (modern style; e.g. run^VSLRTRP)
 )
 
 // Load reads and validates a build spec from a kids/<pkg>.build.json file.
