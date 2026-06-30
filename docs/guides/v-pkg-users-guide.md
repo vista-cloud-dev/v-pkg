@@ -31,25 +31,32 @@ manual: setup, the full command summary, and the day-to-day workflows.
 > fake a reversal it cannot soundly compute, and a tamper-evident install
 > attestation ledger.**
 
+> ### Reliability, in numbers
+> **Proven, not promised — full detail in [§11 Validation & verification](#11-validation--verification--how-thoroughly-v-pkg-is-tested):**
+>
+> - **~500 automated pass/fail assertions** — **222 Go test functions → 291 subtests**, race-detector on, every CI push.
+> - **2,404 real KIDS distributions** (the entire WorldVistA mirror, 157 packages) swept offline, plus **14,296 routine-checksum verifications**.
+> - **Dual-engine live gates** on **YottaDB *and* InterSystems IRIS** — `stress` **56/56**, foreign-refuse **24/24**, partition **17/17** on *each* engine.
+> - **Every command** covered at the unit tier and exercised live; every safety feature proven against an intentionally-broken patch.
+
 ---
 
 ## Table of Contents
 
-**Part I — Background Research**
-1. [What KIDS is, and how stock VistA installs software](#1-what-kids-is-and-how-stock-vista-installs-software)
-2. [The real VistA inventory — a live probe of two production-fidelity systems](#2-the-real-vista-inventory--a-live-probe-of-two-production-fidelity-systems)
-3. [Categories of packages installed in a real VistA](#3-categories-of-packages-installed-in-a-real-vista)
-4. [Gap analysis — how the stock installation process works, and where it falls short](#4-gap-analysis--how-the-stock-installation-process-works-and-where-it-falls-short)
-5. [How v-pkg remediates each gap](#5-how-v-pkg-remediates-each-gap)
-
-**Part II — Using v-pkg**
-6. [Setup — building the CLI and connecting to an engine](#6-setup--building-the-cli-and-connecting-to-an-engine)
-7. [Command summary — every verb, its action, and its use case](#7-command-summary--every-verb-its-action-and-its-use-case)
-8. [Core workflows](#8-core-workflows)
-9. [Install attestation (the audit ledger)](#9-install-attestation-the-audit-ledger)
-10. [Exit codes — the machine-checkable safety contract](#10-exit-codes--the-machine-checkable-safety-contract)
-11. [Validation & verification — how thoroughly v-pkg is tested](#11-validation--verification--how-thoroughly-v-pkg-is-tested)
-12. [Reference — environment, files, and flags](#12-reference--environment-files-and-flags)
+- **Part I — Background Research**
+    1. [What KIDS is, and how stock VistA installs software](#1-what-kids-is-and-how-stock-vista-installs-software)
+    2. [The real VistA inventory — a live probe of two production-fidelity systems](#2-the-real-vista-inventory--a-live-probe-of-two-production-fidelity-systems)
+    3. [Categories of packages installed in a real VistA](#3-categories-of-packages-installed-in-a-real-vista)
+    4. [Gap analysis — how the stock installation process works, and where it falls short](#4-gap-analysis--how-the-stock-installation-process-works-and-where-it-falls-short)
+    5. [How v-pkg remediates each gap](#5-how-v-pkg-remediates-each-gap)
+- **Part II — Using v-pkg**
+    6. [Setup — building the CLI and connecting to an engine](#6-setup--building-the-cli-and-connecting-to-an-engine)
+    7. [Command summary — every verb, its action, and its use case](#7-command-summary--every-verb-its-action-and-its-use-case)
+    8. [Core workflows](#8-core-workflows)
+    9. [Install attestation (the audit ledger)](#9-install-attestation-the-audit-ledger)
+    10. [Exit codes — the machine-checkable safety contract](#10-exit-codes--the-machine-checkable-safety-contract)
+    11. [Validation & verification — how thoroughly v-pkg is tested](#11-validation--verification--how-thoroughly-v-pkg-is-tested)
+    12. [Reference — environment, files, and flags](#12-reference--environment-files-and-flags)
 
 ---
 
