@@ -37,6 +37,7 @@ const (
 	rtnVerify    = "ZVPKGVFY"
 	rtnUninstall = "ZVPKGUNI"
 	rtnRead      = "ZVPKGRD"
+	rtnHeal      = "ZVPKGHL"
 )
 
 // engineConn selects which engine driver to drive and over which transport — the
@@ -319,6 +320,7 @@ type liveInstallInput struct {
 	pairs          []kids.Pair
 	snapshotPath   string // "" = no pre-image requested
 	allowOverwrite bool
+	heal           bool                     // --heal: purge a corrupt half-install (§7.1) before installing
 	runEnvCheck    bool                     // run the build's env-check + Required-Build enforcement before filing (A.1.2)
 	quesAnswers    []installspec.QuesAnswer // pre-answered build install questions (A.1.3)
 	pkgReg         *installspec.PkgReg      // optional PACKAGE #9.4 footprint to write after filing (A.3)
@@ -332,6 +334,32 @@ type liveInstallInput struct {
 // refuse / I/O failure; the caller renders the report and maps post-run install
 // state.
 func liveInstall(ctx context.Context, cl *mdriver.Client, in liveInstallInput) (installReport, *clikit.Error) {
+	// --heal: if a corrupt half-install (§7.1) is blocking reinstall, purge that
+	// PROVEN-corrupt entry first — never a healthy one. Runs before the overwrite
+	// probe so a clean reinstall proceeds against a cleared #9.7 slot.
+	var heal *healResult
+	if in.heal {
+		state, herr := probeHeal(ctx, cl, in.name)
+		if herr != nil {
+			return installReport{Name: in.name}, clikit.Fail(clikit.ExitRuntime, "HEAL_PROBE_FAILED", herr.Error(),
+				"confirm the driver connection before healing")
+		}
+		action, reason := decideHeal(state)
+		heal = &healResult{State: state.String(), Action: action.String(), Reason: reason}
+		switch action {
+		case healRefuse:
+			return installReport{Name: in.name, Heal: heal}, clikit.Fail(clikit.ExitRefused, "HEAL_REFUSED",
+				fmt.Sprintf("refusing to heal %s: %s", in.name, reason),
+				"`v pkg uninstall` removes a healthy install; --heal only repairs a corrupt half-install")
+		case healPurgeProceed:
+			purged, perr := purgeHeal(ctx, cl, in.name)
+			if perr != nil {
+				return installReport{Name: in.name, Heal: heal}, clikit.Fail(clikit.ExitRuntime, "HEAL_FAILED", perr.Error(), "")
+			}
+			heal.Purged = purged
+		}
+	}
+
 	captured, greenfield, err := captureRoutinePreimages(ctx, cl, in.routineNames)
 	if err != nil {
 		return installReport{Name: in.name}, clikit.Fail(clikit.ExitRuntime, "READ_FAILED", err.Error(),
@@ -340,7 +368,7 @@ func liveInstall(ctx context.Context, cl *mdriver.Client, in liveInstallInput) (
 	action, reason := decideInstall(len(captured) > 0, in.snapshotPath, in.allowOverwrite)
 	res := installReport{
 		Name: in.name, Class: in.className, Action: action.String(), Reason: reason,
-		Overwrites: routineNames(captured), Greenfield: greenfield,
+		Overwrites: routineNames(captured), Greenfield: greenfield, Heal: heal,
 	}
 	if action == instRefuse {
 		return res, clikit.Fail(clikit.ExitRefused, "INSTALL_REFUSED",
@@ -373,6 +401,7 @@ type installCmd struct {
 	Snapshot        string   `help:"Capture the pre-image of any routine this install overwrites to this .KID before installing (enables uninstall --restore)."`
 	AutoSnapshot    bool     `help:"Like --snapshot, but to the conventional sidecar path (<kid>.preimage.kids) that uninstall auto-detects."`
 	AllowOverwrite  bool     `help:"Overwrite existing routines WITHOUT capturing a pre-image (unsafe: uninstall cannot then restore them)."`
+	Heal            bool     `help:"Before installing, purge a corrupt half-install (a #9.7 entry with no usable 0-node that falsely blocks reinstall as 'already-installed'); never touches a healthy install."`
 	SkipEnvCheck    bool     `help:"Skip the build's environment-check routine + Required-Build (#9.611) enforcement before filing (default: run them, KIDS-faithful)."`
 	Answer          []string `help:"Pre-answer a build install question as NAME=VALUE (the internal answer $$ANSWER^XPDIQ returns); repeatable." placeholder:"NAME=VALUE"`
 	RegisterPackage string   `help:"Record the PACKAGE #9.4 footprint under this long NAME (find-or-create by the install-name prefix; stamps VERSION + PATCH APPLICATION HISTORY so $$VER/$$PATCH^XPDUTL see the install)." placeholder:"PACKAGE NAME"`
@@ -442,17 +471,18 @@ func parseAnswers(flags []string) ([]installspec.QuesAnswer, error) {
 }
 
 type installReport struct {
-	Name       string   `json:"name"`
-	Class      string   `json:"class"`
-	Action     string   `json:"action"`
-	Reason     string   `json:"reason"`
-	Overwrites []string `json:"overwrites,omitempty"` // existing routines this install replaces
-	Greenfield []string `json:"greenfield,omitempty"` // routines this install newly adds
-	Snapshot   string   `json:"snapshot,omitempty"`   // pre-image .KID written, if any
-	Installed  bool     `json:"installed"`
-	Status     int      `json:"status"`
-	Error      string   `json:"error,omitempty"`
-	PackageIEN string   `json:"packageIen,omitempty"` // #9.4 entry the A.3 footprint stamped, if any
+	Name       string      `json:"name"`
+	Class      string      `json:"class"`
+	Action     string      `json:"action"`
+	Reason     string      `json:"reason"`
+	Heal       *healResult `json:"heal,omitempty"`       // --heal probe/purge of a corrupt half-install (§7.1)
+	Overwrites []string    `json:"overwrites,omitempty"` // existing routines this install replaces
+	Greenfield []string    `json:"greenfield,omitempty"` // routines this install newly adds
+	Snapshot   string      `json:"snapshot,omitempty"`   // pre-image .KID written, if any
+	Installed  bool        `json:"installed"`
+	Status     int         `json:"status"`
+	Error      string      `json:"error,omitempty"`
+	PackageIEN string      `json:"packageIen,omitempty"` // #9.4 entry the A.3 footprint stamped, if any
 }
 
 // installSequence installs each named build in order through the one class-aware
@@ -530,7 +560,7 @@ func (c *installCmd) Run(cc *clikit.Context) error {
 	res, ferr := liveInstall(ctx, cl, liveInstallInput{
 		name: name, header: name + " via v pkg install", className: rev.ClassName,
 		routineNames: b.RoutineNames(), pairs: b.Pairs(),
-		snapshotPath: snapshot, allowOverwrite: c.AllowOverwrite,
+		snapshotPath: snapshot, allowOverwrite: c.AllowOverwrite, heal: c.Heal,
 		runEnvCheck: !c.SkipEnvCheck, quesAnswers: answers,
 		pkgReg: packageReg(name, c.RegisterPackage),
 	})
@@ -540,6 +570,9 @@ func (c *installCmd) Run(cc *clikit.Context) error {
 
 	if err := cc.Result(res, func() {
 		cc.Title("pkg install — " + c.Engine)
+		if res.Heal != nil && res.Heal.Purged {
+			fmt.Fprintf(cc.Stdout, "  %s purged a corrupt half-install of %s before reinstalling\n", cc.Accent("heal"), res.Name)
+		}
 		if len(res.Overwrites) > 0 {
 			fmt.Fprintf(cc.Stdout, "  %s overwrites: %s\n", cc.Accent("patch"), strings.Join(res.Overwrites, ", "))
 		}
@@ -596,7 +629,7 @@ func (c *installCmd) runMulti(ctx context.Context, cc *clikit.Context, cl *mdriv
 			name: name, header: name + " via v pkg install",
 			className:    kids.ClassifyBuild(name, b).ClassName,
 			routineNames: b.RoutineNames(), pairs: b.Pairs(),
-			snapshotPath: snap, allowOverwrite: c.AllowOverwrite,
+			snapshotPath: snap, allowOverwrite: c.AllowOverwrite, heal: c.Heal,
 			runEnvCheck: !c.SkipEnvCheck, quesAnswers: answers,
 		}
 	}

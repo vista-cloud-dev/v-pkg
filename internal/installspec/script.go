@@ -214,6 +214,51 @@ func FinalInstallScript(name, header string, nPairs int, runEnvCheck bool, ques 
 	return b.String()
 }
 
+// HealDetectScript returns READ-ONLY M source that probes a #9.7 INSTALL entry for
+// the half-install-corruption signal (kids-installation-automation.md §7.1): a prior
+// aborted install can leave the "B" xref (so the re-install guard falsely reports
+// already-installed) but no usable 0-node / a status that never reached 3. It emits
+// the IEN, whether the 0-node exists, and the status (piece 9) as ResultMarker lines;
+// the Go side grades them (classifyHeal). It mutates nothing — the purge is a separate,
+// guarded step (HealPurgeScript).
+func HealDetectScript(name string) string {
+	var b strings.Builder
+	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
+	nameLit := kids.MString(name)
+	w(`S U="^"`)
+	w(`S XPDA=$O(^XPD(9.7,"B",` + nameLit + `,0))`)
+	w(`W "` + ResultMarker + `ien=",+XPDA,!`)
+	w(`W "` + ResultMarker + `zero=",$S($D(^XPD(9.7,+XPDA,0)):1,1:0),!`)
+	w(`W "` + ResultMarker + `status=",$P($G(^XPD(9.7,+XPDA,0)),U,9),!`)
+	return b.String()
+}
+
+// HealPurgeScript returns M source that purges a PROVEN-corrupt #9.7 entry by IEN so
+// a clean reinstall can proceed: the entry subtree (which carries the "ASP"/"INI"/
+// "INIT" subnodes a half-install wrote), the "B" + "ASP" cross-references, and the
+// staged ^XTMP("XPDI",ien) transport global (§7.1's documented manual purge — DIK
+// cannot clean an entry whose 0-node is gone). Heal is a TARGETED repair, never a
+// blanket force-delete: the script re-confirms corruption engine-side and REFUSES a
+// healthy (status 3) entry, so a healthy install can never be purged even if the Go
+// side were wrong about the state. Removing a healthy install is uninstall's job.
+func HealPurgeScript(name string) string {
+	var b strings.Builder
+	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
+	nameLit := kids.MString(name)
+	w(`S U="^",DUZ=1,DUZ(0)="@"`)
+	w(`S XPDA=$O(^XPD(9.7,"B",` + nameLit + `,0))`)
+	// Nothing to heal — no entry at all.
+	w(`I 'XPDA W "` + ResultMarker + `healed=0",! Q`)
+	// Defense in depth: never purge a healthy install (0-node present AND status 3).
+	w(`I $D(^XPD(9.7,XPDA,0)),$P(^XPD(9.7,XPDA,0),U,9)=3 W "` + ResultMarker + `error=healthy-refused",! Q`)
+	w(`K ^XPD(9.7,XPDA)`)
+	w(`K ^XPD(9.7,"B",` + nameLit + `,XPDA)`)
+	w(`K ^XPD(9.7,"ASP",XPDA)`)
+	w(`K ^XTMP("XPDI",XPDA)`)
+	w(`W "` + ResultMarker + `healed=1",!`)
+	return b.String()
+}
+
 // VerifyScript returns M source that reports whether name is installed: the
 // #9.7 INSTALL presence + status (piece 9; 3 = "Install Completed"), per routine
 // whether it is loaded ($T probe), per entry COMPONENT whether a record by that

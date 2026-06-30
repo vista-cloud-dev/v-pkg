@@ -232,6 +232,58 @@ func TestFinalInstallScript_QuesAnswers(t *testing.T) {
 	}
 }
 
+// HealDetectScript is a READ-ONLY probe: it emits the #9.7 IEN, whether the entry
+// has a 0-node, and the install status (piece 9) so the Go side can grade the entry
+// (classifyHeal) without mutating anything.
+func TestHealDetectScript(t *testing.T) {
+	got := HealDetectScript("A2AP*1.0*0")
+	for _, want := range []string{
+		`S XPDA=$O(^XPD(9.7,"B","A2AP*1.0*0",0))`, // resolve the IEN from the "B" xref
+		ResultMarker + `ien=`,                     // the IEN (0 = not present)
+		`$D(^XPD(9.7,+XPDA,0))`,                   // 0-node presence test
+		ResultMarker + `zero=`,                    // 0-node present? (the corrupt signal)
+		ResultMarker + `status=`,                  // #9.7 status piece 9
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("HealDetectScript missing %q\n---\n%s", want, got)
+		}
+	}
+	// It must be read-only — no KILL of the #9.7 entry or transport global.
+	for _, forbidden := range []string{`K ^XPD(9.7`, `K ^XTMP`} {
+		if strings.Contains(got, forbidden) {
+			t.Errorf("HealDetectScript must be read-only, found %q\n---\n%s", forbidden, got)
+		}
+	}
+}
+
+// HealPurgeScript purges a PROVEN-corrupt #9.7 entry by IEN — the entry subtree, the
+// "B" and "ASP" cross-references, and the staged ^XTMP("XPDI",ien) transport — so a
+// clean reinstall can proceed (kids-installation-automation.md §7.1). Defense in
+// depth: it re-confirms corruption engine-side and REFUSES a healthy (status 3)
+// entry, so it can never blanket-delete a healthy install.
+func TestHealPurgeScript(t *testing.T) {
+	got := HealPurgeScript("A2AP*1.0*0")
+	for _, want := range []string{
+		`DUZ(0)="@"`, // FM priv for the global KILLs
+		`S XPDA=$O(^XPD(9.7,"B","A2AP*1.0*0",0))`, // resolve the IEN
+		`$P(^XPD(9.7,XPDA,0),U,9)=3`,              // re-confirm: a status-3 entry is healthy
+		ResultMarker + `error=healthy-refused`,    // …refuse to purge it
+		`K ^XPD(9.7,XPDA)`,                        // purge the entry subtree (ASP/INI/INIT subnodes)
+		`K ^XPD(9.7,"B","A2AP*1.0*0",XPDA)`,       // the "B" xref
+		`K ^XPD(9.7,"ASP",XPDA)`,                  // the "ASP" install-sequence xref
+		`K ^XTMP("XPDI",XPDA)`,                    // the staged transport global
+		ResultMarker + `healed=`,                  // outcome marker
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("HealPurgeScript missing %q\n---\n%s", want, got)
+		}
+	}
+	// The healthy-refused guard must come BEFORE any KILL.
+	if iG, iK := strings.Index(got, `error=healthy-refused`), strings.Index(got, `K ^XPD(9.7,XPDA)`); iG < 0 || iK < 0 || iG > iK {
+		t.Errorf("healthy-refused guard (%d) must precede the purge (%d)", iG, iK)
+	}
+}
+
 func TestVerifyScript(t *testing.T) {
 	got := VerifyScript("ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil)
 	for _, want := range []string{

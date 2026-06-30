@@ -140,6 +140,9 @@ expect 0 "verify --drift MSL (applied)" verify  "$MSL" --drift   # MSL is space-
 note "ADVERSARIAL: a second install with no --allow-overwrite must REFUSE (no silent clobber)"
 expect 4 "install MSL again, no overwrite flag → refused" install "$MSL" --register-package "M STANDARD LIBRARY"
 
+note "ADVERSARIAL: --heal must REFUSE a HEALTHY install (heal repairs only a corrupt half-install, never clobbers)"
+expect 4 "install MSL --heal on a healthy install → refused" install "$MSL" --heal --allow-overwrite
+
 note "install VSL (Required-Build MSL present)"
 expect 0 "install VSL (--register)" install "$VSL" --allow-overwrite --register-package "VISTA STANDARD LIBRARY"
 expect 0 "verify VSL (content)"     verify  "$VSL"
