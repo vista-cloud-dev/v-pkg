@@ -104,6 +104,35 @@ func TestClassifyBuild(t *testing.T) {
 			wantClass: ClassSideEffecting, wantRtns: true, wantKRN: true,
 		},
 		{
+			// Routines are registered as KRN components under file #9.8 in EVERY
+			// real build; that registration must NOT count as a side-effecting
+			// FileMan entry (else every routine-bearing build is side-effecting).
+			name: "routine registration as KRN 9.8 stays pure-overwrite",
+			build: buildFrom(
+				[2]string{`"RTN","XUSKAAJ1")`, `0^1`},
+				[2]string{`"BLD",1103,"KRN",9.8,"NM",0)`, ``},
+				[2]string{`"BLD",1103,"KRN",9.8,"NM",1,0)`, `XUSKAAJ1`},
+			),
+			wantClass: ClassPureOverwrite, wantRtns: true, wantKRN: false,
+		},
+		{
+			// The reliable per-build signal: a build DECLARES a FileMan component
+			// in its KRN multiple ("BLD",<n>,"KRN",<file>,"NM",<seq>,0)) even when
+			// the top-level "KRN",<file>,<ien>,0) export region is absent — the
+			// common real-.KID shape (corpus: OPTION 39% via NM vs 13% via the
+			// top-level form). Keying only on the top-level form under-detects
+			// FileMan entries and over-reports the reversible pure-overwrite class.
+			name: "declared KRN component (BLD..KRN..NM, no top-level) -> side-effecting",
+			build: buildFrom(
+				[2]string{`"RTN","ZZ")`, `0^1`},
+				[2]string{`"BLD",1,"KRN",0)`, ``},                  // KRN section header (not an entry)
+				[2]string{`"BLD",1,"KRN",19,0)`, `OPTION`},         // component-type header (not an entry)
+				[2]string{`"BLD",1,"KRN",19,"NM",0)`, ``},          // NM multiple header (not an entry)
+				[2]string{`"BLD",1,"KRN",19,"NM",1,0)`, `ZZ MENU`}, // a declared OPTION entry
+			),
+			wantClass: ClassSideEffecting, wantRtns: true, wantKRN: true,
+		},
+		{
 			name: "FileMan FILE (DD/data) shipment -> side-effecting",
 			build: buildFrom(
 				[2]string{`"RTN","ZZ")`, `0^1`},

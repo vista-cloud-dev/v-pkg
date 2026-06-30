@@ -20,8 +20,16 @@ node-shape probes on `Build.Pairs()`:
   {INI=env-check, INIT=post-install, PRE=pre-install, PRET=pre-transport}. **INID
   is run-timing FLAGS (`^y^n`), NOT code — excluded.** Empty value = declared but
   no routine = not code.
-- FileMan entry: top-level `"KRN",<file#>,<ien>,0)` (`len>=4`, s[1]&s[2] numeric,
-  s[3] zero) — excludes the `"KRN",<file#>,0)` header and `"KRN",..,"B",..` xrefs.
+- FileMan entry: TWO complementary probes (2026-06-30) — (a) top-level
+  `"KRN",<file#>,<ien>,0)` (`len>=4`, s[1]&s[2] numeric, s[3] zero) AND (b) the
+  per-build declaration `"BLD",<n>,"KRN",<file#>,"NM",<seq>,0)` (`len>=6`, s[3]
+  numeric & **≠9.8**, s[4]=="NM", s[5] numeric non-zero). The top-level region is
+  often ABSENT in real `.KID`s (corpus OPTION 13% there vs 39% via the `BLD…NM`
+  form), so probing only (a) under-detected components → over-reported
+  PureOverwrite (the UNSAFE skew). **#9.8 ROUTINE is excluded from (b)** — every
+  build lists its routines as KRN 9.8 entries; counting them would mark every
+  routine build side-effecting. Excludes the `"KRN",<file#>,0)`/`…"NM",0)` headers
+  and `…,"B",…` xrefs.
 - FILE/DD: `"BLD",<n>,4,<file#>,0)` (`len>=5`, s[2]==int 4, s[3] numeric, s[4]
   zero) — excludes the `"BLD",<n>,4,0)` multiple header. File numbers are decimals.
 Class = SideEffecting iff installCode|fileManEntries|fileDD; overall = the
@@ -36,10 +44,15 @@ command surface → had to `make contract` to regenerate `dist/v-contract.json`
 **`make corpus`** (CORPUS ?= ~/data/kids-patches/VistA/Packages) — `internal/kids/
 corpus_test.go` `TestRoundtripCorpus`, gated on `VPKG_KIDS_CORPUS` (SKIPs in CI; no
 corpus committed). Round-trips EVERY local KIDS + classifies each in one walk.
-**Proven over all 2,404 WorldVistA distributions: PASS=2404, DRIFT=0, ERROR=0;
-reversibility pure-overwrite=873 (36%), side-effecting=1531 (63%)** — matches the
-independent analyze.py count (847/1557) within ~26 files (analyze.py over-counted
-install code via human-readable strings; the node-based classifier is more precise).
+**Proven over all WorldVistA distributions: PASS=2406, DRIFT=0, ERROR=0;
+reversibility pure-overwrite=874 (36%), side-effecting=1532 (63%)** (after the
+2026-06-30 per-build KRN probe). The *distribution* aggregate stays ~36% — the
+per-build probe fix flips component-only builds that were already side-effecting at
+distribution granularity — but the *per-build* `ShipsFileManEntries` verdict is now
+accurate (the safety-relevant change: it gates snapshot `completeUndo` + uninstall
+routing). analyze.py reports 28% by additionally counting declared-but-empty hooks
+and header text the node classifier deliberately rejects, so 28% is the analyzer's
+number, not a classifier target.
 
 **Why/how to apply:** `classify` is the prerequisite for the engine-bound verbs —
 class-aware `uninstall` must auto-restore ONLY for PureOverwrite (the 36%), run the

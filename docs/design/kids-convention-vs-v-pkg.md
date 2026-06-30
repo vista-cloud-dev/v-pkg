@@ -339,11 +339,19 @@ irreversible engine mutation that you cannot honestly undo.* Gates assert it
 
 ## 10. Honest gaps
 
-- **The committed classifier (`reversibility.go`) uses an older top-level-`KRN` probe (~36 %
-  pure-overwrite); the corrected corpus probe is 28 %.** Aligning it is tracked separately —
-  it gates real uninstall behavior, so it is changed deliberately, not casually. Either way
-  the class is a minority; the conservative skew (calling *more* builds side-effecting) is
-  the safe direction.
+- **Classifier FileMan-entry detection — FIXED 2026-06-30.** The committed classifier
+  previously keyed only on the top-level `"KRN",<file>,<ien>,0)` export region, which is
+  frequently absent in real `.KID`s (corpus: OPTION 13 % there vs 39 % via the per-build
+  `"BLD",<n>,"KRN",<file>,"NM"` declaration). It now probes **both** (excluding #9.8, the
+  routine payload), so a component-shipping build with no install code and no top-level
+  export region — previously mis-typed *pure-overwrite*, which would have offered
+  snapshot/restore as a complete undo and orphaned the filed entry — is now correctly
+  *side-effecting* (regression-locked by `TestClassifyBuild`). The corpus *distribution*
+  aggregate stays ~36 % pure (those marginal builds were already side-effecting via install
+  code); `analyze.py`'s 28 % additionally counts declared-but-empty hooks and header text,
+  which the classifier deliberately does not — so 28 % is the analyzer's figure, not a
+  classifier target. Either way the reversible class is a minority and the skew is safe
+  (calling *more* builds side-effecting).
 - **v-pkg cannot author the inverse for the 61–72 % side-effecting majority.** For those it
   requires an authored `--backout` or a declared forward back-out patch — the same burden the
   convention's DIBR places on a human, now explicit and typed rather than implicit.

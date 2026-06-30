@@ -27,10 +27,18 @@ related: ../archive/patch-existing-routines-proposal.md (the design these number
 >
 > The corrected entry detection also lowers the pure-routine-only class
 > (**35%→28%**) and raises side-effecting (**64%→72%**) — the forward-only thesis
-> holds *a fortiori*. (The committed classifier `internal/kids/reversibility.go`
-> still uses the older top-level-`KRN` probe → ~36%; aligning it is a follow-up,
-> tracked separately — it gates real uninstall behavior, so it is not changed
-> here.) The corrected `analyze.py` writes `analysis-report.txt`.
+> holds *a fortiori*. (**UPDATE 2026-06-30:** the committed classifier
+> `internal/kids/reversibility.go` now ALSO probes the per-build
+> `"BLD",<n>,"KRN",<file>,"NM"` declaration (excluding #9.8) alongside the
+> top-level `"KRN"` region, closing the FileMan-entry under-detection — its
+> *per-build* `ShipsFileManEntries` verdict is now accurate, which is what gates
+> snapshot `completeUndo` and class-aware uninstall. The corpus *distribution*
+> aggregate stays ~36% because the marginal component-only builds are already
+> side-effecting via install code; the residual gap to `analyze.py`'s 28% is its
+> broader install-code text-probe (it counts declared-but-empty hooks and header
+> text), which the classifier deliberately does NOT replicate — see the
+> "empty PRE value is NOT install code" test. So 28% is the analyzer's number, not
+> a classifier target.) The corrected `analyze.py` writes `analysis-report.txt`.
 
 The v-pkg reversibility proposal ([patch-existing-routines-proposal.md](../archive/patch-existing-routines-proposal.md))
 argued, from the single lived XWBBRK case, that **reversibility is a property of

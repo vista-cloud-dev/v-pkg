@@ -124,9 +124,13 @@ func ClassifyBuild(name string, b *Build) BuildReversibility {
 				rtns[s[1].str] = true
 			}
 		case "KRN":
-			// exported FileMan entry: "KRN",<file#>,<ien>,0) — distinguishes a
-			// real record from the "KRN",<file#>,0) component header and the
-			// "KRN",<file#>,"B",... cross-ref/name nodes.
+			// exported FileMan entry, top-level export region:
+			// "KRN",<file#>,<ien>,0) — distinguishes a real record from the
+			// "KRN",<file#>,0) component header and the "KRN",<file#>,"B",...
+			// cross-ref/name nodes. This region is frequently ABSENT in real .KIDs
+			// (corpus: OPTION 13% here vs 39% via the per-build "BLD",<n>,"KRN",
+			// <file>,"NM" declaration handled in the "BLD" case below), so the two
+			// probes are complementary — keep both.
 			if len(s) >= 4 && s[1].IsNumeric() && s[2].IsNumeric() && s[3].IsZeroInt() {
 				krnFiles[numString(s[1])] = true
 			}
@@ -143,6 +147,22 @@ func ClassifyBuild(name string, b *Build) BuildReversibility {
 			// header is len 4 and excluded.
 			case len(s) >= 5 && s[2].IsInt() && s[2].Int() == 4 && s[3].IsNumeric() && s[4].IsZeroInt():
 				ddFiles[numString(s[3])] = true
+			// Declared FileMan component (the reliable per-build signal):
+			// "BLD",<bld#>,"KRN",<file#>,"NM",<seq>,0) — an entry the build SHIPS
+			// of component file <file#>. This is present even when the top-level
+			// "KRN",<file#>,<ien>,0) export region (handled above) is absent — the
+			// common real-.KID shape (corpus: OPTION 39% via NM vs 13% via
+			// top-level). The component-type header ("…,"KRN",<file#>,0)) and the
+			// "NM" multiple header ("…,"NM",0)) carry a zero-int last subscript and
+			// are excluded by requiring a non-zero numeric seq. File #9.8 (ROUTINE)
+			// is EXCLUDED: builds register their routines as KRN components too, but
+			// that is the pure-overwrite payload itself (the "RTN" probe), not a
+			// side-effecting FileMan entry — including it would mark every
+			// routine-bearing build side-effecting.
+			case len(s) >= 6 && s[2].IsStr() && s[2].str == "KRN" && s[3].IsNumeric() &&
+				numString(s[3]) != "9.8" && s[4].IsStr() && s[4].str == "NM" &&
+				s[5].IsNumeric() && !s[5].IsZeroInt():
+				krnFiles[numString(s[3])] = true
 			}
 		}
 	}
