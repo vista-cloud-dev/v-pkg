@@ -29,6 +29,7 @@ type Commands struct {
 	Roundtrip    roundtripCmd    `cmd:"" group:"Transform" help:"Verify decompose→assemble reproduces the build (exit 3 on drift)."`
 	Canonicalize canonicalizeCmd `cmd:"" group:"Transform" help:"Substitute install-time IENs with \"IEN\" in a tree (LOSSY; review-only)."`
 	Classify     classifyCmd     `cmd:"" group:"Inspect" help:"Derive a .KID's reversibility class (pure-overwrite vs side-effecting) from its structure — no engine."`
+	Diff         diffCmd         `cmd:"" group:"Inspect" help:"Compare a .KID to the live engine WITHOUT mutating it: per-artifact NEW/CHANGED/identical preview (read-only; exit 0)."`
 	Lint         lintCmd         `cmd:"" group:"Inspect" help:"Run the PIKS data-class gate over a .KID (exit 3 on a blocked file)."`
 	Build        buildCmd        `cmd:"" group:"Build & install" help:"Build a KIDS transport global from a declarative build spec (deterministic, normalized export)."`
 	Install      installCmd      `cmd:"" group:"Build & install" help:"Install a built .KID on a live engine over the driver (non-interactive KIDS load+install)."`

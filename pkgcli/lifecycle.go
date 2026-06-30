@@ -369,6 +369,7 @@ func liveInstall(ctx context.Context, cl *mdriver.Client, in liveInstallInput) (
 type installCmd struct {
 	engineConn
 	KidFile         string   `arg:"" help:"Path to the built .KID transport file to install on the live engine."`
+	DryRun          bool     `help:"Preview the install against the live engine WITHOUT mutating it: report NEW/CHANGED/identical per routine and would-add/would-change/identical per component (read-only; exit 0). Same plan as 'v pkg diff'."`
 	Snapshot        string   `help:"Capture the pre-image of any routine this install overwrites to this .KID before installing (enables uninstall --restore)."`
 	AutoSnapshot    bool     `help:"Like --snapshot, but to the conventional sidecar path (<kid>.preimage.kids) that uninstall auto-detects."`
 	AllowOverwrite  bool     `help:"Overwrite existing routines WITHOUT capturing a pre-image (unsafe: uninstall cannot then restore them)."`
@@ -496,6 +497,13 @@ func (c *installCmd) Run(cc *clikit.Context) error {
 		return c.noDriver(err)
 	}
 	ctx := context.Background()
+
+	// --dry-run: preview the install against the live engine and stop (read-only,
+	// exit 0). The same plan `v pkg diff` produces; covers single- and multi-build.
+	if c.DryRun {
+		return runDryRun(ctx, cc, cl, c.Engine, k)
+	}
+
 	answers, aerr := parseAnswers(c.Answer)
 	if aerr != nil {
 		return clikit.Fail(clikit.ExitUsage, "BAD_ANSWER", aerr.Error(), "use --answer NAME=VALUE")

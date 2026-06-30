@@ -70,6 +70,28 @@ run() {
   return 0
 }
 
+# diffck <label> <kid> <new|identical>: the read-only dry-run pre-flight (#2). Asserts
+# `v pkg diff` exits 0 and predicts the expected shape against the live engine — on a
+# clean engine a greenfield build reads all-new (changed=0, identical=0); after the
+# real install the same build reads all-identical (new=0, changed=0). A wrong
+# prediction or any would-change fails the gate.
+diffck() {
+  local label="$1" kid="$2" expect="$3" rc=0
+  "$VPKG" diff "$kid" "${conn[@]}" --output json >"$WORK/diff.json" 2>&1 || rc=$?
+  if [[ "$rc" != 0 ]]; then bad "$label (diff exit $rc, want 0)"; sed -n '1,20p' "$WORK/diff.json"; return 0; fi
+  python3 - "$WORK/diff.json" "$expect" <<'PY' && ok "$label" || bad "$label (prediction mismatch)"
+import json, sys
+b = json.load(open(sys.argv[1]))["data"]["builds"][0]
+s, expect = b["summary"], sys.argv[2]
+if expect == "new":
+    ok = s["new"] > 0 and s["changed"] == 0 and s["identical"] == 0
+else:  # identical
+    ok = s["identical"] > 0 and s["new"] == 0 and s["changed"] == 0
+sys.exit(0 if ok else 1)
+PY
+  return 0
+}
+
 note "build the real packages"
 "$VPKG" build "$MSL_DIR/kids/std.build.json" --src "$MSL_DIR/src" --out "$WORK/MSL.kids" >/dev/null && ok "build MSL.kids" || bad "build MSL.kids"
 "$VPKG" build "$VSL_DIR/kids/vsl.build.json" --src "$VSL_DIR/src" --out "$WORK/VSL.kids" >/dev/null && ok "build VSL.kids" || bad "build VSL.kids"
@@ -79,10 +101,16 @@ note "pre-clean ($ENGINE) — best-effort, ignore if absent"
 "$VPKG" uninstall "$VSL" "${conn[@]}" --force --deregister --output json >/dev/null 2>&1 || true
 "$VPKG" uninstall "$MSL" "${conn[@]}" --force --deregister --output json >/dev/null 2>&1 || true
 
+note "dry-run pre-flight (#2) — clean engine: both builds read all-new (no-op preview)"
+diffck "diff MSL (clean → all-new)" "$MSL" new
+diffck "diff VSL (clean → all-new)" "$VSL" new
+
 note "install + content-verify (happy path; VSL->MSL dependency satisfied)"
 run 0 "install MSL"            install "$MSL" --allow-overwrite --register-package "M STANDARD LIBRARY"
+diffck "diff MSL (installed → all-identical)" "$MSL" identical
 run 0 "verify MSL (content)"   verify  "$MSL"
 run 0 "install VSL (req-build MSL present)" install "$VSL" --allow-overwrite --register-package "VISTA STANDARD LIBRARY"
+diffck "diff VSL (installed → all-identical)" "$VSL" identical
 run 0 "verify VSL (content)"   verify  "$VSL"
 
 note "back out + verify clean (--deregister clears the #9.4 footprint too)"

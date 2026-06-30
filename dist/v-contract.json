@@ -123,6 +123,43 @@
     },
     {
       "path": [
+        "diff"
+      ],
+      "help": "Compare a .KID to the live engine WITHOUT mutating it: per-artifact NEW/CHANGED/identical preview (read-only; exit 0).",
+      "flags": [
+        {
+          "name": "engine",
+          "type": "enum",
+          "enum": [
+            "ydb",
+            "iris"
+          ],
+          "required": true,
+          "help": "Engine to reach: ydb or iris."
+        },
+        {
+          "name": "transport",
+          "type": "enum",
+          "enum": [
+            "local",
+            "docker",
+            "remote"
+          ],
+          "default": "remote",
+          "help": "Driver transport: local | docker | remote."
+        }
+      ],
+      "args": [
+        {
+          "name": "kid-file",
+          "type": "string",
+          "required": true,
+          "help": "Path to the .KID to compare against the live engine (read-only; reports NEW/CHANGED/identical per artifact)."
+        }
+      ]
+    },
+    {
+      "path": [
         "lint"
       ],
       "help": "Run the PIKS data-class gate over a .KID (exit 3 on a blocked file).",
@@ -200,6 +237,11 @@
           ],
           "default": "remote",
           "help": "Driver transport: local | docker | remote."
+        },
+        {
+          "name": "dry-run",
+          "type": "bool",
+          "help": "Preview the install against the live engine WITHOUT mutating it: report NEW/CHANGED/identical per routine and would-add/would-change/identical per component (read-only; exit 0). Same plan as 'v pkg diff'."
         },
         {
           "name": "snapshot",

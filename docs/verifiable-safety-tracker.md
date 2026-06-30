@@ -12,13 +12,13 @@ validation. Archive this doc to `docs/archive/` when all four land.
 **Kickoff prompts** (each bootstraps a fresh `~/vista-cloud-dev/v-pkg` session into
 one increment; archive the prompts folder with this tracker when the effort lands):
 [`#1`](proposals/verifiable-safety/prompts/increment-1-kickoff.md) (done) ·
-[`#2`](proposals/verifiable-safety/prompts/increment-2-kickoff.md) (next — pre-install
+[`#2`](proposals/verifiable-safety/prompts/increment-2-kickoff.md) (done — pre-install
 dry-run / compare-to-current).
 
 | # | Increment | Value | Status |
 |---|---|---|---|
 | 1 | Component-type coverage 11 → all standard FileMan types (verify + uninstall) | reliability — no orphan-on-uninstall, complete verify | **done** (presence-verify + uninstall for all shipping types; content-verify follow-up below) |
-| 2 | Pre-install dry-run / compare-to-current | verifiable-in-advance | planned |
+| 2 | Pre-install dry-run / compare-to-current | verifiable-in-advance | **done** (`install --dry-run` + `diff <kid>`; read-only no-op proven on vehu) |
 | 3 | Robustness: half-install heal · transport-checksum · sidecar integrity | reliability | planned |
 | 4 | Install attestation / audit record | third-party-verifiable | planned |
 
@@ -116,6 +116,24 @@ identical — **without** populating `^XTMP`/running `EN^XPDIJ`. Reuses
 transport's shipped `B`-checksums. Output is a structured, machine-checkable plan;
 exit 0 always (it is read-only). Pairs naturally with #4 (the plan is the
 pre-image of the attestation).
+
+**DONE 2026-06-30.** Both surfaces landed (flag is the engine, `diff` a thin alias):
+`v pkg install --dry-run` (reuses the build-load + multi-build path) and
+`v pkg diff <kid>`, both routing through `runDryRun` → `dryRunPlan` (`pkgcli/dryrun.go`).
+The plan is **relabeled existing read-only probes — no new engine reader**:
+`checkDrift` (routines: absent→NEW / applied→identical / drifted→CHANGED) +
+`verifyContent` (content-verify components & FILE DD: absent→would-add /
+mismatch→would-change / ok→identical) + the `VerifyScript` "B"-index probe
+(presence-only types: present / would-add, **never would-change** — no validated
+content claim, per `docs/memory/component-type-coverage.md`). JSON-first
+(`dryRunReport` + four-bucket `dryRunSummary`); pure assembly unit-tested offline.
+Validation (all green): **TRUE no-op** live-proven on vehu (engine state
+byte-identical before/after `diff`; never stages `^XTMP`/reaches `EN^XPDIJ`; exit 0);
+**prediction fidelity** clean→all-NEW (40) / installed→all-identical (40) / one
+edited routine→exactly that one CHANGED; wired into `make live-gate` as a pre-flight
+(`diffck`, now 14/14), `make stress` 37/37, `make corpus` DRIFT=0 (2404), lint+test
+clean, contract golden regenerated. Durable lesson:
+`docs/memory/dry-run-compare.md`. **Next: increment #3 (robustness hardening).**
 
 ## 3 — Robustness hardening
 
