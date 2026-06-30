@@ -53,13 +53,16 @@ func snapshotNamespace(orig string) string {
 }
 
 // buildSnapshotPairs assembles an installable routine-only KIDS transport from
-// captured pre-image source — the inverse target a class-1 restore re-applies.
+// captured pre-image source — the inverse target a class-1 restore re-applies. The
+// pairs are STAMPED with a content hash (#3c, a private ("VPKG","HASH") node stripped
+// before engine staging) so restore / auto-restore can detect a sidecar tampered
+// after capture and refuse to restore the wrong source.
 func buildSnapshotPairs(name, namespace string, captured []kids.RoutineSrc) []kids.Pair {
-	return kids.MakeBuildPairs(kids.BuildInput{
+	return kids.StampHash(kids.MakeBuildPairs(kids.BuildInput{
 		InstallName: name,
 		Namespace:   namespace,
 		Routines:    captured,
-	})
+	}))
 }
 
 // readRoutinePreimage reads a routine's live source off the engine and reports

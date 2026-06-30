@@ -182,6 +182,15 @@ expect 4 "install tampered foreign .KID --verify-checksums → refused (CHECKSUM
 expect 0 "install pristine foreign .KID --verify-checksums → passes the gate + installs" install "$WORK/ZZCK-ok.kids" --verify-checksums
 expect 0 "uninstall the throwaway ZZCK" uninstall "$WORK/ZZCK-ok.kids" --force
 
+note "ADVERSARIAL: sidecar integrity — a pre-image tampered after capture must be REFUSED on restore (#3c)"
+# Capture a STAMPED pre-image of MSL (installed above), then flip one routine line in
+# a copy so its content no longer matches the stamped hash.
+rc snapshot "$MSL" "$WORK/pre.kids" "${conn[@]}" --output json >/dev/null
+cp "$WORK/pre.kids" "$WORK/pre-bad.kids"
+sed -i '/^"RTN",.*,1,0)$/{n; s/$/ ;tamper/;}' "$WORK/pre-bad.kids"
+expect 0 "restore pristine pre-image (preview) → ok"                     restore "$WORK/pre.kids"
+expect 4 "restore TAMPERED pre-image → refused (SIDECAR_TAMPERED)"       restore "$WORK/pre-bad.kids"
+
 note "install VSL (Required-Build MSL present)"
 expect 0 "install VSL (--register)" install "$VSL" --allow-overwrite --register-package "VISTA STANDARD LIBRARY"
 expect 0 "verify VSL (content)"     verify  "$VSL"

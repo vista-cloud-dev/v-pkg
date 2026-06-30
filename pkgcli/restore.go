@@ -38,6 +38,11 @@ func (c *restoreCmd) Run(cc *clikit.Context) error {
 	if err != nil {
 		return clikit.Fail(clikit.ExitRuntime, "READ_FAILED", err.Error(), "")
 	}
+	// #3c: refuse a sidecar tampered after capture before restoring (even in preview),
+	// so a corrupted pre-image never silently puts back the wrong routine source.
+	if ferr := verifySidecarIntegrity(b, c.KidFile); ferr != nil {
+		return ferr
+	}
 	res := restoreResult{Name: name, Routines: b.RoutineNames()}
 
 	if !c.Commit {

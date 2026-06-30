@@ -1,9 +1,13 @@
 package pkgcli
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/vista-cloud-dev/clikit"
+	"github.com/vista-cloud-dev/v-pkg/internal/kids"
 )
 
 // defaultPreimagePath is the conventional sidecar location for a patch's
@@ -31,4 +35,24 @@ func resolveAutoRestore(restore, backout, kidPath string, sidecarExists bool) (s
 func fileExists(path string) bool {
 	fi, err := os.Stat(path)
 	return err == nil && !fi.IsDir()
+}
+
+// verifySidecarIntegrity refuses a tampered pre-image before it is restored (#3c). A
+// snapshot v-pkg captured is stamped with a content hash (kids.StampHash); restore /
+// uninstall auto-restore recompute it and a mismatch means the sidecar's routine
+// source was altered after capture — restoring it would silently put back the WRONG
+// source. A build with no stamp (an authored --backout, or a pre-#3c snapshot) has
+// nothing to verify and passes. The path is named for the operator's diagnostics.
+func verifySidecarIntegrity(b *kids.Build, path string) *clikit.Error {
+	stored, ok, present := kids.VerifySidecarHash(b)
+	if !present || ok {
+		return nil
+	}
+	short := stored
+	if len(short) > 12 {
+		short = short[:12]
+	}
+	return clikit.Fail(clikit.ExitRefused, "SIDECAR_TAMPERED",
+		fmt.Sprintf("refusing to restore from %s: pre-image integrity hash mismatch (stamped %s…) — the snapshot was altered after capture and would restore the wrong routine source", path, short),
+		"re-capture the pre-image with install --auto-snapshot; never restore from an altered sidecar")
 }

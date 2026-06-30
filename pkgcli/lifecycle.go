@@ -1187,6 +1187,11 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 		if lerr != nil {
 			return clikit.Fail(clikit.ExitRuntime, "READ_FAILED", lerr.Error(), "")
 		}
+		// #3c: refuse a pre-image tampered after capture (auto-detected sidecar OR an
+		// explicit --restore) before it is re-applied — never restore the wrong source.
+		if ferr := verifySidecarIntegrity(preBuild, restore); ferr != nil {
+			return ferr
+		}
 		restoreSet, deleteSet = partitionRoutines(b.RoutineNames(), preBuild.RoutineNames())
 	}
 
