@@ -14,15 +14,16 @@ one increment; archive the prompts folder with this tracker when the effort land
 [`#1`](proposals/verifiable-safety/prompts/increment-1-kickoff.md) (done) ·
 [`#2`](proposals/verifiable-safety/prompts/increment-2-kickoff.md) (done — pre-install
 dry-run / compare-to-current) ·
-[`#3`](proposals/verifiable-safety/prompts/increment-3-kickoff.md) (next — robustness
-hardening: half-install heal · transport-checksum · sidecar integrity).
+[`#3`](proposals/verifiable-safety/prompts/increment-3-kickoff.md) (done — robustness
+hardening: half-install heal · transport-checksum · sidecar integrity). #4 (install
+attestation / audit record) is next — no kickoff prompt authored yet.
 
 | # | Increment | Value | Status |
 |---|---|---|---|
 | 1 | Component-type coverage 11 → all standard FileMan types (verify + uninstall) | reliability — no orphan-on-uninstall, complete verify | **done** (presence-verify + uninstall for all shipping types; content-verify follow-up below) |
 | 2 | Pre-install dry-run / compare-to-current | verifiable-in-advance | **done** (`install --dry-run` + `diff <kid>`; read-only no-op proven on vehu) |
-| 3 | Robustness: half-install heal · transport-checksum · sidecar integrity | reliability | planned |
-| 4 | Install attestation / audit record | third-party-verifiable | planned |
+| 3 | Robustness: half-install heal · transport-checksum · sidecar integrity | reliability | **done** (3a `install --heal`, 3b transport-checksum warn/`--verify-checksums`, 3c sidecar hash; all live-proven on vehu) |
+| 4 | Install attestation / audit record | third-party-verifiable | planned (next) |
 
 ---
 
@@ -139,19 +140,34 @@ clean, contract golden regenerated. Durable lesson:
 
 ## 3 — Robustness hardening
 
-- **Half-install heal.** A prior aborted install leaves a `#9.7` entry with
-  `"ASP"/"INI"/"INIT"` xrefs but no `0`-node; `EN^XPDIJ` silently bails and the
-  re-install guard falsely reports `already-installed`. Detect the corrupt entry
-  (xrefs present, 0-node absent) and offer `--heal` (purge by IEN +
-  `^XTMP("XPDI",ien)`) so a clean reinstall can proceed. (Gotcha documented in
-  `docs/design/kids-installation-automation.md` §7.1.)
-- **Transport checksum verify (pre-install tamper/corruption).** Before staging,
-  recompute each shipped routine's checksum and compare to the build's stored
-  `B`-checksum (the convention's *Verify Checksums in Transport Global*). Refuse a
-  mismatch (corrupted/tampered `.KID`).
-- **Snapshot/sidecar integrity.** Stamp `<kid>.preimage.kids` with a content hash
-  (and verify it on `restore`/auto-restore) so a tampered pre-image cannot silently
-  restore the wrong routine source.
+**DONE 2026-06-30** — three sub-features, each its own gate-green commit + live-proven
+on vehu. Durable lessons: `docs/memory/{half-install-heal,transport-checksum,
+sidecar-integrity}.md`.
+
+- **3a — Half-install heal** (`459d522`). A prior aborted install leaves a `#9.7`
+  entry with the `"B"` xref (and `"ASP"/"INI"/"INIT"` subnodes) but no usable `0`-node
+  / a status ≠ 3; `EN^XPDIJ` silently bails and the re-install guard falsely reports
+  `already-installed`. `v pkg install --heal` detects that PROVEN-corrupt entry
+  (read-only `classifyHeal`) and purges it by IEN (subtree + `B`/`ASP` xrefs +
+  `^XTMP("XPDI",ien)` — DIK can't clean a 0-node-less entry), then reinstalls. NEVER
+  touches a healthy install (refuse + engine-side re-confirm). §7.1 gotcha in
+  `design/kids-installation-automation.md`.
+- **3b — Transport checksum verify** (`4f2d5ae`). `kids.RoutineChecksumB` ports the
+  line-2-blind **SUMB** checksum (`$$SUMB^XPDRSUM`); compares to the stored RTN-node
+  `B<n>` (v-pkg 0/0 builds skipped). **Posture = WARN by default**, not refuse: a
+  corpus sweep found ~1.6% of real national patches are *born self-inconsistent*
+  (engine-confirmed), indistinguishable offline from a tamper over a non-cryptographic
+  sum — so mismatches surface as `checksumWarnings` and proceed; `--verify-checksums`
+  makes it a hard pre-connect refuse (owner decision, 2026-06-30).
+- **3c — Snapshot/sidecar integrity** (`258dcd9`). `buildSnapshotPairs` stamps the
+  pre-image with a sha256 (`kids.HashPairs` over `EnginePairs`) in a private
+  `("VPKG","HASH")` ride-along node (stripped before staging); `restore` + uninstall
+  auto-restore recompute it and REFUSE `SIDECAR_TAMPERED` (unstamped authored
+  back-outs pass). So a tampered sidecar can't silently restore the wrong source.
+
+Gates across all three: `make lint test` (race), `make contract` (3a/3b flags), `make
+stress` 43/43 (heal-refuses-healthy, checksum pristine/tampered, sidecar tamper
+probes), `make corpus` DRIFT=0 (2404) + checksum sweep 1.62% mismatch.
 
 ## 4 — Install attestation / audit record
 
