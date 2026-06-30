@@ -9,9 +9,11 @@ over 12,955 installed builds) and
 verified increment (TDD + gates + commit), most needing dual-engine (vehu/foia)
 validation. Archive this doc to `docs/archive/` when all four land.
 
-**Kickoff:** [`proposals/verifiable-safety/prompts/increment-1-kickoff.md`](proposals/verifiable-safety/prompts/increment-1-kickoff.md)
-bootstraps a fresh session into increment #1 (archive the prompts folder with this
-tracker when the effort lands).
+**Kickoff prompts** (each bootstraps a fresh `~/vista-cloud-dev/v-pkg` session into
+one increment; archive the prompts folder with this tracker when the effort lands):
+[`#1`](proposals/verifiable-safety/prompts/increment-1-kickoff.md) (done) ·
+[`#2`](proposals/verifiable-safety/prompts/increment-2-kickoff.md) (next — pre-install
+dry-run / compare-to-current).
 
 | # | Increment | Value | Status |
 |---|---|---|---|
