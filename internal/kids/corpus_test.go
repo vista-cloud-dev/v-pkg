@@ -100,6 +100,86 @@ func TestRoundtripCorpus(t *testing.T) {
 	}
 }
 
+// TestChecksumCorpus validates the RoutineChecksumB port (the SUMB / line-2-blind
+// "B" checksum, #3b) against the ENTIRE local corpus: nearly every routine whose RTN
+// node carries a real B<n> must recompute byte-for-byte from its shipped source. A
+// SUMB port bug would mis-flag THOUSANDS of pristine patches, so this is the
+// at-scale regression guard.
+//
+// It does NOT require zero mismatches: ~1.6% of real national patches are "born
+// self-inconsistent" (their stored checksum was computed on a slightly different
+// routine version than what shipped — confirmed against the engine's own
+// $$SUMB^XPDRSUM, which agrees with this port over the transport source). That is a
+// corpus property, not a port bug, and is exactly why the install gate WARNS by
+// default rather than refusing (see pkgcli/checksum.go). The guard therefore asserts
+// the mismatch RATE stays low (a port regression would blow past it). Gated on
+// VPKG_KIDS_CORPUS, same as the round-trip sweep (`make corpus` sets it).
+func TestChecksumCorpus(t *testing.T) {
+	root := os.Getenv("VPKG_KIDS_CORPUS")
+	if root == "" {
+		t.Skip("VPKG_KIDS_CORPUS not set — point it at a KIDS corpus dir to run the checksum sweep")
+	}
+	root = expandHome(root)
+
+	var files []string
+	if err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			if ext := strings.ToLower(filepath.Ext(path)); ext == ".kid" || ext == ".kids" {
+				files = append(files, path)
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("walking corpus %q: %v", root, err)
+	}
+	sort.Strings(files)
+
+	var checked, mismatch, skipped int
+	var failures []string
+	for _, f := range files {
+		k, err := ParseKID(f)
+		if err != nil {
+			continue // parse coverage is the round-trip test's job
+		}
+		rel, _ := filepath.Rel(root, f)
+		for _, name := range k.InstallNames {
+			for _, r := range VerifyBuildChecksums(k.Builds[name]) {
+				switch r.Verdict {
+				case ChecksumOK:
+					checked++
+				case ChecksumMismatch:
+					mismatch++
+					if len(failures) < 40 {
+						failures = append(failures, "MISMATCH "+rel+" "+name+":"+r.Name+" stored="+r.Stored+" recomputed="+r.Computed)
+					}
+				default: // no-stored (v-pkg builds don't appear here) / unknown-format
+					skipped++
+				}
+			}
+		}
+	}
+	total := checked + mismatch
+	t.Logf("checksum sweep: OK=%d MISMATCH=%d SKIPPED=%d (no-stored/unknown) over %d files", checked, mismatch, skipped, len(files))
+	if total > 0 {
+		t.Logf("mismatch rate: %.2f%% (born-inconsistent corpus KIDs; ~1.6%% expected)", 100*float64(mismatch)/float64(total))
+	}
+	if checked == 0 {
+		t.Fatalf("no B-checksummed routines verified in the corpus — the sweep proved nothing")
+	}
+	// A correct port reproduces the overwhelming majority; a port bug would flip
+	// thousands from OK to MISMATCH. Allow generous headroom over the observed ~1.6%
+	// (born-inconsistent KIDs) while still catching a real regression.
+	if rate := float64(mismatch) / float64(total); rate > 0.05 {
+		for _, m := range failures {
+			t.Logf("%s", m)
+		}
+		t.Fatalf("checksum mismatch rate %.2f%% exceeds 5%% — RoutineChecksumB likely regressed", 100*rate)
+	}
+}
+
 // expandHome resolves a leading ~ to the user's home dir (test-only convenience
 // so VPKG_KIDS_CORPUS=~/data/... works without shell expansion).
 func expandHome(p string) string {

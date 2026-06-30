@@ -143,6 +143,45 @@ expect 4 "install MSL again, no overwrite flag → refused" install "$MSL" --reg
 note "ADVERSARIAL: --heal must REFUSE a HEALTHY install (heal repairs only a corrupt half-install, never clobbers)"
 expect 4 "install MSL --heal on a healthy install → refused" install "$MSL" --heal --allow-overwrite
 
+note "ADVERSARIAL: transport-checksum gate (--verify-checksums) — pristine passes, tampered REFUSED (offline, pre-connect)"
+# A foreign-style routine-only .KID carrying a REAL stored checksum (B10838 over the
+# ground-truthed ZZT source). The tampered copy flips one command line so the source
+# no longer reproduces the stored checksum.
+mkck() { sed "s/__L5__/$2/" >"$1" <<'KID'
+KIDS Distribution saved by v-pkg
+v-pkg reassembled output
+**KIDS**:ZZCK*1.0*1^
+
+**INSTALL NAME**
+ZZCK*1.0*1
+"BLD",1,0)
+ZZCK*1.0*1^ZZT^0^0
+"RTN")
+1
+"RTN","ZZT")
+0^5^B10838
+"RTN","ZZT",1,0)
+ZZT ;test routine ;1.0
+"RTN","ZZT",2,0)
+ ;;1.0;ZZT;;
+"RTN","ZZT",3,0)
+ Q
+"RTN","ZZT",4,0)
+PING() ;
+"RTN","ZZT",5,0)
+__L5__
+"VER")
+8.0^22.2
+**END**
+**END**
+KID
+}
+mkck "$WORK/ZZCK-ok.kids"   ' Q "pong"'
+mkck "$WORK/ZZCK-bad.kids"  ' Q "PONG"'
+expect 4 "install tampered foreign .KID --verify-checksums → refused (CHECKSUM_MISMATCH)" install "$WORK/ZZCK-bad.kids" --verify-checksums
+expect 0 "install pristine foreign .KID --verify-checksums → passes the gate + installs" install "$WORK/ZZCK-ok.kids" --verify-checksums
+expect 0 "uninstall the throwaway ZZCK" uninstall "$WORK/ZZCK-ok.kids" --force
+
 note "install VSL (Required-Build MSL present)"
 expect 0 "install VSL (--register)" install "$VSL" --allow-overwrite --register-package "VISTA STANDARD LIBRARY"
 expect 0 "verify VSL (content)"     verify  "$VSL"

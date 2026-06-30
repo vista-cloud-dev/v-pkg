@@ -264,6 +264,11 @@
           "help": "Before installing, purge a corrupt half-install (a #9.7 entry with no usable 0-node that falsely blocks reinstall as 'already-installed'); never touches a healthy install."
         },
         {
+          "name": "verify-checksums",
+          "type": "bool",
+          "help": "Make the transport-checksum check a HARD gate: REFUSE a .KID whose stored routine checksum does not match its shipped source (default: warn and proceed — ~6% of real foreign patches carry a self-inconsistent checksum, indistinguishable from tampering offline)."
+        },
+        {
           "name": "skip-env-check",
           "type": "bool",
           "help": "Skip the build's environment-check routine + Required-Build (#9.611) enforcement before filing (default: run them, KIDS-faithful)."

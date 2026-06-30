@@ -402,6 +402,7 @@ type installCmd struct {
 	AutoSnapshot    bool     `help:"Like --snapshot, but to the conventional sidecar path (<kid>.preimage.kids) that uninstall auto-detects."`
 	AllowOverwrite  bool     `help:"Overwrite existing routines WITHOUT capturing a pre-image (unsafe: uninstall cannot then restore them)."`
 	Heal            bool     `help:"Before installing, purge a corrupt half-install (a #9.7 entry with no usable 0-node that falsely blocks reinstall as 'already-installed'); never touches a healthy install."`
+	VerifyChecksums bool     `help:"Make the transport-checksum check a HARD gate: REFUSE a .KID whose stored routine checksum does not match its shipped source (default: warn and proceed — ~6% of real foreign patches carry a self-inconsistent checksum, indistinguishable from tampering offline)."`
 	SkipEnvCheck    bool     `help:"Skip the build's environment-check routine + Required-Build (#9.611) enforcement before filing (default: run them, KIDS-faithful)."`
 	Answer          []string `help:"Pre-answer a build install question as NAME=VALUE (the internal answer $$ANSWER^XPDIQ returns); repeatable." placeholder:"NAME=VALUE"`
 	RegisterPackage string   `help:"Record the PACKAGE #9.4 footprint under this long NAME (find-or-create by the install-name prefix; stamps VERSION + PATCH APPLICATION HISTORY so $$VER/$$PATCH^XPDUTL see the install)." placeholder:"PACKAGE NAME"`
@@ -471,18 +472,19 @@ func parseAnswers(flags []string) ([]installspec.QuesAnswer, error) {
 }
 
 type installReport struct {
-	Name       string      `json:"name"`
-	Class      string      `json:"class"`
-	Action     string      `json:"action"`
-	Reason     string      `json:"reason"`
-	Heal       *healResult `json:"heal,omitempty"`       // --heal probe/purge of a corrupt half-install (§7.1)
-	Overwrites []string    `json:"overwrites,omitempty"` // existing routines this install replaces
-	Greenfield []string    `json:"greenfield,omitempty"` // routines this install newly adds
-	Snapshot   string      `json:"snapshot,omitempty"`   // pre-image .KID written, if any
-	Installed  bool        `json:"installed"`
-	Status     int         `json:"status"`
-	Error      string      `json:"error,omitempty"`
-	PackageIEN string      `json:"packageIen,omitempty"` // #9.4 entry the A.3 footprint stamped, if any
+	Name             string                `json:"name"`
+	Class            string                `json:"class"`
+	Action           string                `json:"action"`
+	Reason           string                `json:"reason"`
+	Heal             *healResult           `json:"heal,omitempty"`             // --heal probe/purge of a corrupt half-install (§7.1)
+	ChecksumWarnings []kids.ChecksumResult `json:"checksumWarnings,omitempty"` // #3b: routines whose stored checksum ≠ shipped source (warned, not refused)
+	Overwrites       []string              `json:"overwrites,omitempty"`       // existing routines this install replaces
+	Greenfield       []string              `json:"greenfield,omitempty"`       // routines this install newly adds
+	Snapshot         string                `json:"snapshot,omitempty"`         // pre-image .KID written, if any
+	Installed        bool                  `json:"installed"`
+	Status           int                   `json:"status"`
+	Error            string                `json:"error,omitempty"`
+	PackageIEN       string                `json:"packageIen,omitempty"` // #9.4 entry the A.3 footprint stamped, if any
 }
 
 // installSequence installs each named build in order through the one class-aware
@@ -520,6 +522,22 @@ func (c *installCmd) Run(cc *clikit.Context) error {
 	}
 	if len(k.InstallNames) == 0 {
 		return clikit.Fail(clikit.ExitUsage, "NO_BUILD", "no build found in "+c.KidFile, "")
+	}
+
+	// Offline transport-checksum check (#3b), computed before reaching the engine.
+	// Default = WARN: mismatches ride on the install report (and print) but do not
+	// block — ~6% of real foreign patches are born self-inconsistent and the check
+	// can't tell that from tampering offline. --verify-checksums makes it a HARD gate
+	// that refuses (fail fast, no connection, no write). Skipped for --dry-run (a
+	// read-only, exit-0 preview).
+	var cksumScan map[string][]kids.ChecksumResult
+	if !c.DryRun {
+		cksumScan = checksumScan(k)
+		if c.VerifyChecksums {
+			if ferr := checksumRefusal(cksumScan); ferr != nil {
+				return ferr
+			}
+		}
 	}
 
 	cl, err := c.client()
@@ -567,9 +585,13 @@ func (c *installCmd) Run(cc *clikit.Context) error {
 	if ferr != nil {
 		return ferr
 	}
+	res.ChecksumWarnings = cksumScan[name] // #3b: warn-mode mismatches (none if --verify-checksums passed)
 
 	if err := cc.Result(res, func() {
 		cc.Title("pkg install — " + c.Engine)
+		for _, w := range res.ChecksumWarnings {
+			fmt.Fprintln(cc.Stdout, cc.Warning(fmt.Sprintf("checksum mismatch %s: stored %s, recomputed %s (installing anyway; --verify-checksums to refuse)", w.Name, w.Stored, w.Computed)))
+		}
 		if res.Heal != nil && res.Heal.Purged {
 			fmt.Fprintf(cc.Stdout, "  %s purged a corrupt half-install of %s before reinstalling\n", cc.Accent("heal"), res.Name)
 		}
@@ -634,9 +656,18 @@ func (c *installCmd) runMulti(ctx context.Context, cc *clikit.Context, cl *mdriv
 		}
 	}
 	res, ferr := installSequence(ctx, cl, k.InstallNames, mk)
+	// #3b warn-mode: attach each build's checksum mismatches to its report (strict
+	// --verify-checksums already refused upstream, so this only fires in warn mode).
+	cksumScan := checksumScan(k)
+	for i := range res.Builds {
+		res.Builds[i].ChecksumWarnings = cksumScan[res.Builds[i].Name]
+	}
 	if rerr := cc.Result(res, func() {
 		cc.Title("pkg install (multi-build) — " + c.Engine)
 		for _, b := range res.Builds {
+			for _, w := range b.ChecksumWarnings {
+				fmt.Fprintln(cc.Stdout, cc.Warning(fmt.Sprintf("checksum mismatch %s:%s: stored %s, recomputed %s (installing anyway; --verify-checksums to refuse)", b.Name, w.Name, w.Stored, w.Computed)))
+			}
 			switch {
 			case b.Error != "":
 				fmt.Fprintln(cc.Stdout, cc.Failure(b.Name+": "+b.Error))
