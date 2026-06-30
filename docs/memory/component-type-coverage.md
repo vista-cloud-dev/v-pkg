@@ -10,7 +10,7 @@ the gap that `v pkg install` files every component type natively (KRN^XPDIK) but
 `verify`/`uninstall` only knew **11** hand-coded types, so a build shipping an
 INPUT TEMPLATE (#.402, the 3rd-commonest component in vehu), FORM, BULLETIN, …
 installed fine yet **uninstall orphaned it and verify couldn't assert it**. Canon
-for the 4-part effort: `../verifiable-safety-tracker.md`. Pairs with
+for the 4-part effort: `../archive/verifiable-safety-tracker.md`. Pairs with
 [[verify-content]], [[class-aware-uninstall]], [[fileman-dd-component]].
 
 **The mechanism — one registry, three consumers.** `entryTypeByFile`

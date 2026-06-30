@@ -316,7 +316,8 @@ type liveInstallInput struct {
 	name           string
 	header         string
 	className      string
-	routineNames   []string // the routines this build lands on (overwrite probe targets)
+	build          *kids.Build // the build being installed (for attestation before/after checksums)
+	routineNames   []string    // the routines this build lands on (overwrite probe targets)
 	pairs          []kids.Pair
 	snapshotPath   string // "" = no pre-image requested
 	allowOverwrite bool
@@ -370,6 +371,12 @@ func liveInstall(ctx context.Context, cl *mdriver.Client, in liveInstallInput) (
 		Name: in.name, Class: in.className, Action: action.String(), Reason: reason,
 		Overwrites: routineNames(captured), Greenfield: greenfield, Heal: heal,
 	}
+	// #4 attestation: record what the routines hashed to BEFORE (live pre-image /
+	// absent) and AFTER (the source this install files), assembled from the same
+	// overwrite probe — no extra engine read.
+	if in.build != nil {
+		res.Before, res.After = routineChecksumMaps(in.build, captured, greenfield)
+	}
 	if action == instRefuse {
 		return res, clikit.Fail(clikit.ExitRefused, "INSTALL_REFUSED",
 			fmt.Sprintf("refusing to install %s: %s", in.name, reason),
@@ -382,6 +389,7 @@ func liveInstall(ctx context.Context, cl *mdriver.Client, in liveInstallInput) (
 			return res, clikit.Fail(clikit.ExitRuntime, "WRITE_FAILED", werr.Error(), "")
 		}
 		res.Snapshot = in.snapshotPath
+		res.SnapshotHash = kids.HashPairs(pairs) // #3c/#4: the sidecar's content hash, recorded in the attestation
 	}
 	ir, ierr := runInstall(ctx, cl, in.name, in.header, in.pairs, in.runEnvCheck, in.quesAnswers, in.pkgReg)
 	if ierr != nil {
@@ -396,6 +404,7 @@ func liveInstall(ctx context.Context, cl *mdriver.Client, in liveInstallInput) (
 
 type installCmd struct {
 	engineConn
+	attestFlags
 	KidFile         string   `arg:"" help:"Path to the built .KID transport file to install on the live engine."`
 	DryRun          bool     `help:"Preview the install against the live engine WITHOUT mutating it: report NEW/CHANGED/identical per routine and would-add/would-change/identical per component (read-only; exit 0). Same plan as 'v pkg diff'."`
 	Snapshot        string   `help:"Capture the pre-image of any routine this install overwrites to this .KID before installing (enables uninstall --restore)."`
@@ -481,6 +490,9 @@ type installReport struct {
 	Overwrites       []string              `json:"overwrites,omitempty"`       // existing routines this install replaces
 	Greenfield       []string              `json:"greenfield,omitempty"`       // routines this install newly adds
 	Snapshot         string                `json:"snapshot,omitempty"`         // pre-image .KID written, if any
+	SnapshotHash     string                `json:"snapshotHash,omitempty"`     // #3c content hash of the pre-image (for the attestation)
+	Before           map[string]string     `json:"-"`                          // #4: per-routine pre-image "B" checksum / "absent" (attestation, not JSON output)
+	After            map[string]string     `json:"-"`                          // #4: per-routine filed-source "B" checksum (attestation, not JSON output)
 	Installed        bool                  `json:"installed"`
 	Status           int                   `json:"status"`
 	Error            string                `json:"error,omitempty"`
@@ -577,7 +589,7 @@ func (c *installCmd) Run(cc *clikit.Context) error {
 	}
 	res, ferr := liveInstall(ctx, cl, liveInstallInput{
 		name: name, header: name + " via v pkg install", className: rev.ClassName,
-		routineNames: b.RoutineNames(), pairs: b.Pairs(),
+		build: b, routineNames: b.RoutineNames(), pairs: b.Pairs(),
 		snapshotPath: snapshot, allowOverwrite: c.AllowOverwrite, heal: c.Heal,
 		runEnvCheck: !c.SkipEnvCheck, quesAnswers: answers,
 		pkgReg: packageReg(name, c.RegisterPackage),
@@ -615,6 +627,13 @@ func (c *installCmd) Run(cc *clikit.Context) error {
 	}); err != nil {
 		return err
 	}
+	// #4: record the mutation. Only a completed install mutated the engine; an
+	// already-installed / not-completed result changed nothing, so it attests nothing.
+	if res.Installed {
+		if aerr := emitAttestation(c.attestFlags, c.KidFile, newRecord(installAttestInput(res, b, c.Engine, c.Transport))); aerr != nil {
+			return attestEmitError(aerr)
+		}
+	}
 	if res.Error != "" {
 		return clikit.Fail(clikit.ExitRefused, "ALREADY_INSTALLED", res.Name+": "+res.Error,
 			"uninstall it first, or bump the patch")
@@ -649,8 +668,8 @@ func (c *installCmd) runMulti(ctx context.Context, cc *clikit.Context, cl *mdriv
 		}
 		return liveInstallInput{
 			name: name, header: name + " via v pkg install",
-			className:    kids.ClassifyBuild(name, b).ClassName,
-			routineNames: b.RoutineNames(), pairs: b.Pairs(),
+			className: kids.ClassifyBuild(name, b).ClassName,
+			build:     b, routineNames: b.RoutineNames(), pairs: b.Pairs(),
 			snapshotPath: snap, allowOverwrite: c.AllowOverwrite, heal: c.Heal,
 			runEnvCheck: !c.SkipEnvCheck, quesAnswers: answers,
 		}
@@ -680,6 +699,17 @@ func (c *installCmd) runMulti(ctx context.Context, cc *clikit.Context, cl *mdriv
 		fmt.Fprintf(cc.Stdout, "  %d of %d build(s) installed\n", countInstalled(res.Builds), len(k.InstallNames))
 	}); rerr != nil {
 		return rerr
+	}
+	// #4: one attestation record per build that actually completed (mutated the
+	// engine), chained in install order onto the shared ledger.
+	for i := range res.Builds {
+		b := res.Builds[i]
+		if !b.Installed {
+			continue
+		}
+		if aerr := emitAttestation(c.attestFlags, c.KidFile, newRecord(installAttestInput(b, k.Builds[b.Name], c.Engine, c.Transport))); aerr != nil {
+			return attestEmitError(aerr)
+		}
 	}
 	if ferr != nil {
 		return ferr
@@ -1133,6 +1163,7 @@ func decideUninstall(class kids.ReversibilityClass, restoreKid, backoutKid strin
 
 type uninstallCmd struct {
 	engineConn
+	attestFlags
 	KidFile    string `arg:"" help:"Path to the .KID whose install to reverse."`
 	Restore    string `help:"Pre-image snapshot .KID to restore instead of deleting (class-1 reversal for a patched-over routine)."`
 	Backout    string `help:"Authored back-out .KID to install instead of deleting (class-2 reversal of a side-effecting patch)."`
@@ -1402,6 +1433,41 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 		}
 	}); err != nil {
 		return err
+	}
+	// #4: attest the reversal that actually ran. AFTER reflects the new live state of
+	// each touched routine: a deleted routine is now "absent"; a restored one carries
+	// the re-applied pre-image source checksum (an authored --backout is its own
+	// inverse, so its routines are left unrecorded here — provenance is the verdict).
+	if res.Done {
+		after := map[string]string{}
+		switch action {
+		case actDelete:
+			for _, r := range greenfieldDelete {
+				after[r] = "absent"
+			}
+		case actRestore:
+			if preBuild != nil {
+				for _, r := range preBuild.RoutineNames() {
+					after[r] = kids.BChecksum(preBuild.RoutineSource(r))
+				}
+			}
+		case actPartition:
+			for _, r := range restoreSet {
+				after[r] = kids.BChecksum(preBuild.RoutineSource(r))
+			}
+			for _, r := range deleteSet {
+				after[r] = "absent"
+			}
+		}
+		rec := newRecord(attestInput{
+			Op: "uninstall", Action: res.Action, Name: res.Name, Class: res.Class,
+			Engine: c.Engine, Transport: c.Transport, After: after,
+			Components: componentKeys(b.Components()), RequiredBuilds: b.RequiredBuildNames(),
+			Status: res.Status, Verify: uninstallVerifyVerdict(res), Exit: 0,
+		})
+		if aerr := emitAttestation(c.attestFlags, c.KidFile, rec); aerr != nil {
+			return attestEmitError(aerr)
+		}
 	}
 	if !res.Done {
 		return clikit.Fail(clikit.ExitRuntime, "NOT_UNINSTALLED",

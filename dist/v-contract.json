@@ -239,6 +239,21 @@
           "help": "Driver transport: local | docker | remote."
         },
         {
+          "name": "attest",
+          "type": "string",
+          "help": "Append the audit record to this ledger path (default: \u003ckid\u003e.attest.jsonl next to the .KID)."
+        },
+        {
+          "name": "no-attest",
+          "type": "bool",
+          "help": "Do NOT write an attestation audit record for this op (default: record every engine-mutating op)."
+        },
+        {
+          "name": "sign",
+          "type": "bool",
+          "help": "Sign each record with a detached ed25519 signature (key from $VPKG_ATTEST_KEY, a hex 32-byte seed) — tamper-RESISTANT, not just tamper-evident."
+        },
+        {
           "name": "dry-run",
           "type": "bool",
           "help": "Preview the install against the live engine WITHOUT mutating it: report NEW/CHANGED/identical per routine and would-add/would-change/identical per component (read-only; exit 0). Same plan as 'v pkg diff'."
@@ -369,6 +384,21 @@
           "help": "Driver transport: local | docker | remote."
         },
         {
+          "name": "attest",
+          "type": "string",
+          "help": "Append the audit record to this ledger path (default: \u003ckid\u003e.attest.jsonl next to the .KID)."
+        },
+        {
+          "name": "no-attest",
+          "type": "bool",
+          "help": "Do NOT write an attestation audit record for this op (default: record every engine-mutating op)."
+        },
+        {
+          "name": "sign",
+          "type": "bool",
+          "help": "Sign each record with a detached ed25519 signature (key from $VPKG_ATTEST_KEY, a hex 32-byte seed) — tamper-RESISTANT, not just tamper-evident."
+        },
+        {
           "name": "commit",
           "type": "bool",
           "help": "DESTRUCTIVE: install the snapshot on the live engine (overwrites the live routines). Default off = preview."
@@ -453,6 +483,21 @@
           "help": "Driver transport: local | docker | remote."
         },
         {
+          "name": "attest",
+          "type": "string",
+          "help": "Append the audit record to this ledger path (default: \u003ckid\u003e.attest.jsonl next to the .KID)."
+        },
+        {
+          "name": "no-attest",
+          "type": "bool",
+          "help": "Do NOT write an attestation audit record for this op (default: record every engine-mutating op)."
+        },
+        {
+          "name": "sign",
+          "type": "bool",
+          "help": "Sign each record with a detached ed25519 signature (key from $VPKG_ATTEST_KEY, a hex 32-byte seed) — tamper-RESISTANT, not just tamper-evident."
+        },
+        {
           "name": "restore",
           "type": "string",
           "help": "Pre-image snapshot .KID to restore instead of deleting (class-1 reversal for a patched-over routine)."
@@ -484,6 +529,59 @@
           "type": "string",
           "required": true,
           "help": "Path to the .KID whose install to reverse."
+        }
+      ]
+    },
+    {
+      "path": [
+        "attest"
+      ],
+      "help": "Validate the install-attestation audit ledger (hash chain + signatures; optional live replay)."
+    },
+    {
+      "path": [
+        "attest",
+        "verify"
+      ],
+      "help": "Validate an attestation ledger's hash chain (+ signatures), optionally replaying it against the live engine.",
+      "flags": [
+        {
+          "name": "trust",
+          "type": "string",
+          "help": "Pin every record's signature to this hex ed25519 public key (default $VPKG_ATTEST_PUBKEY). Fails if any record is unsigned or signed by a different key."
+        },
+        {
+          "name": "replay",
+          "type": "bool",
+          "help": "Also read each recorded routine off the live engine and confirm it still matches the record's AFTER checksum (needs --engine)."
+        },
+        {
+          "name": "engine",
+          "type": "enum",
+          "enum": [
+            "ydb",
+            "iris"
+          ],
+          "help": "Engine for --replay: ydb or iris."
+        },
+        {
+          "name": "transport",
+          "type": "enum",
+          "enum": [
+            "local",
+            "docker",
+            "remote"
+          ],
+          "default": "remote",
+          "help": "Driver transport for --replay."
+        }
+      ],
+      "args": [
+        {
+          "name": "ledger",
+          "type": "string",
+          "required": true,
+          "help": "Path to the attestation ledger (JSON Lines) to validate."
         }
       ]
     }

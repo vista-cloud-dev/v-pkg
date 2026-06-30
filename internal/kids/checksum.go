@@ -69,6 +69,13 @@ func mChar(s string, k int) byte {
 	return 0
 }
 
+// BChecksum renders a routine's recomputed line-2-blind checksum as the "B<n>"
+// string a KIDS transport stores (and the install-attestation record carries as a
+// routine's before/after value). It is the recompute side of VerifyRoutineChecksum.
+func BChecksum(lines []string) string {
+	return "B" + strconv.FormatInt(RoutineChecksumB(lines), 10)
+}
+
 // RoutineChecksum returns the checksum string stored in the build's transport RTN
 // node for routine name — piece 3 of the 2-subscript `"RTN",<name>)` value
 // (`0^<numlines>^<checksum>…`). "" if the build ships no such node. A v-pkg build

@@ -109,6 +109,10 @@ note "install + content-verify (happy path; VSL->MSL dependency satisfied)"
 run 0 "install MSL"            install "$MSL" --allow-overwrite --register-package "M STANDARD LIBRARY"
 diffck "diff MSL (installed → all-identical)" "$MSL" identical
 run 0 "verify MSL (content)"   verify  "$MSL"
+# Attestation (#4): the install above wrote a tamper-evident audit record to the
+# default sidecar ledger; verify --replay reads MSL's routines off the live engine
+# and confirms the recorded AFTER checksums still hold.
+run 0 "attest verify MSL ledger (chain + live replay)" attest verify "$WORK/MSL.attest.jsonl" --replay
 run 0 "install VSL (req-build MSL present)" install "$VSL" --allow-overwrite --register-package "VISTA STANDARD LIBRARY"
 diffck "diff VSL (installed → all-identical)" "$VSL" identical
 run 0 "verify VSL (content)"   verify  "$VSL"

@@ -37,6 +37,7 @@ type Commands struct {
 	Restore      restoreCmd      `cmd:"" group:"Back-out" help:"Re-apply a pre-image snapshot .KID to revert routines to stock (preview by default; --commit installs)."`
 	Verify       verifyCmd       `cmd:"" group:"Build & install" help:"Verify a .KID's install on a live engine (#9.7 status + per-routine presence)."`
 	Uninstall    uninstallCmd    `cmd:"" group:"Back-out" help:"Uninstall a .KID from a live engine (routine-only back-out: routines + #9.7/#9.6)."`
+	Attest       attestCmd       `cmd:"" group:"Inspect" help:"Validate the install-attestation audit ledger (hash chain + signatures; optional live replay)."`
 }
 
 // --- parse -------------------------------------------------------------------

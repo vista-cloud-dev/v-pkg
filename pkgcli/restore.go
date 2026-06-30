@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/vista-cloud-dev/clikit"
+	"github.com/vista-cloud-dev/v-pkg/internal/kids"
 )
 
 // restore re-applies a pre-image snapshot .KID (produced by `v pkg snapshot`),
@@ -29,6 +30,7 @@ type restoreResult struct {
 
 type restoreCmd struct {
 	engineConn
+	attestFlags
 	KidFile string `arg:"" help:"the pre-image snapshot .KID to re-apply (restore to its captured state)."`
 	Commit  bool   `help:"DESTRUCTIVE: install the snapshot on the live engine (overwrites the live routines). Default off = preview."`
 }
@@ -65,6 +67,22 @@ func (c *restoreCmd) Run(cc *clikit.Context) error {
 	res.Committed = true
 	res.Installed = ir.Installed
 	res.Status = ir.Status
+
+	// #4: a committed, completed restore mutated the live engine — attest it. AFTER is
+	// the checksum of each re-applied pre-image routine (what the engine now carries).
+	if res.Installed {
+		after := map[string]string{}
+		for _, rt := range b.RoutineNames() {
+			after[rt] = kids.BChecksum(b.RoutineSource(rt))
+		}
+		rec := newRecord(attestInput{
+			Op: "restore", Action: "restore", Name: name, Engine: c.Engine, Transport: c.Transport,
+			After: after, Status: ir.Status, Exit: 0,
+		})
+		if aerr := emitAttestation(c.attestFlags, c.KidFile, rec); aerr != nil {
+			return attestEmitError(aerr)
+		}
+	}
 
 	if err := cc.Result(res, func() {
 		cc.Title("pkg restore — " + c.Engine)

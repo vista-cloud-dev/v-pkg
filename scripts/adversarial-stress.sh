@@ -224,6 +224,23 @@ note "ADVERSARIAL: negative dependency — VSL alone, MSL absent + deregistered,
 expect 1 "install VSL alone → refused (Required-Build MSL absent)" install "$VSL" --allow-overwrite
 rc uninstall "$VSL" "${conn[@]}" --force --deregister --output json >/dev/null || true
 
+note "ATTESTATION (#4): every mutating op writes a tamper-EVIDENT audit record; verify validates the chain + replays it live"
+# MSL is currently backed out (line above), so a clean install→uninstall pair chains
+# two records onto one ledger. attest verify is read-only; --replay reads the live
+# engine and confirms the recorded AFTER checksums still hold (net state).
+ATT="$WORK/att.jsonl"
+expect 0 "install MSL writes an attestation record"          install "$MSL" --allow-overwrite --attest "$ATT"
+expect 0 "attest verify — hash chain intact"                 attest verify "$ATT"
+expect 0 "attest verify --replay — recorded AFTER holds live" attest verify "$ATT" --replay
+# Tamper a recorded field WITHOUT re-hashing → the chain must break → verify REFUSES.
+cp "$ATT" "$ATT.bad"; sed -i 's/"status":3/"status":9/' "$ATT.bad"
+expect 3 "attest verify on a TAMPERED ledger → REFUSED"      attest verify "$ATT.bad"
+expect 0 "uninstall MSL appends a chained record"            uninstall "$MSL" --force --attest "$ATT"
+expect 0 "attest verify — 2nd record chains onto the 1st"    attest verify "$ATT"
+expect 0 "attest verify --replay — net state still matches"  attest verify "$ATT" --replay
+[[ "$(wc -l <"$ATT")" == 2 ]] && ok "ledger holds 2 chained records" || bad "ledger record count $(wc -l <"$ATT"), want 2"
+rc uninstall "$MSL" "${conn[@]}" --force --deregister --output json >/dev/null || true
+
 note "summary — $ENGINE"
 printf '  %d passed, %d failed\n' "$pass" "$fail"
 [[ "$fail" == 0 ]]

@@ -2,6 +2,7 @@ package kids
 
 import (
 	"strconv"
+	"strings"
 )
 
 // This file emits the KIDS transport pairs for two non-routine component kinds:
@@ -60,6 +61,22 @@ func emitRequiredBuildManifest(b *Build, reqs []ReqBuild) {
 		b.Set(sub(intSub(seq), intSub(0)), r.Name+"^"+strconv.Itoa(r.Action))
 		b.Set(sub(strSub("B"), strSub(r.Name), intSub(seq)), "")
 	}
+}
+
+// RequiredBuildNames reads the build's #9.611 Required-Build chain back off its BLD
+// manifest, in sequence order — the `BLD,1,"REQB",<seq>,0)` = `Name^Action` nodes
+// emitRequiredBuildManifest writes. The install-attestation record carries this so
+// an audit shows the prerequisite chain the op declared. nil when the build has none.
+func (b *Build) RequiredBuildNames() []string {
+	var names []string
+	for seq := int64(1); ; seq++ {
+		v, ok := b.Get(Subs{strSub("BLD"), intSub(1), strSub("REQB"), intSub(seq), intSub(0)})
+		if !ok {
+			break
+		}
+		names = append(names, strings.SplitN(v, "^", 2)[0])
+	}
+	return names
 }
 
 // emitMBREQ writes the top-level MBREQ count node (the transport summary of how

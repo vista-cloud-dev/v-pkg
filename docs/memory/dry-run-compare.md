@@ -9,7 +9,7 @@ metadata:
 — closes the gap that no verb previewed a build's effect against the LIVE system
 BEFORE mutating it (the KIDS convention's *Compare Transport Global to Current
 System*, menu 2–4): `classify` is static, `verify` asserts a COMPLETED install.
-Canon: `../verifiable-safety-tracker.md` §2. Pairs with [[verify-drift]],
+Canon: `../archive/verifiable-safety-tracker.md` §2. Pairs with [[verify-drift]],
 [[verify-content]], [[component-type-coverage]].
 
 **Surface.** `v pkg install --dry-run` (the flag is the engine; reuses the
