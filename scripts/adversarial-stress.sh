@@ -43,6 +43,12 @@ if [[ "$ENGINE" == "ydb" ]]; then
 fi
 
 conn=(--engine "$ENGINE" --transport "$TRANSPORT")
+
+# m-cli's `m vista exec` is the approved ad-hoc M path (driver stack, not a raw login)
+# used ONLY to seed the corrupt-half-install fixture for the G7 heal probe below.
+MCLI="${MCLI:-$here/../m-cli/dist/m}"; [[ -x "$MCLI" ]] || MCLI="$(command -v m || true)"
+mseed() { "$MCLI" vista exec "${conn[@]}" "$1" --output json >/dev/null 2>&1 || true; }
+
 pass=0 fail=0
 ok()   { printf '  \033[32mPASS\033[0m %s\n' "$1"; pass=$((pass+1)); }
 bad()  { printf '  \033[31mFAIL\033[0m %s\n' "$1"; fail=$((fail+1)); }
@@ -143,6 +149,22 @@ expect 4 "install MSL again, no overwrite flag → refused" install "$MSL" --reg
 note "ADVERSARIAL: --heal must REFUSE a HEALTHY install (heal repairs only a corrupt half-install, never clobbers)"
 expect 4 "install MSL --heal on a healthy install → refused" install "$MSL" --heal --allow-overwrite
 
+note "G7: --heal PURGES a corrupt half-install — seed a #9.7 with a B xref + ASP but NO 0-node (the §7.1 corpse), prove a normal install is FALSELY blocked, then --heal purges + reinstalls"
+if [[ -x "$MCLI" ]]; then
+  "$VPKG" build "$here/testdata/zzskel/kids/ZZSKEL.build.json" --src "$here/testdata/zzskel/src" --out "$WORK/ZZHEAL.KID" >/dev/null && ok "build heal fixture (ZZSKEL)" || bad "build heal fixture"
+  rc uninstall "$WORK/ZZHEAL.KID" "${conn[@]}" --force --output json >/dev/null || true   # pre-clean any real install
+  # Clear any stale seed from a prior aborted run, THEN seed the corrupt corpse (B xref
+  # + ASP at a fixed out-of-range IEN, no 0-node) so the probe is deterministic.
+  mseed 'K ^XPD(9.7,9000001),^XPD(9.7,"B","ZZSKEL*1.0*1",9000001),^XPD(9.7,"ASP",9000001) S nm="ZZSKEL*1.0*1",i=9000001 S ^XPD(9.7,"B",nm,i)="",^XPD(9.7,"ASP",i)="" W "seeded"'
+  expect 4 "normal install FALSELY blocked by the corrupt #9.7 (already-installed)" install "$WORK/ZZHEAL.KID"
+  expect 0 "install --heal purges the corpse + reinstalls to status 3"             install "$WORK/ZZHEAL.KID" --heal
+  expect 0 "verify confirms the healed install"                                    verify  "$WORK/ZZHEAL.KID"
+  rc uninstall "$WORK/ZZHEAL.KID" "${conn[@]}" --force --output json >/dev/null || true
+  mseed 'K ^XPD(9.7,9000001),^XPD(9.7,"B","ZZSKEL*1.0*1",9000001),^XPD(9.7,"ASP",9000001)'   # belt-and-suspenders cleanup
+else
+  note "  (skipped — m-cli not found at \$MCLI; the heal corrupt-purge seed needs ad-hoc M exec)"
+fi
+
 note "ADVERSARIAL: transport-checksum gate (--verify-checksums) — pristine passes, tampered REFUSED (offline, pre-connect)"
 # A foreign-style routine-only .KID carrying a REAL stored checksum (B10838 over the
 # ground-truthed ZZT source). The tampered copy flips one command line so the source
@@ -180,6 +202,16 @@ mkck "$WORK/ZZCK-ok.kids"   ' Q "pong"'
 mkck "$WORK/ZZCK-bad.kids"  ' Q "PONG"'
 expect 4 "install tampered foreign .KID --verify-checksums → refused (CHECKSUM_MISMATCH)" install "$WORK/ZZCK-bad.kids" --verify-checksums
 expect 0 "install pristine foreign .KID --verify-checksums → passes the gate + installs" install "$WORK/ZZCK-ok.kids" --verify-checksums
+# G6: dry-run CHANGED detection — ZZCK-bad differs from the now-installed ZZCK-ok by one
+# routine line, so a read-only `diff` must read that routine CHANGED (changed>=1), not
+# identical. (The standing live-gate only covers all-new + all-identical; this adds the
+# CHANGED case as a standing gate.)
+"$VPKG" diff "$WORK/ZZCK-bad.kids" "${conn[@]}" --output json >"$WORK/diffc.json" 2>&1 || true
+python3 - "$WORK/diffc.json" <<'PY' && ok "G6 dry-run flags the edited routine CHANGED (read-only)" || { bad "G6 dry-run CHANGED detection"; sed -n '1,20p' "$WORK/diffc.json"; }
+import json,sys
+b=json.load(open(sys.argv[1]))["data"]["builds"][0]
+sys.exit(0 if b["summary"]["changed"]>=1 else 1)
+PY
 expect 0 "uninstall the throwaway ZZCK" uninstall "$WORK/ZZCK-ok.kids" --force
 
 note "ADVERSARIAL: sidecar integrity — a pre-image tampered after capture must be REFUSED on restore (#3c)"

@@ -48,7 +48,8 @@ manual: setup, the full command summary, and the day-to-day workflows.
 8. [Core workflows](#8-core-workflows)
 9. [Install attestation (the audit ledger)](#9-install-attestation-the-audit-ledger)
 10. [Exit codes — the machine-checkable safety contract](#10-exit-codes--the-machine-checkable-safety-contract)
-11. [Reference — environment, files, and flags](#11-reference--environment-files-and-flags)
+11. [Validation & verification — how thoroughly v-pkg is tested](#11-validation--verification--how-thoroughly-v-pkg-is-tested)
+12. [Reference — environment, files, and flags](#12-reference--environment-files-and-flags)
 
 ---
 
@@ -405,7 +406,89 @@ mutated the engine; a refused / no-op / already-installed op attests nothing.
 Exit `4` is the heart of the safety model: *do not perform an irreversible engine
 mutation that cannot be honestly undone.* Scripts and CI gate on it directly.
 
-## 11. Reference — environment, files, and flags
+## 11. Validation & verification — how thoroughly v-pkg is tested
+
+v-pkg is built test-first (TDD), and reliability is not a claim — it is a number you
+can re-run. Every release is held to **three independent tiers** of automated proof,
+and the live tiers run against **two production-fidelity VistA systems on two different
+M engines** (YottaDB *and* InterSystems IRIS), not a mock.
+
+### By the numbers
+
+| Tier | What it proves | Scale |
+|---|---|---:|
+| **Unit + integration** (Go, race-detector on, every CI push) | every function, decision tree, parser, emitter, and engine-interaction path (via a fake driver) | **222 test functions → 291 assertions** |
+| **Offline corpus sweep** (`make corpus`) | parse / decompose / assemble / round-trip / checksum, over the **entire WorldVistA patch mirror** | **2,404 real KIDS distributions** (157 packages) — round-trip oracle + **14,296 routine-checksum verifications** |
+| **Live adversarial gates** (`make stress` / `live-gate` + foreign-refuse + partition), **× 2 engines** | the full install→verify→back-out lifecycle *and* every safety refusal, against a real VistA | **97 assertions/engine × 2 engines = 194 live assertions** (+ 15 happy-path) |
+
+That is **~500 automated pass/fail assertions plus ~16,700 corpus verifications across
+2,404 real-world KIDS distributions**, re-runnable on demand — the unit + corpus tiers
+on every push, the live tiers on the engine host.
+
+### The two real engines
+
+The live tiers are run end-to-end on **both** of VistA's supported M engines, against
+real, fully-populated systems:
+
+- **vehu** (VistA-VEHU-M) on **YottaDB** — 12,955 builds / 14,345 installs / 470 packages.
+- **foia** (FOIA VistA) on **InterSystems IRIS** — 13,829 builds / 13,100 installs / 157 packages.
+
+The same gate scripts pass on both (`make stress` **56/56**, foreign-refuse **24/24**,
+partition **17/17** on each engine), so the safety guarantees are engine-independent.
+
+### Per-command coverage
+
+Every command is covered at the unit tier *and* exercised live; the safety-bearing
+commands additionally have dedicated adversarial (intentionally-broken-input) probes.
+
+| Command | Unit tests¹ | Offline corpus | Live (YDB + IRIS) | Adversarial / erroneous-input probes |
+|---|---:|:--:|:--:|---|
+| `build` | ~75 | — | ✓ (every gate builds its inputs) | deterministic-output + golden-KID drift |
+| `parse` | ~11 | ✓ 2,404 | ✓ | malformed-section handling |
+| `decompose`/`assemble`/`roundtrip`/`canonicalize` | ~15 | ✓ 2,404 round-trips | ✓ | **tamper-faithfulness** (an edit must survive the round-trip, exit 3 on drift) |
+| `classify` | ~13 | ✓ 2,404 | — | mixed/foreign-overwrite class detection |
+| `lint` (PIKS) | ~6 | — | — | blocked-data-class refusal (exit 3) |
+| `diff` / `--dry-run` | ~6 | — | ✓ clean→NEW, installed→identical, **edited→CHANGED** | read-only no-op proof (engine byte-identical) |
+| `install` | ~47 | — | ✓ | no-clobber refuse, already-installed, **checksum-mismatch**, **heal-on-healthy**, env-check/required-build, **half-install corpse → heal** |
+| `verify` | ~38 | — | ✓ content + drift | not-installed (exit 3), drift detection |
+| `snapshot` | ~9 | — | ✓ | honest `completeUndo` for side-effecting builds |
+| `restore` | ~8 | — | ✓ | **tampered-sidecar refuse** (`SIDECAR_TAMPERED`) |
+| `uninstall` | ~23 | — | ✓ | side-effecting refuse, **foreign-brick refuse** (24/24), **partition ordering** (17/17), double-uninstall grace |
+| `attest verify` | ~21 | — | ✓ chain + **live replay** | **tampered-ledger refuse**, wrong-key / unsigned refuse |
+
+¹ Approximate: counts the test functions exercising each command; shared suites
+(e.g. the install/verify/uninstall lifecycle suite) are counted under each relevant
+command, so the column sums to more than the 222 distinct functions.
+
+### Intentionally-broken patches (the safety demos)
+
+Every safety feature is proven against a deliberately-malformed input that v-pkg must
+refuse — these run on **both** engines every `make stress`:
+
+| Broken input | v-pkg must… | Result |
+|---|---|---|
+| Routine bytes that don't match the stored checksum | refuse `CHECKSUM_MISMATCH` (exit 4) | ✓ |
+| Pre-image sidecar edited after capture | refuse `SIDECAR_TAMPERED` (exit 4) | ✓ |
+| Attestation ledger record edited | `attest verify` fail (exit 3, chain broken) | ✓ |
+| Install over a national routine with no pre-image | refuse `INSTALL_REFUSED` (exit 4) | ✓ |
+| Bare uninstall of a side-effecting patch | refuse (would orphan data) | ✓ |
+| Uninstall a foreign-overwrite with no pre-image | refuse (would brick a national routine) | ✓ 24/24 |
+| `--heal` on a healthy install | refuse (heal ≠ clobber) | ✓ |
+| A corrupt half-install (`#9.7` with a `"B"` xref but no `0`-node) | detect + **purge + reinstall** under `--heal` | ✓ |
+| Required-build absent | refuse (env-check enforcement) | ✓ |
+| Decompose→assemble of a tampered tree | carry the change through (auditable, no silent swallow) | ✓ |
+
+### What is *not* claimed
+
+In the spirit of v-pkg's own honesty principle: the live tiers prove the install
+lifecycle on **two real national packages (MSL + VSL) plus 16 synthetic fixtures**, not
+by installing all 2,404 corpus distributions on a live engine (infeasible — many have
+unmet inter-package dependencies). The corpus-wide tier covers the *offline* path
+(parse/round-trip/checksum/classify) across all 2,404. The live adversarial gates run on
+the engine host (they need the Docker/remote engines), not inside the per-push CI, which
+runs the unit tier + lint + vulnerability scan.
+
+## 12. Reference — environment, files, and flags
 
 **Environment (read by the driver, never on the command line):**
 - YDB: `M_YDB_BIN`, `M_YDB_CONTAINER`, `M_YDB_TRANSPORT`, `M_YDB_DIST`, `M_YDB_GBLDIR`, `M_YDB_ROUTINES`

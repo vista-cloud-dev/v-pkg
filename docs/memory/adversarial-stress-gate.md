@@ -1,6 +1,6 @@
 ---
 name: adversarial-stress-gate
-description: scripts/adversarial-stress.sh + `make stress` — the live-gate's harder sibling; full MSL+VSL lifecycle (assembly→disassembly→install→verify+drift→back-out) with adversarial refusal probes. 37/37 both engines 2026-06-29. Surfaced AND fixed the verify --drift TAB-indentation false-positive.
+description: scripts/adversarial-stress.sh + `make stress` — the live-gate's harder sibling; full MSL+VSL lifecycle (assembly→disassembly→install→verify+drift→back-out) with adversarial refusal probes. 56/56 both engines (YDB vehu + IRIS foia) 2026-06-30. Surfaced AND fixed the verify --drift TAB-indentation false-positive.
 metadata:
   type: project
 ---
@@ -8,9 +8,22 @@ metadata:
 **Adversarial stress gate (2026-06-29)** — `scripts/adversarial-stress.sh` /
 `make stress [ENGINE=ydb|iris] [TRANSPORT=] [OFFLINE=1]`. The live-package-gate
 proves the happy path; this tries to BREAK things across the *whole* lifecycle and
-asserts v-pkg REFUSES the unsafe moves. **36/36 on BOTH YDB/vehu and IRIS/foia-t12.**
+asserts v-pkg REFUSES the unsafe moves. **56/56 on BOTH YDB/vehu and IRIS/foia (2026-06-30).**
 Complements [[live-package-gate]], [[verify-drift]], [[class-aware-install]],
-[[class-aware-uninstall]].
+[[class-aware-uninstall]], [[install-attestation]], [[half-install-heal]], [[dry-run-compare]].
+
+**Added 2026-06-30 (closing the V&V coverage boundaries):**
+- **G7 heal corrupt-purge (live):** seeds a §7.1 corpse (`^XPD(9.7,ien)` with a `"B"`
+  xref + `"ASP"` but NO `0`-node, at a fixed out-of-range IEN 9000001) via the approved
+  ad-hoc `m vista exec` (`mseed` helper, MUST be `|| true` so a seed hiccup never aborts
+  the `set -e` script; prefer the repo-local `../m-cli/dist/m`, not the PATH `m` wrapper),
+  proves a normal install is FALSELY blocked (already-installed, exit 4), then `--heal`
+  purges + reinstalls to status 3. Belt-and-suspenders K before AND after.
+- **G6 dry-run CHANGED (live):** `diff ZZCK-bad` against the installed ZZCK-ok reads the
+  one differing routine as `changed>=1` — the CHANGED case the standing live-gate (all-new
+  / all-identical only) didn't cover.
+- **Attestation #4 (8 probes):** install writes a record → chain verify → `--replay` →
+  tampered-ledger refuse (exit 3) → uninstall chains a 2nd record. Now proven on IRIS too.
 
 **Phase 1 — OFFLINE (22 asserts, no engine), per package:** build · determinism
 (byte-identical rebuild) · parse (install-name) · classify (MSL=class-1 pure,
