@@ -112,7 +112,7 @@ func TestLoadBuild_ZZSKEL(t *testing.T) {
 // --- install ----------------------------------------------------------------
 
 func TestRunInstall_Success(t *testing.T) {
-	f := &fakeDriver{runStdout: installspec.ResultMarker + "status=3\n"}
+	f := &fakeDriver{runStdout: installspec.ResultMarker + "status:" + opToken + "=3\n"}
 	res, err := runInstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", "hdr", zzskelPairs(), true, nil, nil)
 	if err != nil {
 		t.Fatalf("runInstall: %v", err)
@@ -132,7 +132,7 @@ func TestRunInstall_Success(t *testing.T) {
 // A.4: a multi-build distribution installs each constituent in header order. When
 // every build files, all reports come back in order with Installed=true.
 func TestInstallSequence_AllInOrder(t *testing.T) {
-	f := &fakeDriver{runStdout: installspec.ResultMarker + "status=3\n"}
+	f := &fakeDriver{runStdout: installspec.ResultMarker + "status:" + opToken + "=3\n"}
 	names := []string{"EAS*1.0*96", "IVM*2.0*156"}
 	mk := func(name string) liveInstallInput {
 		return liveInstallInput{name: name, header: name, pairs: zzskelPairs(), runEnvCheck: false}
@@ -152,7 +152,7 @@ func TestInstallSequence_AllInOrder(t *testing.T) {
 // A.4: if a constituent build fails to reach status 3, the sequence stops — later
 // builds (which may depend on it) are never attempted.
 func TestInstallSequence_StopsOnFailure(t *testing.T) {
-	f := &fakeDriver{runStdout: installspec.ResultMarker + "status=2\n"} // never completes
+	f := &fakeDriver{runStdout: installspec.ResultMarker + "status:" + opToken + "=2\n"} // never completes
 	names := []string{"EAS*1.0*96", "IVM*2.0*156"}
 	mk := func(name string) liveInstallInput {
 		return liveInstallInput{name: name, header: name, pairs: zzskelPairs(), runEnvCheck: false}
@@ -172,7 +172,7 @@ func TestInstallSequence_StopsOnFailure(t *testing.T) {
 // A package whose transport global exceeds one chunk must stage in several
 // load+run cycles (none big enough to truncate), then finalize once.
 func TestRunInstall_MultiChunkStages(t *testing.T) {
-	f := &fakeDriver{runStdout: installspec.ResultMarker + "status=3\n"}
+	f := &fakeDriver{runStdout: installspec.ResultMarker + "status:" + opToken + "=3\n"}
 	lines := make([]string, 0, 4000)
 	lines = append(lines, "ZZBIG ;big")
 	for i := 0; i < 4000; i++ {
@@ -182,7 +182,7 @@ func TestRunInstall_MultiChunkStages(t *testing.T) {
 		InstallName: "ZZBIG*1.0*1", Namespace: "ZZBIG",
 		Routines: []kids.RoutineSrc{{Name: "ZZBIG", Lines: lines}},
 	})
-	chunks := installspec.StageChunks(pairs, stageChunkBytes)
+	chunks := installspec.StageChunks(pairs, stageChunkBytes, opToken)
 	if len(chunks) < 2 {
 		t.Fatalf("test needs a multi-chunk build, got %d chunks for %d pairs", len(chunks), len(pairs))
 	}

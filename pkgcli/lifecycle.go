@@ -2,6 +2,8 @@ package pkgcli
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,15 +31,32 @@ import (
 // output. Live-proven end-to-end on the YDB FOIA engine (ZZSKEL), see
 // docs/kids-installation-automation.md §7.1.
 
-// Scratch routine names for the staged lifecycle scripts (ZV* keeps them in a
-// local/throwaway namespace, clear of real VistA routines). They persist on the
-// target after the run — harmless, and overwritten on the next invocation.
-const (
-	rtnInstall   = "ZVPKGINS"
-	rtnVerify    = "ZVPKGVFY"
-	rtnUninstall = "ZVPKGUNI"
-	rtnRead      = "ZVPKGRD"
-	rtnHeal      = "ZVPKGHL"
+// opToken is a per-PROCESS random token (8 hex chars) that makes this invocation's
+// engine-side scratch state unique, so two concurrent `v pkg` runs against the same
+// engine cannot clobber each other. It suffixes the scratch routine names AND
+// subscripts the staging global (^XTMP("VPKGI",opToken,…)). One process ↔ one token
+// (all chunks + the finalize of an install share it); a fresh process gets a fresh
+// token. A rand failure falls back to the PID so the names stay valid + distinct.
+var opToken = newOpToken()
+
+func newOpToken() string {
+	var b [4]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "p" + strconv.Itoa(os.Getpid())
+	}
+	return hex.EncodeToString(b[:])
+}
+
+// Scratch routine names for the staged lifecycle scripts — ZV* (throwaway namespace,
+// clear of real VistA routines) + the per-process opToken so concurrent runs use
+// DISTINCT routine names (no cross-op clobber of staged source between a Load and its
+// ExecRun). They persist on the target after the run — harmless, overwritten next time.
+var (
+	rtnInstall   = "ZVINS" + opToken
+	rtnVerify    = "ZVVFY" + opToken
+	rtnUninstall = "ZVUNI" + opToken
+	rtnRead      = "ZVRD" + opToken
+	rtnHeal      = "ZVHL" + opToken
 )
 
 // engineConn selects which engine driver to drive and over which transport — the
@@ -229,13 +248,13 @@ func runInstall(ctx context.Context, cl *mdriver.Client, name, header string, pa
 	// staged into KIDS filing (F1, waterline rule 3: only real KIDS content crosses
 	// the seam). A declaration-free build is unaffected (EnginePairs is a no-op).
 	pairs = kids.EnginePairs(pairs)
-	chunks := installspec.StageChunks(pairs, stageChunkBytes)
+	chunks := installspec.StageChunks(pairs, stageChunkBytes, opToken)
 	for i, body := range chunks {
 		if _, _, err := runMScript(ctx, cl, rtnInstall, body); err != nil {
 			return installResult{Name: name}, fmt.Errorf("stage chunk %d/%d: %w", i+1, len(chunks), err)
 		}
 	}
-	markers, _, err := runMScript(ctx, cl, rtnInstall, installspec.FinalInstallScript(name, header, len(pairs), runEnvCheck, ques, reg))
+	markers, _, err := runMScript(ctx, cl, rtnInstall, installspec.FinalInstallScript(name, header, len(pairs), runEnvCheck, ques, reg, opToken))
 	if err != nil {
 		return installResult{Name: name}, err
 	}
@@ -244,6 +263,12 @@ func runInstall(ctx context.Context, cl *mdriver.Client, name, header string, pa
 		if e == "already-installed" {
 			r.Error = e
 			return r, nil
+		}
+		// install-locked: another v-pkg install of the SAME name holds the advisory
+		// lock (concurrent op). Surface as a runtime refusal — retry once it releases.
+		if e == "install-locked" {
+			return installResult{Name: name}, fmt.Errorf(
+				"install refused: another install of %s is in progress (advisory lock held) — retry shortly", name)
 		}
 		// env-check-rejected^<rc>^<reqab>: the build's environment-check routine
 		// or Required-Build (#9.611) enforcement rejected the install (A.1.2).
@@ -258,7 +283,10 @@ func runInstall(ctx context.Context, cl *mdriver.Client, name, header string, pa
 		return installResult{Name: name}, fmt.Errorf("install refused: %s (staged %s of %d nodes)",
 			e, strings.TrimSpace(markers["staged"]), len(pairs))
 	}
-	r.Status, _ = strconv.Atoi(strings.TrimSpace(markers["status"]))
+	// Read the nonce-tagged success oracle: only the status line carrying THIS op's
+	// token is trusted (a build's pre/post M cannot forge it). An untagged or
+	// wrong-token status is ignored → Installed stays false.
+	r.Status, _ = strconv.Atoi(strings.TrimSpace(markers["status:"+opToken]))
 	r.Installed = r.Status == 3
 	r.PackageIEN = strings.TrimSpace(markers["pkg"])
 	return r, nil

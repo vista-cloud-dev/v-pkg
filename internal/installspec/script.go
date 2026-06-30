@@ -35,20 +35,23 @@ const ResultMarker = "<<VPKG>>"
 //
 // The MERGE makes the install routine constant-size regardless of package size.
 
-// stageOpen is the open global reference the staging SETs hang off (MRef closes
-// the paren); stageGbl is the same global, used to clear/merge/count it whole.
-const (
-	stageOpen = `^XTMP("VPKGI",`
-	stageGbl  = `^XTMP("VPKGI")`
-)
+// The staging global is subscripted by a per-OP token — ^XTMP("VPKGI",<token>,…) —
+// so two concurrent installs against the same engine stage into DISJOINT subtrees and
+// cannot clobber or contaminate each other's staged transport (the count guard alone
+// could not distinguish interleaved nodes). stageOpenFor is the open ref the staging
+// SETs hang off (MRef closes the paren); stageGblFor is the same subtree whole
+// (clear/merge/count). The token is escaped as an M string subscript.
+func stageOpenFor(token string) string { return `^XTMP("VPKGI",` + kids.MString(token) + `,` }
+func stageGblFor(token string) string  { return `^XTMP("VPKGI",` + kids.MString(token) + `)` }
 
-// StageChunks renders the transport-global pairs as M routine bodies that
-// populate the staging global ^XTMP("VPKGI",…). Each body is kept at or below
-// maxBytes (a lone over-long SET is its own chunk), so no single staged routine
-// is large enough to hit the driver's silent-truncation limit. The first body
-// clears any stale staging global. Run each body in order; the global persists
+// StageChunks renders the transport-global pairs as M routine bodies that populate
+// this op's staging subtree ^XTMP("VPKGI",token,…). Each body is kept at or below
+// maxBytes (a lone over-long SET is its own chunk), so no single staged routine is
+// large enough to hit the driver's silent-truncation limit. The first body clears any
+// stale staging subtree FOR THIS TOKEN. Run each body in order; the global persists
 // across the (stateless) driver processes, accumulating the whole tree.
-func StageChunks(pairs []kids.Pair, maxBytes int) []string {
+func StageChunks(pairs []kids.Pair, maxBytes int, token string) []string {
+	stageOpen, stageGbl := stageOpenFor(token), stageGblFor(token)
 	var chunks []string
 	var b strings.Builder
 	b.WriteString("K " + stageGbl + "\n") // clear stale staging before the first batch
@@ -95,21 +98,30 @@ type PkgReg struct {
 	Patch   string
 }
 
-func FinalInstallScript(name, header string, nPairs int, runEnvCheck bool, ques []QuesAnswer, reg *PkgReg) string {
+func FinalInstallScript(name, header string, nPairs int, runEnvCheck bool, ques []QuesAnswer, reg *PkgReg, token string) string {
+	stageGbl := stageGblFor(token)
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
 	nameLit := kids.MString(name)
 
 	w(`S U="^",DUZ=1,DUZ(0)="@" S:'$D(DT) DT=$$DT^XLFDT`)
+	// Serialize same-build installs: hold an advisory LOCK across the
+	// already-installed guard AND the $$INST^XPDIL1 entry-create below, so two
+	// concurrent installs of the SAME name cannot both pass the $D check and file two
+	// #9.7 entries (the duplicate-entry TOCTOU). The LOCK is incremental on a v-pkg
+	// node (not a KIDS global, to avoid colliding with KIDS' own locks); a 5s timeout
+	// refuses rather than blocking forever. Held for the whole process (released at Q).
+	w(`L +^XTMP("VPKGLOCK",` + nameLit + `):5 E  K ` + stageGbl + ` W "` + ResultMarker + `error=install-locked",! Q`)
 	// Refuse a re-install up front — INST^XPDIL1 prompts "OK to continue with
 	// Load" when the name is already in #9.7, and there is no stdin over Exec.
-	w(`I $D(^XPD(9.7,"B",` + nameLit + `)) K ` + stageGbl + ` W "` + ResultMarker + `error=already-installed",! Q`)
-	// Count the staged nodes ($QUERY over the staging subtree) and refuse unless
-	// every pair arrived — guards against a silently-truncated chunk stage.
+	w(`I $D(^XPD(9.7,"B",` + nameLit + `)) L -^XTMP("VPKGLOCK",` + nameLit + `) K ` + stageGbl + ` W "` + ResultMarker + `error=already-installed",! Q`)
+	// Count the staged nodes ($QUERY over THIS op's token subtree only) and refuse
+	// unless every pair arrived — guards a silently-truncated chunk stage, and the
+	// $QSUBSCRIPT bound keeps a concurrent op's subtree from inflating the count.
 	w(`N VC,VR S VC=0,VR=` + kids.MString(stageGbl))
-	w(`F  S VR=$Q(@VR) Q:(VR="")!(VR'[` + kids.MString("VPKGI") + `)  S VC=VC+1`)
+	w(`F  S VR=$Q(@VR) Q:(VR="")!($QS(VR,1)'=` + kids.MString("VPKGI") + `)!($QS(VR,2)'=` + kids.MString(token) + `)  S VC=VC+1`)
 	w(`W "` + ResultMarker + `staged=",VC,!`)
-	w(`I VC'=` + strconv.Itoa(nPairs) + ` K ` + stageGbl + ` W "` + ResultMarker + `error=stage-incomplete",! Q`)
+	w(`I VC'=` + strconv.Itoa(nPairs) + ` L -^XTMP("VPKGLOCK",` + nameLit + `) K ` + stageGbl + ` W "` + ResultMarker + `error=stage-incomplete",! Q`)
 	w(`D HOME^%ZIS`)
 	w(`S XPDST=0,XPDIT=1,XPDST("H1")=` + kids.MString(header+"  ;Created on "))
 	w(`S XPDA=$$INST^XPDIL1(` + nameLit + `)`)
@@ -136,7 +148,7 @@ func FinalInstallScript(name, header string, nPairs int, runEnvCheck bool, ques 
 		w(`S XPDNM=$P($G(^XPD(9.7,XPDA,0)),U),XPDPKG=+$P($G(^XPD(9.7,XPDA,0)),U,2)`)
 		w(`S XPDT(XPDIT)=XPDA_U_XPDNM,XPDT("NM",XPDA)=XPDIT,XPDT("DA",XPDNM)=XPDIT`)
 		w(`N XPDENV,XPDENVRC S XPDENV=1,XPDENVRC=$$ENV^XPDIL1(1)`)
-		w(`I XPDENVRC K ^XPD(9.7,"B",XPDNM,XPDA),^XPD(9.7,XPDA),` + stageGbl + ` W "` + ResultMarker + `error=env-check-rejected^"_XPDENVRC_"^"_$G(XPDREQAB),! Q`)
+		w(`I XPDENVRC L -^XTMP("VPKGLOCK",` + nameLit + `) K ^XPD(9.7,"B",XPDNM,XPDA),^XPD(9.7,XPDA),` + stageGbl + ` W "` + ResultMarker + `error=env-check-rejected^"_XPDENVRC_"^"_$G(XPDREQAB),! Q`)
 	}
 	// Pre-answer the build's install questions (A.1.3). The interactive question
 	// phase (EN^XPDIQ, via EN^XPDI) is skipped by the direct-populate path, so a
@@ -184,7 +196,12 @@ func FinalInstallScript(name, header string, nPairs int, runEnvCheck bool, ques 
 	w(`S XPDCPR=$G(^XTMP("XPDI",XPDA,"INIT")) I XPDCPR]"" S XPDCPY=$$NEWCP^XPDUTL("XPD POSTINSTALL STARTED",XPDCPR)`)
 	w(`D EN^XPDIJ`)
 	w(`K ` + stageGbl)
-	w(`W "` + ResultMarker + `status=",$P($G(^XPD(9.7,XPDA,0)),U,9),!`)
+	w(`L -^XTMP("VPKGLOCK",` + nameLit + `)`)
+	// Nonce-tag the success oracle with the per-op token (status:<token>): the token is
+	// host-random and lives only in this op's scratch routine, so a build's pre/post
+	// routine (which runs INSIDE EN^XPDIJ, before this line) cannot pre-forge a
+	// `status:<token>=3` marker. The Go side trusts only the token-tagged line.
+	w(`W "` + ResultMarker + `status:` + token + `=",$P($G(^XPD(9.7,XPDA,0)),U,9),!`)
 	// A.3 PACKAGE #9.4 footprint (F6). The real install line (XPDIP, PKGV) stamps the
 	// package's VERSION (#9.49) + PATCH APPLICATION HISTORY (#9.4901) from the build's
 	// PACKAGE FILE LINK; the direct-populate path files the build but writes no #9.4

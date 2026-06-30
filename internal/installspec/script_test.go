@@ -28,31 +28,31 @@ func zzskelPairs() []kids.Pair {
 }
 
 // StageChunks splits the transport global into size-bounded routine bodies that
-// populate the ^XTMP("VPKGI",…) staging global — never one routine big enough to
+// populate the ^XTMP("VPKGI","tok",…) staging global — never one routine big enough to
 // exceed the driver's per-routine staging limit (which silently truncates large
 // loads, T0b.2 discoveries P1).
 func TestStageChunks_CoversAllPairsBounded(t *testing.T) {
 	pairs := zzskelPairs()
 	const maxBytes = 80
-	chunks := StageChunks(pairs, maxBytes)
+	chunks := StageChunks(pairs, maxBytes, "tok")
 	if len(chunks) < 2 {
 		t.Fatalf("want multiple chunks at maxBytes=%d, got %d", maxBytes, len(chunks))
 	}
 	// The first chunk clears any stale staging global before populating it.
-	if !strings.HasPrefix(chunks[0], `K ^XTMP("VPKGI")`) {
+	if !strings.HasPrefix(chunks[0], `K ^XTMP("VPKGI","tok")`) {
 		t.Errorf("first chunk must clear the staging global, got:\n%s", chunks[0])
 	}
 	all := strings.Join(chunks, "\n")
-	// Every pair is staged exactly once, into ^XTMP("VPKGI",…) (not the live
+	// Every pair is staged exactly once, into ^XTMP("VPKGI","tok",…) (not the live
 	// ^XTMP("XPDI",XPDA,…) — that is filled by the finalize MERGE).
 	for _, p := range pairs {
-		ref := "S " + p.Subs.MRef(`^XTMP("VPKGI",`) + "="
+		ref := "S " + p.Subs.MRef(`^XTMP("VPKGI","tok",`) + "="
 		if n := strings.Count(all, ref); n != 1 {
 			t.Errorf("pair %q staged %d times, want 1", ref, n)
 		}
 	}
 	// Embedded quotes in routine source are doubled.
-	if !strings.Contains(all, `S ^XTMP("VPKGI","RTN","ZZSKEL",5,0)=" quit ""pong"""`) {
+	if !strings.Contains(all, `S ^XTMP("VPKGI","tok","RTN","ZZSKEL",5,0)=" quit ""pong"""`) {
 		t.Errorf("RTN line 5 not M-escaped:\n%s", all)
 	}
 	// Each chunk stays bounded (a lone over-long SET may exceed maxBytes, but a
@@ -67,7 +67,7 @@ func TestStageChunks_CoversAllPairsBounded(t *testing.T) {
 // FinalInstallScript verifies the staged count, then installs in one process:
 // INST → MERGE the staged tree into ^XTMP("XPDI",XPDA) → EN^XPDIJ.
 func TestFinalInstallScript(t *testing.T) {
-	got := FinalInstallScript("ZZSKEL*1.0*1", "ZZSKEL via v pkg install", 7, true, nil, nil)
+	got := FinalInstallScript("ZZSKEL*1.0*1", "ZZSKEL via v pkg install", 7, true, nil, nil, "tok")
 	for _, want := range []string{
 		`I $D(^XPD(9.7,"B","ZZSKEL*1.0*1"))`,            // already-installed guard
 		`DUZ(0)="@"`,                                    // full FM priv for EN^XPDIJ
@@ -75,13 +75,13 @@ func TestFinalInstallScript(t *testing.T) {
 		`I VC'=7`,                                       // truncation guard: count must match
 		ResultMarker + `error=stage-incomplete`,         // …else refuse, do not install partial
 		`S XPDA=$$INST^XPDIL1("ZZSKEL*1.0*1")`,          // real KIDS #9.7 entry
-		`M ^XTMP("XPDI",XPDA)=^XTMP("VPKGI")`,           // staged tree → live transport global
+		`M ^XTMP("XPDI",XPDA)=^XTMP("VPKGI","tok")`,     // staged tree → live transport global
 		`^XPD(9.7,XPDA,"KRN")=^XTMP("XPDI",XPDA,"BLD",`, // seed #9.7 KRN tracking (else XPDIK GVUNDEF)
 		`^XTMP("XPDI",XPDA,"FIA",`,                      // FileMan FILE: seed new-file flag …,0,2)
 		`XPCK^XPDIK("FIA")`,                             // …and the #9.7 FILE checkpoint (else FIA^XPDIK GVUNDEF)
 		`D EN^XPDIJ`,                                    // synchronous install (same process)
-		`K ^XTMP("VPKGI")`,                              // clean the staging global
-		ResultMarker + `status=`,                        // #9.7 status marker
+		`K ^XTMP("VPKGI","tok")`,                        // clean the staging global
+		ResultMarker + `status:tok=`,                    // #9.7 status marker (nonce-tagged)
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("FinalInstallScript missing %q\n---\n%s", want, got)
@@ -96,9 +96,9 @@ func TestFinalInstallScript(t *testing.T) {
 // KIDS load always starts from a clean node. (Live-proven: a stale REQB made a
 // hook-only build's env-check return 2 until the KILL was added.)
 func TestFinalInstallScript_KillBeforeMerge(t *testing.T) {
-	got := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, true, nil, nil)
+	got := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, true, nil, nil, "tok")
 	kill := strings.Index(got, `K ^XTMP("XPDI",XPDA)`)
-	merge := strings.Index(got, `M ^XTMP("XPDI",XPDA)=^XTMP("VPKGI")`)
+	merge := strings.Index(got, `M ^XTMP("XPDI",XPDA)=^XTMP("VPKGI","tok")`)
 	if kill < 0 {
 		t.Fatalf("FinalInstallScript must KILL ^XTMP(\"XPDI\",XPDA) before the MERGE\n---\n%s", got)
 	}
@@ -113,7 +113,7 @@ func TestFinalInstallScript_KillBeforeMerge(t *testing.T) {
 // HISTORY) — so downstream $$VER/$$PATCH^XPDUTL see the install.
 func TestFinalInstallScript_PackageFootprint(t *testing.T) {
 	reg := &PkgReg{Prefix: "ZZP", Name: "ZZ DEMO PACKAGE", Version: "1.0", Patch: "1"}
-	got := FinalInstallScript("ZZP*1.0*1", "hdr", 7, true, nil, reg)
+	got := FinalInstallScript("ZZP*1.0*1", "hdr", 7, true, nil, reg, "tok")
 	for _, want := range []string{
 		`^DIC(9.4,"C","ZZP",`,                     // resolve the package by PREFIX
 		`XPDFDA(9.4,"+1,",.01)="ZZ DEMO PACKAGE"`, // create #9.4 entry (NAME) when absent
@@ -132,7 +132,7 @@ func TestFinalInstallScript_PackageFootprint(t *testing.T) {
 		t.Error("package footprint must come after D EN^XPDIJ")
 	}
 	// Without a registration, no footprint code leaks in.
-	plain := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, true, nil, nil)
+	plain := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, true, nil, nil, "tok")
 	if strings.Contains(plain, `$$PKGVER^XPDIP(`) {
 		t.Error("a build with no package registration must emit no #9.4 footprint")
 	}
@@ -141,7 +141,7 @@ func TestFinalInstallScript_PackageFootprint(t *testing.T) {
 // A patch-less registration writes the VERSION footprint but skips PATCH history.
 func TestFinalInstallScript_PackageFootprint_NoPatch(t *testing.T) {
 	reg := &PkgReg{Prefix: "ZZP", Name: "ZZ DEMO PACKAGE", Version: "2.0"}
-	got := FinalInstallScript("ZZP*2.0", "hdr", 7, true, nil, reg)
+	got := FinalInstallScript("ZZP*2.0", "hdr", 7, true, nil, reg, "tok")
 	if !strings.Contains(got, `$$PKGVER^XPDIP(`) {
 		t.Error("patch-less registration must still write the VERSION footprint")
 	}
@@ -156,7 +156,7 @@ func TestFinalInstallScript_PackageFootprint_NoPatch(t *testing.T) {
 // for the COMPLETED checkpoint, then the STARTED one (carrying the routine) only
 // when the transport carries a pre/post routine name.
 func TestFinalInstallScript_PrePostCheckpoints(t *testing.T) {
-	got := FinalInstallScript("ZZSKEL*1.0*1", "ZZSKEL via v pkg install", 7, true, nil, nil)
+	got := FinalInstallScript("ZZSKEL*1.0*1", "ZZSKEL via v pkg install", 7, true, nil, nil, "tok")
 	for _, want := range []string{
 		`S XPDCP="INI"`, // pre-install checkpoint multiple (subfile 9.713)
 		`$$NEWCP^XPDUTL("XPD PREINSTALL COMPLETED")`, // base checkpoint
@@ -183,7 +183,7 @@ func TestFinalInstallScript_PrePostCheckpoints(t *testing.T) {
 // on a non-zero reject. With runEnvCheck=false it must emit none of that (the
 // restore/back-out callers must not re-run env-check).
 func TestFinalInstallScript_EnvCheck(t *testing.T) {
-	on := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, true, nil, nil)
+	on := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, true, nil, nil, "tok")
 	for _, want := range []string{
 		`S XPDT(XPDIT)=XPDA_U_XPDNM`,                 // seed XPDT (else ENV self-rejects)
 		`XPDPKG=+$P($G(^XPD(9.7,XPDA,0)),U,2)`,       // package pointer for the version check
@@ -199,7 +199,7 @@ func TestFinalInstallScript_EnvCheck(t *testing.T) {
 	if iE, iJ := strings.Index(on, `$$ENV^XPDIL1(1)`), strings.Index(on, `D EN^XPDIJ`); iE < 0 || iJ < 0 || iE > iJ {
 		t.Errorf("env-check (%d) must precede EN^XPDIJ (%d)", iE, iJ)
 	}
-	off := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, false, nil, nil)
+	off := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, false, nil, nil, "tok")
 	if strings.Contains(off, `$$ENV^XPDIL1`) {
 		t.Errorf("runEnvCheck=false must NOT call $$ENV^XPDIL1\n---\n%s", off)
 	}
@@ -213,7 +213,7 @@ func TestFinalInstallScript_QuesAnswers(t *testing.T) {
 	got := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, true, []QuesAnswer{
 		{Name: "ZZ4Q", Value: "HELLO"},
 		{Name: "RUN MODE", Value: "1"},
-	}, nil)
+	}, nil, "tok")
 	for _, want := range []string{
 		`S ^XPD(9.7,XPDA,"QUES",1,0)="ZZ4Q",^XPD(9.7,XPDA,"QUES",1,1)="HELLO",^XPD(9.7,XPDA,"QUES","B","ZZ4Q",1)=""`,
 		`S ^XPD(9.7,XPDA,"QUES",2,0)="RUN MODE",^XPD(9.7,XPDA,"QUES",2,1)="1",^XPD(9.7,XPDA,"QUES","B","RUN MODE",2)=""`,
@@ -227,7 +227,7 @@ func TestFinalInstallScript_QuesAnswers(t *testing.T) {
 		t.Errorf("QUES seed (%d) must precede EN^XPDIJ (%d)", iQ, iJ)
 	}
 	// No answers → no QUES sets at all.
-	if none := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, true, nil, nil); strings.Contains(none, `"QUES"`) {
+	if none := FinalInstallScript("ZZSKEL*1.0*1", "hdr", 7, true, nil, nil, "tok"); strings.Contains(none, `"QUES"`) {
 		t.Errorf("hook-free build must not seed QUES\n---\n%s", none)
 	}
 }

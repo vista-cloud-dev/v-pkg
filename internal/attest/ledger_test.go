@@ -2,6 +2,8 @@ package attest
 
 import (
 	"path/filepath"
+	"strconv"
+	"sync"
 	"testing"
 )
 
@@ -45,5 +47,52 @@ func TestLedger_AppendChainsAndLoads(t *testing.T) {
 	}
 	if n, err := VerifyChain(recs); err != nil {
 		t.Errorf("loaded chain failed verify at %d: %v", n, err)
+	}
+}
+
+// TestWithLedgerLock_ConcurrentAppendsStayChained proves the lock serializes
+// read-tip→seal→append: 30 goroutines appending concurrently to one ledger must
+// produce a VALID chain of exactly 30 records. Without the lock they would read the
+// same tip, seal with the same prevHash, and fork the chain (VerifyChain would break).
+func TestWithLedgerLock_ConcurrentAppendsStayChained(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "concurrent.attest.jsonl")
+	const n = 30
+	var wg sync.WaitGroup
+	errs := make(chan error, n)
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			errs <- WithLedgerLock(path, func() error {
+				last, err := LastHash(path)
+				if err != nil {
+					return err
+				}
+				r := sampleRecord()
+				r.Name = "B*1.0*" + strconv.Itoa(i)
+				sealed, err := Seal(r, last, nil)
+				if err != nil {
+					return err
+				}
+				return Append(path, sealed)
+			})
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent append: %v", err)
+		}
+	}
+	recs, err := Load(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(recs) != n {
+		t.Fatalf("got %d records, want %d (a lost/forked append)", len(recs), n)
+	}
+	if at, err := VerifyChain(recs); err != nil {
+		t.Errorf("concurrent ledger chain invalid at %d: %v", at, err)
 	}
 }

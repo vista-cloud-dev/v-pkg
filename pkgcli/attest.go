@@ -191,19 +191,24 @@ func emitAttestation(flags attestFlags, kidFile string, r attest.Record) error {
 		priv = p
 	}
 	path := flags.ledgerPath(kidFile)
-	last, err := attest.LastHash(path)
-	if err != nil {
-		return fmt.Errorf("read attestation ledger %s: %w", path, err)
-	}
 	r.Timestamp = time.Now().UTC().Format(time.RFC3339)
-	sealed, err := attest.Seal(r, last, priv)
-	if err != nil {
-		return fmt.Errorf("seal attestation record: %w", err)
-	}
-	if err := attest.Append(path, sealed); err != nil {
-		return fmt.Errorf("append attestation record to %s: %w", path, err)
-	}
-	return nil
+	// Read-tip → seal → append must be atomic across concurrent v-pkg processes, or two
+	// ops chain onto the same tip and fork the hash chain. Hold the cross-process ledger
+	// lock for the whole sequence.
+	return attest.WithLedgerLock(path, func() error {
+		last, err := attest.LastHash(path)
+		if err != nil {
+			return fmt.Errorf("read attestation ledger %s: %w", path, err)
+		}
+		sealed, err := attest.Seal(r, last, priv)
+		if err != nil {
+			return fmt.Errorf("seal attestation record: %w", err)
+		}
+		if err := attest.Append(path, sealed); err != nil {
+			return fmt.Errorf("append attestation record to %s: %w", path, err)
+		}
+		return nil
+	})
 }
 
 // attestEmitError wraps an attestation-emit failure as a clikit error. The engine
