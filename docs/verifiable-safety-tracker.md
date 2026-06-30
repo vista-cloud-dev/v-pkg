@@ -13,7 +13,9 @@ validation. Archive this doc to `docs/archive/` when all four land.
 one increment; archive the prompts folder with this tracker when the effort lands):
 [`#1`](proposals/verifiable-safety/prompts/increment-1-kickoff.md) (done) ·
 [`#2`](proposals/verifiable-safety/prompts/increment-2-kickoff.md) (done — pre-install
-dry-run / compare-to-current).
+dry-run / compare-to-current) ·
+[`#3`](proposals/verifiable-safety/prompts/increment-3-kickoff.md) (next — robustness
+hardening: half-install heal · transport-checksum · sidecar integrity).
 
 | # | Increment | Value | Status |
 |---|---|---|---|
