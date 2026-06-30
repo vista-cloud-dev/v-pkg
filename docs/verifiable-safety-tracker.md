@@ -9,6 +9,10 @@ over 12,955 installed builds) and
 verified increment (TDD + gates + commit), most needing dual-engine (vehu/foia)
 validation. Archive this doc to `docs/archive/` when all four land.
 
+**Kickoff:** [`proposals/verifiable-safety/prompts/increment-1-kickoff.md`](proposals/verifiable-safety/prompts/increment-1-kickoff.md)
+bootstraps a fresh session into increment #1 (archive the prompts folder with this
+tracker when the effort lands).
+
 | # | Increment | Value | Status |
 |---|---|---|---|
 | 1 | Component-type coverage 11 → all standard FileMan types (verify + uninstall) | reliability — no orphan-on-uninstall, complete verify | **in progress** |
