@@ -115,10 +115,24 @@ note "install P2 --auto-snapshot -> overwrites ZZFGN, adds ZZVPTG, captures pre-
 [[ "$(rc install "$P2" "${conn[@]}" --auto-snapshot --output json)" == 0 ]] && ok "install P2 (auto-snapshot)" || { bad "install P2"; cat "$WORK/out.json"; }
 SIDE="$WORK/p2.preimage.kids"
 [[ -f "$SIDE" ]] && ok "pre-image sidecar written" || bad "no pre-image sidecar"
+[[ "$(jdata "['overwrites']")" == *ZZFGN* ]] && ok "ZZFGN captured as the overwrite" || bad "overwrites = $(jdata "['overwrites']")"
+[[ "$(jdata "['greenfield']")" == *ZZVPTG* ]] && ok "ZZVPTG is greenfield (not in pre-image)" || bad "greenfield = $(jdata "['greenfield']")"
 
-# A re-install probe sees ZZFGN and ZZVPTG as overwrites (both now present).
-rc install "$P2" "${conn[@]}" --auto-snapshot --output json >/dev/null
-[[ "$(jdata "['overwrites']")" == *ZZFGN* ]] && ok "ZZFGN present (overwrite) after install" || bad "overwrites = $(jdata "['overwrites']")"
+# --- D4: clean partition + --verify -> foreignRestore = exact ----------------
+# The pre-image captured ONLY ZZFGN (ZZVPTG was greenfield), so uninstall --verify
+# partitions (restore ZZFGN, delete ZZVPTG) and grades the declared-foreign restore:
+# ZZFGN must come back byte-identical to its pre-image (checksum surface + line-2).
+note "uninstall P2 --verify (sidecar present) -> partition + national-overwrite verify"
+r="$(rc uninstall "$P2" "${conn[@]}" --verify --output json)"
+[[ "$r" == 0 ]] && ok "partition uninstall (exit 0)" || { bad "partition uninstall exit = $r"; cat "$WORK/out.json"; }
+[[ "$(jdata "['action']")" == "partition" ]] && ok "action = partition" || bad "action = $(jdata "['action']")"
+[[ "$(jdata "['restored']")" == *ZZFGN* ]] && ok "restored = [ZZFGN]" || bad "restored = $(jdata "['restored']")"
+[[ "$(jdata "['verifyClean']")" == "clean" ]] && ok "verify-clean (line-2-blind)" || bad "verifyClean = $(jdata "['verifyClean']")"
+[[ "$(jdata "['foreignRestore']")" == "exact" ]] && ok "foreignRestore = exact (D4: byte-identical incl line 2)" || bad "foreignRestore = $(jdata "['foreignRestore']"), want exact"
+# Re-arm: ZZFGN is now back to v1 and ZZVPTG is gone — re-install P2 --auto-snapshot
+# so the refuse test below starts from the tap-shaped state again (ZZFGN overwritten
+# to v2, ZZVPTG present, fresh pre-image capturing ONLY ZZFGN v1).
+[[ "$(rc install "$P2" "${conn[@]}" --auto-snapshot --output json)" == 0 ]] && ok "re-armed (install P2)" || { bad "re-arm install"; cat "$WORK/out.json"; }
 
 # --- THE REFUSE: remove the sidecar, then bare uninstall --------------------
 note "REMOVE the sidecar, then uninstall P2 (no flags) -> MUST be REFUSED"

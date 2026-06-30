@@ -773,6 +773,32 @@ func checkDrift(ctx context.Context, cl *mdriver.Client, b *kids.Build) (map[str
 	return drift, nil
 }
 
+// foreignRestoreVerdict grades how faithfully the declared-foreign routines were
+// restored from src (the re-installed pre-image), reading each live off the engine
+// — the D4 national-overwrite verify, STRICTER than checkDrift's line-2-blind
+// RoutineDriftMatch. It returns the WORST verdict across the foreign routines
+// (kids.RestoreExact / RestoreProvenanceDrift / RestoreDrift), or "" when the
+// build declares no foreign routines. A foreign routine that reads back absent is
+// graded RestoreDrift (the restore did not reinstate it).
+func foreignRestoreVerdict(ctx context.Context, cl *mdriver.Client, src *kids.Build, foreignNames []string) (string, error) {
+	rank := map[string]int{"": 0, kids.RestoreExact: 1, kids.RestoreProvenanceDrift: 2, kids.RestoreDrift: 3}
+	worst := ""
+	for _, name := range foreignNames {
+		live, present, err := readRoutinePreimage(ctx, cl, name)
+		if err != nil {
+			return "", fmt.Errorf("read %s: %w", name, err)
+		}
+		v := kids.RestoreDrift
+		if present {
+			v = kids.RoutineRestoreVerdict(src.RoutineSource(name), live)
+		}
+		if rank[v] > rank[worst] {
+			worst = v
+		}
+	}
+	return worst, nil
+}
+
 // verifyContent reads the live 0-node of each shipped entry record off the engine
 // and grades it against the shipped image: "ok" (matches, FileMan-transformed
 // pieces aside), "mismatch" (a record by that name exists but differs), or
@@ -1197,17 +1223,18 @@ type uninstallCmd struct {
 }
 
 type uninstallReport struct {
-	Name         string   `json:"name"`
-	Class        string   `json:"class"`
-	Action       string   `json:"action"`
-	Reason       string   `json:"reason"`
-	AutoDetected bool     `json:"autoDetected,omitempty"` // pre-image found via the sidecar convention
-	Restored     []string `json:"restored,omitempty"`     // overwritten-foreign routines re-applied from the pre-image (actPartition)
-	Deleted      []string `json:"deleted,omitempty"`      // greenfield-added routines deleted (actPartition)
-	Done         bool     `json:"done"`
-	Status       int      `json:"status,omitempty"`       // #9.7 status for restore/backout installs
-	VerifyClean  string   `json:"verifyClean,omitempty"`  // "" | "clean" | "dirty" (when --verify)
-	Deregistered bool     `json:"deregistered,omitempty"` // #9.4 patch-history footprint cleared (when --deregister)
+	Name           string   `json:"name"`
+	Class          string   `json:"class"`
+	Action         string   `json:"action"`
+	Reason         string   `json:"reason"`
+	AutoDetected   bool     `json:"autoDetected,omitempty"` // pre-image found via the sidecar convention
+	Restored       []string `json:"restored,omitempty"`     // overwritten-foreign routines re-applied from the pre-image (actPartition)
+	Deleted        []string `json:"deleted,omitempty"`      // greenfield-added routines deleted (actPartition)
+	Done           bool     `json:"done"`
+	Status         int      `json:"status,omitempty"`         // #9.7 status for restore/backout installs
+	VerifyClean    string   `json:"verifyClean,omitempty"`    // "" | "clean" | "dirty" (when --verify)
+	ForeignRestore string   `json:"foreignRestore,omitempty"` // D4: declared-foreign restore fidelity (exact | command-clean-provenance-drift | drift) when --verify
+	Deregistered   bool     `json:"deregistered,omitempty"`   // #9.4 patch-history footprint cleared (when --deregister)
 }
 
 func (c *uninstallCmd) Run(cc *clikit.Context) error {
@@ -1312,6 +1339,16 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 					break
 				}
 			}
+			// D4: a pure-restore build that ALSO declared foreign overwrites (all of
+			// them in the pre-image, so no greenfield to partition) gets the same
+			// stricter national-overwrite grade against the re-applied pre-image.
+			if action == actRestore && len(foreign) > 0 {
+				fr, ferr := foreignRestoreVerdict(ctx, cl, rb, foreign)
+				if ferr != nil {
+					return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", ferr.Error(), "")
+				}
+				res.ForeignRestore = fr
+			}
 		}
 	case actPartition:
 		// Drop any stale snapshot provenance first: the restore re-installs the
@@ -1366,6 +1403,14 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 					break
 				}
 			}
+			// D4: national-overwrite verify — grade the declared-foreign routine(s)
+			// stricter than the line-2-blind drift: byte-equal on the checksum surface
+			// (command lines) and on line-2 provenance.
+			fr, ferr := foreignRestoreVerdict(ctx, cl, preBuild, foreign)
+			if ferr != nil {
+				return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", ferr.Error(), "")
+			}
+			res.ForeignRestore = fr
 		}
 	default: // actDelete
 		// Delete the GREENFIELD subset only. For a declaration-free build that is
@@ -1415,6 +1460,14 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 			fmt.Fprintln(cc.Stdout, cc.Success("verify-clean: live routines match the re-applied artifact"))
 		case "dirty":
 			fmt.Fprintln(cc.Stdout, cc.Failure("verify-clean FAILED: live routines do not match the re-applied artifact"))
+		}
+		switch res.ForeignRestore {
+		case kids.RestoreExact:
+			fmt.Fprintln(cc.Stdout, cc.Success("foreign-restore: byte-identical (checksum surface + line-2 provenance)"))
+		case kids.RestoreProvenanceDrift:
+			fmt.Fprintln(cc.Stdout, cc.Faint("foreign-restore: checksum surface clean, but line-2 patch-history provenance differs"))
+		case kids.RestoreDrift:
+			fmt.Fprintln(cc.Stdout, cc.Failure("foreign-restore DRIFT: a command line differs — the foreign routine was NOT byte-restored"))
 		}
 		if c.Deregister {
 			if res.Deregistered {

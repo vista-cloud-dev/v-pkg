@@ -59,3 +59,52 @@ func TestRoutineDriftMatch(t *testing.T) {
 		})
 	}
 }
+
+// D4 (F1): a national-overwrite restore needs a STRICTER verdict than the
+// line-2-blind RoutineDriftMatch. The COMMAND lines (every line except line 2) are
+// the checksum surface — both VistA checksums (RSUM/CHECK1^XTSUMBLD) exclude line 2
+// — so command-line byte-equality is what proves the restored routine matches the
+// FORUM gold checksum. Line 2 carries the volatile patch-history provenance (patch
+// list / date / Build N): a restore that leaves it wrong is checksum-clean but
+// provenance-drifted. So the verdict is three-way.
+func TestRoutineRestoreVerdict(t *testing.T) {
+	shipped := []string{`XWBPRS ;hdr`, ` ;;1.0;XWB;**1,7**;Jul 10, 1995;Build 8`, ` D EN^XWBPRS`, ` Q`}
+	cases := []struct {
+		name string
+		live []string
+		want string
+	}{
+		{
+			name: "byte-identical incl line 2 -> exact",
+			live: []string{`XWBPRS ;hdr`, ` ;;1.0;XWB;**1,7**;Jul 10, 1995;Build 8`, ` D EN^XWBPRS`, ` Q`},
+			want: "exact",
+		},
+		{
+			name: "command lines identical, line-2 patch list differs -> provenance drift",
+			live: []string{`XWBPRS ;hdr`, ` ;;1.0;XWB;**1**;older;Build 6`, ` D EN^XWBPRS`, ` Q`},
+			want: "command-clean-provenance-drift",
+		},
+		{
+			name: "a command line differs (checksum surface broken) -> drift",
+			live: []string{`XWBPRS ;hdr`, ` ;;1.0;XWB;**1,7**;Jul 10, 1995;Build 8`, ` D EVIL^X`, ` Q`},
+			want: "drift",
+		},
+		{
+			name: "different length (line added/removed) -> drift",
+			live: []string{`XWBPRS ;hdr`, ` ;;1.0;XWB;**1,7**;Jul 10, 1995;Build 8`, ` Q`},
+			want: "drift",
+		},
+		{
+			name: "line 1 (header) differs -> drift (line 1 is a command line)",
+			live: []string{`XWBPRS ;TAMPERED`, ` ;;1.0;XWB;**1,7**;Jul 10, 1995;Build 8`, ` D EN^XWBPRS`, ` Q`},
+			want: "drift",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := RoutineRestoreVerdict(shipped, tc.live); got != tc.want {
+				t.Errorf("RoutineRestoreVerdict = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

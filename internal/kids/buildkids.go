@@ -209,3 +209,46 @@ func RoutineDriftMatch(shipped, live []string) bool {
 	}
 	return true
 }
+
+// Foreign-restore verdicts (D4) — the three outcomes RoutineRestoreVerdict grades
+// a restored declared-foreign routine into, in increasing severity.
+const (
+	// RestoreExact: byte-identical to the pre-image, line 2 included.
+	RestoreExact = "exact"
+	// RestoreProvenanceDrift: command lines (the checksum surface) are byte-identical
+	// — so the national checksum (CHECK1^XTSUMBLD / RSUM, both line-2-blind) matches
+	// the FORUM gold — but line 2 differs, so the patch-history provenance is wrong.
+	RestoreProvenanceDrift = "command-clean-provenance-drift"
+	// RestoreDrift: a COMMAND line differs (or a line was added/removed) — the
+	// checksum surface itself is broken, the restore did NOT reinstate the routine.
+	RestoreDrift = "drift"
+)
+
+// RoutineRestoreVerdict grades how faithfully a restored routine matches its
+// pre-image, STRICTER than the line-2-blind RoutineDriftMatch (D4). It is the
+// national-overwrite verify mode: a declared-foreign routine (e.g. XWBPRS) must
+// come back byte-identical on its COMMAND lines — every line except line 2, which
+// is exactly the surface both VistA checksums hash — and ideally byte-identical on
+// line 2 too (its patch-history provenance). Returns RestoreExact /
+// RestoreProvenanceDrift / RestoreDrift.
+func RoutineRestoreVerdict(shipped, live []string) string {
+	// A different line count means a command line was added or removed — the
+	// checksum surface is broken regardless of which line it was.
+	if len(shipped) != len(live) {
+		return RestoreDrift
+	}
+	for i := range shipped {
+		if i == 1 {
+			continue // line 2 is provenance, graded separately below
+		}
+		if shipped[i] != live[i] {
+			return RestoreDrift
+		}
+	}
+	// Command lines are byte-identical (checksum-clean). Line 2 decides exact vs
+	// provenance-drift. A routine with no line 2 (len<2) trivially matches.
+	if len(shipped) >= 2 && shipped[1] != live[1] {
+		return RestoreProvenanceDrift
+	}
+	return RestoreExact
+}

@@ -68,6 +68,23 @@ guard: with a pre-image present, a declared-foreign routine that lands in the de
 the engine byte-untouched, `--force` deletes greenfield-only). Implements D1+D2+D3 of
 `../proposals/v-pkg-mixed-build-split-reversal.md`.
 
+**National-overwrite verify (`D4`, 2026-06-30).** `uninstall --verify` of a restore/partition
+that touched declared-foreign routines now adds a STRICTER grade than the line-2-blind
+`RoutineDriftMatch`: `kids.RoutineRestoreVerdict(shipped, live)` →
+`exact` | `command-clean-provenance-drift` | `drift`, surfaced as `uninstallReport.foreignRestore`.
+The KEY FACT (N-5, corpus-confirmed): both VistA checksums (`$$RSUM`/`CHECK1^XTSUMBLD`) EXCLUDE
+line 2, so the **command lines (every line except line 2) ARE the checksum surface** —
+byte-equality there ⇒ the restored routine matches the FORUM #9.8 gold checksum. Line 2 carries
+volatile patch-history provenance (patch list/date/Build N): `command-clean-provenance-drift` =
+checksum-clean but provenance differs; `drift` = a command line differs or a line was
+added/removed (the restore did NOT reinstate it — and this case ALSO trips the existing
+line-2-blind `verifyClean=dirty` → `ExitCheck`, so `foreignRestore` adds diagnostic precision,
+not a new exit). `foreignRestoreVerdict` (pkgcli) reads each foreign routine live and returns the
+WORST verdict; absent → `drift`. Live verdict on a clean partition is always `exact`
+(drift/provenance cases are inherently a broken restore — covered by unit tests, not the live
+gate). Implements D4 of the proposal. `scripts/foreign-refuse-gate.sh` asserts `exact` (24/24
+vehu+foia).
+
 **GOTCHA — foreignness is NEVER inferred from routine names.** A package's routine
 namespace need not match its package name (m-stdlib's package is `MSL` but it ships `STD*`
 routines; v-stdlib's `VSL` ships `VSL*`). So the "routine whose name doesn't start with the
