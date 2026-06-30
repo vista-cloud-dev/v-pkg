@@ -11,7 +11,7 @@ const (
 	// Version is the declared SemVer of the v-pkg domain surface. It is a
 	// committed constant (distinct from the link-time build version reported by
 	// `version`) so the generated contract is drift-stable.
-	Version = "0.3.0"
+	Version = "0.4.0"
 
 	// ContractVersion bumps only on an incompatible command-surface change
 	// (v-cli-platform.md §4), independent of Version.
