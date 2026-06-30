@@ -290,8 +290,9 @@ func TestVerifyScript(t *testing.T) {
 		`S XPDA=$O(^XPD(9.7,"B","ZZSKEL*1.0*1",0))`,
 		ResultMarker + `installed=`,
 		ResultMarker + `status=`,
-		`$T(^ZZSKEL)`,                // routine-presence probe
-		ResultMarker + `rtn:ZZSKEL=`, // per-routine marker
+		`S VRN="+0^"_"ZZSKEL"`,          // routine name reaches the script only inside an M literal
+		`$T(@VRN)`,                      // injection-safe indirection probe (was $T(^ZZSKEL))
+		ResultMarker + `rtn:","ZZSKEL"`, // per-routine marker, name emitted as an escaped value
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("VerifyScript missing %q\n---\n%s", want, got)
@@ -338,7 +339,7 @@ func TestVerifyScript_Components(t *testing.T) {
 	for i, tc := range componentCases {
 		got := VerifyScript("ZZ*1.0*1", []string{"ZZRT"}, componentLit(i), nil)
 		probe := `$D(` + tc.dataRoot + `"B",` + msliteral(tc.name) + `)`
-		marker := ResultMarker + `comp:` + tc.fileStr + `:` + tc.name + `=`
+		marker := ResultMarker + `comp:` + tc.fileStr + `:",` + msliteral(tc.name) // name emitted as an escaped value
 		if !strings.Contains(got, probe) {
 			t.Errorf("%s: VerifyScript missing presence probe %q\n---\n%s", tc.label, probe, got)
 		}
@@ -356,9 +357,9 @@ func TestVerifyContentScript(t *testing.T) {
 		{File: 19, FileStr: "19", Name: "ZZOPT RUN ROUTINE", DataRoot: "^DIC(19,", Zero: "ZZOPT RUN ROUTINE^x^^R"},
 	}, nil)
 	for _, want := range []string{
-		`$O(^DIC(19,"B","ZZOPT RUN ROUTINE",0))`, // resolve site IEN by name
-		`S VR="^DIC(19,"_VIEN_",0)"`,             // build the 0-node ref by indirection
-		ResultMarker + `z:19:ZZOPT RUN ROUTINE=`, // emit the live 0-node
+		`$O(^DIC(19,"B","ZZOPT RUN ROUTINE",0))`,    // resolve site IEN by name
+		`S VR="^DIC(19,"_VIEN_",0)"`,                // build the 0-node ref by indirection
+		ResultMarker + `z:19:","ZZOPT RUN ROUTINE"`, // emit the live 0-node; name as escaped value
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("VerifyContentScript missing %q\n---\n%s", want, got)
@@ -465,5 +466,37 @@ func TestDeregisterScript(t *testing.T) {
 	}
 	if s := DeregisterScript(nil); s != "" {
 		t.Errorf("nil DeregisterScript = %q, want empty", s)
+	}
+}
+
+// TestVerifyScripts_NoMInjection is the adversarial guard for the verify path: a
+// crafted .KID can carry a routine/component/entry NAME containing a double-quote
+// plus arbitrary M. Those names must reach the generated script ONLY inside escaped
+// M string literals (via kids.MString), never as raw code — otherwise running
+// `v pkg verify <untrusted.kid>` would execute attacker M in programmer context.
+// Invariant: every generated line is balanced (even number of `"`); a raw splice of
+// a name with one `"` makes the line odd (a literal breakout).
+func TestVerifyScripts_NoMInjection(t *testing.T) {
+	evil := `Z" S ^HACKED=1 W "` // an unbalanced quote + payload + reopen
+	comps := []kids.Component{{File: 19, FileStr: "19", DataRoot: `^DIC(19,`, Names: []string{evil}}}
+	contents := []kids.EntryContent{{File: 19, FileStr: "19", DataRoot: `^DIC(19,`, Name: evil}}
+	scripts := map[string]string{
+		"VerifyScript/routine":   VerifyScript("PKG*1.0*1", []string{evil}, nil, nil),
+		"VerifyScript/component": VerifyScript("PKG*1.0*1", nil, comps, nil),
+		"VerifyContentScript":    VerifyContentScript(contents, nil),
+	}
+	for label, s := range scripts {
+		// Decisive invariant: every generated line is quote-balanced. A raw splice of a
+		// name carrying one `"` makes its line odd (a literal breakout); MString doubles
+		// the quote, keeping the line even.
+		for i, line := range strings.Split(s, "\n") {
+			if strings.Count(line, `"`)%2 != 0 {
+				t.Errorf("%s line %d: unbalanced quotes — M-injection breakout: %q", label, i+1, line)
+			}
+		}
+		// Positive confirmation: the evil name appears only in its MString-escaped form.
+		if !strings.Contains(s, kids.MString(evil)) {
+			t.Errorf("%s: the name was not emitted via kids.MString (escaping bypassed)", label)
+		}
 	}
 }

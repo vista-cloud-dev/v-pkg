@@ -276,14 +276,25 @@ func VerifyScript(name string, routines []string, comps []kids.Component, files 
 	w(`W "` + ResultMarker + `installed=",$S(+XPDA:1,1:0),!`)
 	w(`W "` + ResultMarker + `status=",$P($G(^XPD(9.7,+XPDA,0)),U,9),!`)
 	for _, r := range routines {
-		w(`W "` + ResultMarker + `rtn:` + r + `=",$S($T(^` + r + `)]"":1,1:0),!`)
+		// The routine NAME is build-controlled, so it must never be spliced into the
+		// script as raw M — it reaches the line ONLY inside escaped M string literals
+		// (kids.MString). The existence probe uses entryref indirection ($T(@VRN)) so
+		// the name is a string operand, not code: a name carrying a `"` cannot break
+		// out of the literal. Equivalent to the old `$T(^<r>)]""` (first line present).
+		rl := kids.MString(r)
+		w(`S VRN="+0^"_` + rl)
+		w(`W "` + ResultMarker + `rtn:",` + rl + `,"=",$S($T(@VRN)]"":1,1:0),!`)
 	}
 	// Per entry component: a record by this .01 NAME is present iff it has a
 	// "B"-index entry under the type's storage global (KRN^XPDIK builds it on
 	// install). The "B" subscript + name hang off the type's DataRoot.
 	for _, c := range comps {
 		for _, n := range c.Names {
-			w(`W "` + ResultMarker + `comp:` + c.FileStr + `:` + n + `=",$S($D(` + c.DataRoot + `"B",` + kids.MString(n) + `)):1,1:0),!`)
+			// c.FileStr/c.DataRoot are registry-fixed (safe); the .01 NAME n is
+			// build-controlled, so it is written as an escaped value (kids.MString),
+			// never as raw literal text — both the label and the "B" subscript.
+			nl := kids.MString(n)
+			w(`W "` + ResultMarker + `comp:` + c.FileStr + `:",` + nl + `,"=",$S($D(` + c.DataRoot + `"B",` + nl + `)):1,1:0),!`)
 		}
 	}
 	for _, f := range files {
@@ -334,7 +345,9 @@ func VerifyContentScript(contents []kids.EntryContent, files []kids.FileContent)
 		// (the data global root is per-type, so the node is assembled at runtime).
 		w(`S VIEN=+$O(` + c.DataRoot + `"B",` + nameLit + `,0))`)
 		w(`S VR="` + c.DataRoot + `"_VIEN_",0)"`)
-		w(`W "` + ResultMarker + `z:` + c.FileStr + `:` + c.Name + `=",$S(VIEN:$G(@VR),1:""),!`)
+		// c.Name is build-controlled — write it as an escaped value (nameLit), not raw
+		// literal text, so a name carrying a `"` cannot break out into executable M.
+		w(`W "` + ResultMarker + `z:` + c.FileStr + `:",` + nameLit + `,"=",$S(VIEN:$G(@VR),1:""),!`)
 	}
 	// FILE DD content: read each shipped field's ^DD(file,fld,0) definition node
 	// back (filed verbatim by DDIN^DIFROMS, so it matches the shipped fieldDef). The
