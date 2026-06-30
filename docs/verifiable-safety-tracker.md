@@ -15,8 +15,10 @@ one increment; archive the prompts folder with this tracker when the effort land
 [`#2`](proposals/verifiable-safety/prompts/increment-2-kickoff.md) (done — pre-install
 dry-run / compare-to-current) ·
 [`#3`](proposals/verifiable-safety/prompts/increment-3-kickoff.md) (done — robustness
-hardening: half-install heal · transport-checksum · sidecar integrity). #4 (install
-attestation / audit record) is next — no kickoff prompt authored yet.
+hardening: half-install heal · transport-checksum · sidecar integrity) ·
+[`#4`](proposals/verifiable-safety/prompts/increment-4-kickoff.md) (next + FINAL —
+install attestation / audit record; its landing commit archives this tracker + the
+prompts folder).
 
 | # | Increment | Value | Status |
 |---|---|---|---|
