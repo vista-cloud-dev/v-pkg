@@ -891,3 +891,37 @@ func TestComponents(t *testing.T) {
 		t.Errorf("routine-only Components() = %+v, want none", c)
 	}
 }
+
+// TestComponents_VerifyUninstallOnlyTypes proves the increment-1 coverage
+// extension: a real .KID shipping an INPUT TEMPLATE (#.402) and a FORM (#.403) —
+// types v-pkg never AUTHORS — is still picked up by Components() for presence +
+// ^DIK back-out (the orphan fix), keyed on each type's live storage global. And
+// because their 0-node mask is not ground-truthed, they are contentVerify:false,
+// so EntryContents EXCLUDES them — verify never asserts an unvalidated 0-node (no
+// false drift on the volatile template dates).
+func TestComponents_VerifyUninstallOnlyTypes(t *testing.T) {
+	b := newBuild()
+	// KRN record images in the shape a parsed real .KID yields (top-level
+	// "KRN",<file>,<srcIEN>,0) = the .01 name in piece 1 + FileMan metadata after).
+	b.Set(parseSubscriptLine(`"KRN",.402,2468,0)`), "ZZTMPL FILE #999000^3170901.09^^999000^^^3170901")
+	b.Set(parseSubscriptLine(`"KRN",.403,7,0)`), "ZZFORM^^^^3170901^3170901^A Demo Form^999000")
+	byFile := map[float64]Component{}
+	for _, c := range b.Components() {
+		byFile[c.File] = c
+	}
+	tmpl, ok := byFile[0.402]
+	if !ok || tmpl.DataRoot != "^DIE(" || tmpl.Label != "INPUT TEMPLATE" ||
+		len(tmpl.Names) != 1 || tmpl.Names[0] != "ZZTMPL FILE #999000" {
+		t.Errorf("INPUT TEMPLATE component = %+v", tmpl)
+	}
+	form, ok := byFile[0.403]
+	if !ok || form.DataRoot != "^DIST(.403," || form.Label != "FORM" ||
+		len(form.Names) != 1 || form.Names[0] != "ZZFORM" {
+		t.Errorf("FORM component = %+v", form)
+	}
+	for _, ec := range b.EntryContents() {
+		if ec.File == 0.402 || ec.File == 0.403 {
+			t.Errorf("EntryContents must EXCLUDE contentVerify:false type #%v (would assert an unvalidated 0-node)", ec.File)
+		}
+	}
+}

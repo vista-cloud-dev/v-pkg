@@ -36,6 +36,14 @@ type entryType struct {
 	// 0-node files verbatim.
 	dataRoot string
 	volatile []int
+	// contentVerify gates the 0-node content assertion (EntryContents). It is true
+	// only for types whose 0-node IS the record's content AND whose volatile mask is
+	// live-ground-truthed (a wrong mask → false drift). The verify/uninstall-only
+	// types added for presence + ^DIK coverage (the compiled TEMPLATE family, whose
+	// real content lives in DR/DIAB subnodes, not the 0-node) leave it false: they
+	// get presence-verify + uninstall (the orphan fix) without an unvalidated
+	// content claim. Flip to true per type once its mask is ground-truthed.
+	contentVerify bool
 }
 
 // imageNode is one node of a record image: the subscripts BELOW the
@@ -192,7 +200,17 @@ func (b *Build) entryNames(file float64) []string {
 
 // entryTypeByFile maps a file number to its entry type — the registry a
 // content-asserting verify uses to recover the storage global + transform mask of
-// any shipped KRN record. Every type buildEntryGroups can emit is registered here.
+// any shipped KRN record. Every type buildEntryGroups can emit is registered here,
+// plus the verify/uninstall-only types (contentVerify:false) that v-pkg never
+// AUTHORS but must still presence-verify + ^DIK back out when a real .KID ships
+// them — the increment-1 coverage extension. Their storage roots are live DD
+// values (^DIC(file,0,"GL") on vehu, 2026-06-30); they take presence + uninstall
+// (the orphan fix) with no content claim. Each is a plain noun a developer can
+// guess; the compiled TEMPLATE family's real content (DR/DIAB subnodes) is out of
+// scope for a 0-node content assertion. Excluded on purpose: #.5 FUNCTION
+// (^DD("FUNC", — not a standard ^DIK target), #8993 XULM (its .01 lives at node
+// "E1,245)", not "0)", so the 0-node name probe would miss), #869.2 / lexicon
+// #9002226 (never shipped as a top-level KRN image in the corpus).
 var entryTypeByFile = map[float64]entryType{
 	optionFile:       optionEntryType,
 	paramDefFile:     paramDefEntryType,
@@ -205,6 +223,15 @@ var entryTypeByFile = map[float64]entryType{
 	hl7AppFile:       hl7AppEntryType,
 	logicalLinkFile:  logicalLinkEntryType,
 	hloAppFile:       hloAppEntryType,
+	// Increment-1 verify/uninstall-only types (presence + ^DIK; contentVerify:false).
+	0.402:   {number: 0.402, name: "INPUT TEMPLATE", dataRoot: "^DIE("},
+	0.4:     {number: 0.4, name: "PRINT TEMPLATE", dataRoot: "^DIPT("},
+	0.401:   {number: 0.401, name: "SORT TEMPLATE", dataRoot: "^DIBT("},
+	0.403:   {number: 0.403, name: "FORM", dataRoot: "^DIST(.403,"},
+	0.84:    {number: 0.84, name: "DIALOG", dataRoot: "^DI(.84,"},
+	3.6:     {number: 3.6, name: "BULLETIN", dataRoot: "^XMB(3.6,"},
+	8989.52: {number: 8989.52, name: "PARAMETER TEMPLATE", dataRoot: "^XTV(8989.52,"},
+	1.5:     {number: 1.5, name: "ENTITY", dataRoot: "^DDE("},
 }
 
 // Component is one entry-component TYPE a build ships, for the registry-driven
@@ -273,7 +300,7 @@ func (b *Build) EntryContents() []EntryContent {
 		if len(s) == 4 && s[0].IsStr() && s[0].Str() == "KRN" &&
 			s[1].IsNumeric() && s[2].IsInt() && s[3].IsZeroInt() {
 			et, ok := entryTypeByFile[subNum(s[1])]
-			if !ok {
+			if !ok || !et.contentVerify {
 				continue
 			}
 			name := p.Value
@@ -337,7 +364,7 @@ const (
 	optionOrdTail = ";;OPT^XPDTA;OPTF1^XPDIA;OPTE1^XPDIA;OPTF2^XPDIA;;OPTDEL^XPDIA"
 )
 
-var optionEntryType = entryType{number: optionFile, name: optionFileName, ordTail: optionOrdTail, dataRoot: "^DIC(19,"}
+var optionEntryType = entryType{number: optionFile, name: optionFileName, ordTail: optionOrdTail, dataRoot: "^DIC(19,", contentVerify: true}
 
 // Option is one #19 OPTION record to ship as a KIDS KRN component (SEND-TO-SITE).
 // The build files the option definition; TypeCode is the #19 field 4 (TYPE)
@@ -416,7 +443,7 @@ func (b *Build) OptionNames() []string { return b.entryNames(optionFile) }
 
 // --- PARAMETER DEFINITION (#8989.51) — migrated onto the generic core ---------
 
-var paramDefEntryType = entryType{number: paramDefFile, name: paramDefFileName, ordTail: "1;;;;;;;", dataRoot: "^XTV(8989.51,"}
+var paramDefEntryType = entryType{number: paramDefFile, name: paramDefFileName, ordTail: "1;;;;;;;", dataRoot: "^XTV(8989.51,", contentVerify: true}
 
 // paramDefRecords packs each #8989.51 PARAMETER DEFINITION into the generic
 // entry-record shape: the SEND XPDFL flag ("0" — a single piece, unlike OPTION's
@@ -469,7 +496,7 @@ const (
 	securityKeyOrdTail = ";;KEY^XPDTA1;KEYF1^XPDIA1;KEYE1^XPDIA1;KEYF2^XPDIA1;;KEYDEL^XPDIA1"
 )
 
-var securityKeyEntryType = entryType{number: securityKeyFile, name: securityKeyFileName, ordTail: securityKeyOrdTail, dataRoot: "^DIC(19.1,"}
+var securityKeyEntryType = entryType{number: securityKeyFile, name: securityKeyFileName, ordTail: securityKeyOrdTail, dataRoot: "^DIC(19.1,", contentVerify: true}
 
 // SecurityKey is one #19.1 SECURITY KEY record to ship as a KIDS KRN component
 // (SEND-TO-SITE). A key is fundamentally just a named token holders are granted;
@@ -507,7 +534,7 @@ const (
 	protocolOrdTail = ";;PRO^XPDTA;PROF1^XPDIA;PROE1^XPDIA;PROF2^XPDIA;;PRODEL^XPDIA"
 )
 
-var protocolEntryType = entryType{number: protocolFile, name: protocolFileName, ordTail: protocolOrdTail, dataRoot: "^ORD(101,"}
+var protocolEntryType = entryType{number: protocolFile, name: protocolFileName, ordTail: protocolOrdTail, dataRoot: "^ORD(101,", contentVerify: true}
 
 // Protocol is one #101 PROTOCOL record to ship as a KIDS KRN component
 // (SEND-TO-SITE). Stored in ^ORD(101,; the node skeleton matches OPTION but the
@@ -588,7 +615,7 @@ const (
 	rpcOrdTail = "1;;;;;;;RPCDEL^XPDIA1"
 )
 
-var rpcEntryType = entryType{number: rpcFile, name: rpcFileName, ordTail: rpcOrdTail, dataRoot: "^XWB(8994,"}
+var rpcEntryType = entryType{number: rpcFile, name: rpcFileName, ordTail: rpcOrdTail, dataRoot: "^XWB(8994,", contentVerify: true}
 
 // RPC is one #8994 REMOTE PROCEDURE record to ship as a KIDS KRN component
 // (SEND-TO-SITE). Stored in ^XWB(8994,; the record is a single 0-node carrying the
@@ -664,7 +691,7 @@ const (
 	mailGroupOrdTail = ";;MAILG^XPDTA1;MAILGF1^XPDIA1;MAILGE1^XPDIA1;MAILGF2^XPDIA1;;MAILGDEL^XPDIA1(%)"
 )
 
-var mailGroupEntryType = entryType{number: mailGroupFile, name: mailGroupFileName, ordTail: mailGroupOrdTail, dataRoot: "^XMB(3.8,"}
+var mailGroupEntryType = entryType{number: mailGroupFile, name: mailGroupFileName, ordTail: mailGroupOrdTail, dataRoot: "^XMB(3.8,", contentVerify: true}
 
 // MailGroup is one #3.8 MAIL GROUP record to ship as a KIDS KRN component
 // (SEND-TO-SITE). Stored in ^XMB(3.8,; the record is a single 0-node
@@ -718,7 +745,7 @@ const (
 	listTemplateOrdTail = "1;;;;LME1^XPDIA1;;;LMDEL^XPDIA1"
 )
 
-var listTemplateEntryType = entryType{number: listTemplateFile, name: listTemplateFileName, ordTail: listTemplateOrdTail, dataRoot: "^SD(409.61,"}
+var listTemplateEntryType = entryType{number: listTemplateFile, name: listTemplateFileName, ordTail: listTemplateOrdTail, dataRoot: "^SD(409.61,", contentVerify: true}
 
 // ListTemplate is one #409.61 LIST TEMPLATE (List Manager screen) record to ship as
 // a KIDS KRN component (SEND-TO-SITE). Stored in ^SD(409.61,. The record is a fixed
@@ -799,7 +826,7 @@ const (
 	helpFrameOrdTail = ";;HELP^XPDTA1;HLPF1^XPDIA1;HLPE1^XPDIA1;HLPF2^XPDIA1;;HLPDEL^XPDIA1"
 )
 
-var helpFrameEntryType = entryType{number: helpFrameFile, name: helpFrameFileName, ordTail: helpFrameOrdTail, dataRoot: "^DIC(9.2,"}
+var helpFrameEntryType = entryType{number: helpFrameFile, name: helpFrameFileName, ordTail: helpFrameOrdTail, dataRoot: "^DIC(9.2,", contentVerify: true}
 
 // HelpFrame is one #9.2 HELP FRAME record to ship as a KIDS KRN component
 // (SEND-TO-SITE). Stored in ^DIC(9.2,. The record is the 0-node (.01 NAME ^ HEADER)
@@ -846,7 +873,7 @@ const (
 
 // hl7App #771 0-node piece 7 is COUNTRY CODE, a #779.004 pointer FileMan resolves
 // from the shipped external value ("USA") to its IEN at install — skip it (B.1-i).
-var hl7AppEntryType = entryType{number: hl7AppFile, name: hl7AppFileName, ordTail: hl7AppOrdTail, dataRoot: "^HL(771,", volatile: []int{7}}
+var hl7AppEntryType = entryType{number: hl7AppFile, name: hl7AppFileName, ordTail: hl7AppOrdTail, dataRoot: "^HL(771,", volatile: []int{7}, contentVerify: true}
 
 // HL7App is one #771 HL7 APPLICATION PARAMETER record to ship as a KIDS KRN
 // component (SEND-TO-SITE) — the canonical "register an HL7 application" entry.
@@ -896,7 +923,7 @@ const (
 
 // logicalLink #870 0-node piece 3 is LLP TYPE, a #869.1 pointer FileMan resolves
 // from the shipped external value ("TCP") to its IEN at install — skip it (B.1-j).
-var logicalLinkEntryType = entryType{number: logicalLinkFile, name: logicalLinkFileName, ordTail: logicalLinkOrdTail, dataRoot: "^HLCS(870,", volatile: []int{3}}
+var logicalLinkEntryType = entryType{number: logicalLinkFile, name: logicalLinkFileName, ordTail: logicalLinkOrdTail, dataRoot: "^HLCS(870,", volatile: []int{3}, contentVerify: true}
 
 // LogicalLink is one #870 HL LOGICAL LINK record to ship as a KIDS KRN component —
 // an HL7 communication endpoint. Stored in ^HLCS(870,. The record is the sparse
@@ -954,7 +981,7 @@ const (
 	hloAppOrdTail = "1;;HLOAP^XPDTA1;;HLOE^XPDIA1;;;"
 )
 
-var hloAppEntryType = entryType{number: hloAppFile, name: hloAppFileName, ordTail: hloAppOrdTail, dataRoot: "^HLD(779.2,"}
+var hloAppEntryType = entryType{number: hloAppFile, name: hloAppFileName, ordTail: hloAppOrdTail, dataRoot: "^HLD(779.2,", contentVerify: true}
 
 // HLOMsgType is one MESSAGE TYPE ACTIONS entry (#779.21 subfile) of an HLO
 // application: which incoming HL7 message type/event the application handles and

@@ -12,8 +12,9 @@ also reads each shipped KRN entry record's **live 0-node** back and compares it 
 the image the build shipped. Pairs with [[verify-drift]] (routines) and
 [[option-entry-component]] (the emitter whose output it checks).
 
-Design (kept orthogonal — the presence path is untouched, zero churn to its 14-arg
-signature):
+Design (kept orthogonal — the presence path is a separate staged script;
+presence + uninstall are now registry-driven over `kids.Component`, see
+[[component-type-coverage]]):
 - `internal/installspec.VerifyContentScript(contents)` — a SECOND staged script:
   per record resolve the site IEN via the data file's `"B"` index, then
   `W` the stored 0-node as a `z:<file>:<name>` marker (empty = absent). Read the

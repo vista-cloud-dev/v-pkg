@@ -15,7 +15,7 @@ tracker when the effort lands).
 
 | # | Increment | Value | Status |
 |---|---|---|---|
-| 1 | Component-type coverage 11 → all standard FileMan types (verify + uninstall) | reliability — no orphan-on-uninstall, complete verify | **in progress** |
+| 1 | Component-type coverage 11 → all standard FileMan types (verify + uninstall) | reliability — no orphan-on-uninstall, complete verify | **done** (presence-verify + uninstall for all shipping types; content-verify follow-up below) |
 | 2 | Pre-install dry-run / compare-to-current | verifiable-in-advance | planned |
 | 3 | Robustness: half-install heal · transport-checksum · sidecar integrity | reliability | planned |
 | 4 | Install attestation / audit record | third-party-verifiable | planned |
@@ -69,6 +69,34 @@ new type becomes one table row. The authoritative storage global is the live DD'
 **Files:** `internal/kids/entrycomp.go` (registry + per-type `entryType`),
 `internal/installspec/script.go` (generic presence-verify + uninstall loops),
 `pkgcli/lifecycle.go` (collect generic component list), new `testdata/` fixtures.
+
+**DONE 2026-06-30** (commits `683eace` genericize + the registry-add commit). Two
+steps landed:
+1. **Genericized** verify/uninstall over the registry: 14 positional name-slices →
+   one `[]kids.Component` driven by `(b *Build) Components()` / `entryTypeByFile`;
+   `verifyResult.Components` replaced the 11 typed maps. Behaviour-preserving for
+   the 11 (live-gate 10/10 on vehu). A new type is now one registry row.
+2. **+8 presence-verify + uninstall-only types** (`contentVerify:false`): #.402
+   INPUT TEMPLATE `^DIE(`, #.4 `^DIPT(`, #.401 `^DIBT(`, #.403 FORM `^DIST(.403,`,
+   #.84 DIALOG `^DI(.84,`, #3.6 BULLETIN `^XMB(3.6,`, #8989.52 PARAMETER TEMPLATE
+   `^XTV(8989.52,`, #1.5 ENTITY `^DDE(`. **DIK safety live-proven net-zero on vehu**
+   for all 8 (seed record + "B" xref + compiled subfile → run the generated `^DIK`
+   → record subtree + xref gone). The orphan-on-uninstall gap is closed.
+   - **Excluded** (not "all" — the ones that can't ship safely as a `KRN` image):
+     #.5 FUNCTION (`^DD("FUNC",`, not a `^DIK` target), #8993 XULM (.01 at node
+     `E1,245)` not `0)`; 1 corpus KID), #869.2 + lexicon #9002226 (0 top-level KRN
+     images in the 2,404-KID corpus — untestable dead code).
+
+**CONTENT-VERIFY FOLLOW-UP (the `contentVerify` flip, deferred — verifiable-safety:
+never assert an unvalidated 0-node mask).** The new types are presence-only because
+their volatile masks are not yet ground-truthed. To enable content-verify per type,
+do the install-fixture shipped-vs-filed 0-node diff, then set `contentVerify:true`
++ the `volatile` mask. Analytic masks from the live DD (vehu): **BULLETIN #3.6** and
+**ENTITY #1.5** have no 0-node pointers → mask empty; **PARAMETER TEMPLATE #8989.52**
+pieces 3 (USE ENTITY FROM, variable-ptr) + 4 (USE INSTANCE FROM → #8989.51) →
+`{3,4}`. The TEMPLATE family (#.402/.4/.401/.403) + DIALOG #.84 stay presence-only
+(compiled records — real content in DR/DIAB subnodes, install-volatile dates in the
+0-node). See `docs/memory/component-type-coverage.md`.
 
 ## 2 — Pre-install dry-run / compare-to-current
 
