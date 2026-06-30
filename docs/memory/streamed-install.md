@@ -45,10 +45,11 @@ Two phases, no SDK change:
   `scripts/kids-test-in-place.sh ydb` (m-stdlib) → **15/15 suites pass in place,
   1403 assertions, 0 fail**; uninstall reversible, verify-clean.
 
-## Owed
-- **IRIS live-validation of the chunked path** (m-iris/Atelier stages each chunk
-  via PutDoc; ^XTMP persists across runner invocations — expected to work, not yet
-  run). Will be exercised by the **T0b.2 IRIS leg** (m-stdlib session).
+## Status / follow-ups
+- **IRIS chunked path: VALIDATED** (was owed from the YDB-only proof). The
+  m-iris/Atelier path stages each chunk via PutDoc and `^XTMP` persists across
+  runner invocations — proven by the MSL+VSL live-package-gate (11/11 on
+  foia-t12; see [[live-package-gate]]).
 - A native `mdriver.Client.SetGlobal` would let the host populate `^XTMP` directly
   (no staging routines) — cleaner, but an SDK/coordinator change; not needed now.
 

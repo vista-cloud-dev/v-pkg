@@ -1,9 +1,9 @@
 ---
 title: "v-pkg adversarial coverage analysis — what it takes to build and install any of the ~2,400 real KIDS distributions"
-status: proposed
+status: accepted — largely implemented (only B.1 compiled-FileMan templates remain → ../proposals/v-pkg-from-engine-capture.md)
 created: 2026-06-28
 last_modified: 2026-06-29
-revisions: 2
+revisions: 3
 doc_type: [PROPOSAL, ANALYSIS]
 grounding:
   - "vdocs GOLD corpus — Kernel 8.0 KIDS Developer's Guide (XU/krn_8_0_dg_kids_ug) + Systems Management KIDS UG (XU/krn_8_0_sm_kids_ug) + VistA Build Analyzer UG (XU/vista_build_analyzer_ug)"
@@ -844,22 +844,25 @@ the Track B tiers are what make v-pkg able to *author* the full component range
 
 ## Risks and open questions
 
-- **The install-engine fork (A.1) is the pivotal architectural decision.** Silent
-  XPD\* answer-variable seeding vs expect-driven menus vs continuing to extend the
-  populate path. The corpus does not document the Kernel silent-install API in
-  full; resolving A.1 likely needs the Kernel 8.0 *KIDS Developer Tools* UG (noted
-  absent from the gold corpus in `implementation-plan.md`). **Recommend a spike
-  before committing.**
+- **The install-engine fork (A.1) — RESOLVED.** The spike chose **route (c)
+  augmented direct-populate** (extend the populate path with real KIDS phases),
+  over Tier A headless `EN^XPDI` or Tier B expect; landed and live-proven both
+  engines. The "*KIDS Developer Tools* UG absent from the corpus" worry was
+  **illusory** — that material is a section of `krn_8_0_dg_kids_ug`, in the
+  corpus. See [`../archive/v-pkg-install-fidelity-spike.md`](../archive/v-pkg-install-fidelity-spike.md).
 - **Reading live entries for authoring (B.1)** means v-pkg gains broad FileMan-read
   surface; keep every read through the DBS API + `mdriver.Client`, never direct
   global reads, to stay inside the waterline.
 - **Permanent file numbers (B.2)** need a namespace policy (which non-test range a
   package owns); coordinate with the org namespace registry rather than minting
   numbers ad hoc.
-- **This is a v-pkg roadmap, not a committed plan.** It reorders and extends the
-  existing `implementation-plan.md` / `kids-installation-automation.md` threads
-  (Tier A/B install, package extraction) with corrected evidence and the two-track
-  framing; fold it into that tracker rather than forking a parallel plan.
+- **Status: largely landed.** Tracks T0, A.1–A.4, B.1-a…o, B.2, B.3 are done
+  (live-proven both engines); only the B.1 compiled-FileMan template family
+  remains, scoped in
+  [`v-pkg-from-engine-capture.md`](v-pkg-from-engine-capture.md). The original
+  `implementation-plan.md` tracker this fed has since been **archived**
+  ([`../archive/implementation-plan.md`](../archive/implementation-plan.md)); the
+  live status is this doc plus [`../repo-consistency-audit.md`](../repo-consistency-audit.md).
 
 ---
 

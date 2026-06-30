@@ -113,7 +113,18 @@ payloads worth gating.
 
 ---
 
-## C. Flagged for decision — content refreshes (low risk; not executed)
+## C. Content refreshes — ✅ ALL SWEPT 2026-06-29
+
+C1 `kids-installation-automation.md` §5/§11 marked landed (route (c); engine
+parity proven) · C2 `coverage-analysis` status → accepted/largely-implemented +
+stale "fold into tracker" note repointed · C3 `clikit-grouped-help` trimmed to
+the durable gotchas (dropped version-pin journal) · C4 `streamed-install` Owed
+IRIS item marked validated · C5 `snapshot-restore` dropped the deleted-wrap-rpc
+lineage (both refs) · C6 `patch-existing` `related:` path → `../archive/` · C7
+`architecture.md` §3 diagram adds `classify` + relabels the surface
+`pkgcli.Commands` · C8 `package-extraction` "corpus gap" corrected (it's a
+section of `krn_8_0_dg_kids_ug`, in corpus) · C9 `MEMORY.md` index trimmed to
+true one-liners. Original table:
 
 | # | File | Issue | Action |
 |---|---|---|---|

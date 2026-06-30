@@ -3,7 +3,7 @@ title: "v-pkg: patching EXISTING routines (snapshot / restore / drift) — not j
 status: IMPLEMENTED (2026-06-25) — `classify`, `snapshot`/`restore`, class-aware `install`/`uninstall`, `verify --drift`, pre-image pairing + verify-clean all landed (live-proven on vehu). Non-routine reversal resolved by design: authored back-out (open Q2 closed).
 created: 2026-06-25
 for: extending the v-pkg verb contract + build-spec schema so a build can safely PATCH an existing national routine and be reversed to stock
-related: v-stdlib RPC-broker splice (VSLRPCWRAP / CALLP^XWBBRK), v-stdlib VSLTAPBO + FU-21 (the per-package hack this generalizes), docs/fileman-dd-install-plan.md
+related: v-stdlib RPC-broker splice (VSLRPCWRAP / CALLP^XWBBRK), v-stdlib VSLTAPBO + FU-21 (the per-package hack this generalizes), docs/archive/fileman-dd-install-plan.md
 ---
 
 # v-pkg: patching existing routines, not just greenfield install

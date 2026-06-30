@@ -291,8 +291,11 @@ is one codebase that targets both YottaDB and IRIS — consistent with the
    code is *not* covered by any retained `#9.6` build entry (local mods, ancient
    patches)? Drives how much S2/S3 fallback is needed.
 5. **Open: exact re-export entry points & whether `XPD TRANSPORT PACKAGE` can be
-   driven non-interactively** — needs the *KIDS Developer Tools User Guide*
-   (gap, §References [4]).
+   driven non-interactively** — to be confirmed against the *KIDS Developer
+   Tools* material (a section of `krn_8_0_dg_kids_ug`, **in** the gold corpus;
+   §References [4]) plus the real `XPD*` transport routines. (The install-fidelity
+   spike established no clean headless silent API is *documented* — the same may
+   hold for transport; confirm before designing the re-export leg.)
 6. **Open: IEN normalization policy** for cross-instance comparison vs.
    reinstall fidelity (`v pkg canonicalize` is lossy by design).
 
@@ -317,8 +320,8 @@ is one codebase that targets both YottaDB and IRIS — consistent with the
    VDL, Infrastructure → Kernel. <https://www.va.gov/vdl/application.asp?appid=10>
 4. Department of Veterans Affairs. *Kernel 8.0 Developer's Guide: KIDS Developer
    Tools User Guide* — developer export/transport internals and any
-   non-interactive transport APIs. *(Recommended fetch — not yet in the gold
-   corpus.)* VDL, Infrastructure → Kernel.
+   non-interactive transport APIs. *(A section of `krn_8_0_dg_kids_ug`, which is
+   in the gold corpus — not a standalone gap.)* VDL, Infrastructure → Kernel.
 5. `vista-meta` — the authoritative PIKS (Patient/Institution/Knowledge/System)
    classification over FileMan files, consumed by reference for the data
    airlock. (Internal `vista-cloud-dev` project.)

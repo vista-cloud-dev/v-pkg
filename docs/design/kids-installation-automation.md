@@ -152,6 +152,15 @@ KIDS is a **conversational, terminal-driven** subsystem. The obstacles:
 Drive KIDS programmatically rather than scraping a terminal. Two tiers, choose
 per environment:
 
+> **Status — LANDED (2026-06-29).** `v pkg install` shipped a *third* route the
+> spike settled on: **route (c) augmented direct-populate** — populate `^XTMP`
+> over the driver, then run the real KIDS phases (`$$ENV^XPDIL1` env-check,
+> `$$NEWCP^XPDUTL` INI/INIT checkpoints, seeded `#9.7` QUES, `EN^XPDIJ`). It is
+> neither Tier A headless `EN^XPDI` (un-suppressible prompts vs a stdin-less
+> driver `Exec`) nor Tier B expect; Tier B remains the cross-engine fallback. The
+> Tier A/B sketch below is the original design exploration — see the landed
+> design + ground truth in [`../archive/v-pkg-install-fidelity-spike.md`](../archive/v-pkg-install-fidelity-spike.md).
+
 ```mermaid
 flowchart LR
     KID[".KID (from v pkg assemble)"] --> SPEC
@@ -439,13 +448,18 @@ Back-out, Rollback guide). Automation should:
    — `EN1^XPDIL` load (two stdin answers), `EN^XPDIJ` synchronous install (no
    prompt; `$$ANSWER^XPDIQ`→`""` default-NO), `#9.7` status piece 9 = 3, routine
    installed + executes. Reversible uninstall via `^%ZOSF("DEL")` + `DIK` on
-   `#9.7`/`#9.6`. The one remaining design point is **non-interactive load over
-   the driver `Exec`** (direct `^XTMP` populate vs stdin transport), not the entry
-   points. Tier B (expect) stays the cross-engine fallback.
+   `#9.7`/`#9.6`. **The remaining design point — non-interactive load over the
+   driver `Exec` (direct `^XTMP` populate vs stdin transport) — is RESOLVED:**
+   `v pkg install` ships route (c) augmented direct-populate, live-proven both
+   engines (see [`../archive/v-pkg-install-fidelity-spike.md`](../archive/v-pkg-install-fidelity-spike.md)).
+   Tier B (expect) stays the cross-engine fallback.
 2. **Queued-install polling contract.** Standardize how the orchestrator polls
    TaskMan + `#9.7` for queued/background completion.
-3. **Engine parity.** Confirm `^XTMP`, `XINDEX`, and KIDS behave identically
-   under YottaDB and IRIS (the `m-ydb`/`m-iris` real-engine spikes).
+3. **Engine parity. ~~Open~~ — substantially PROVEN (2026-06-29).** `^XTMP` +
+   KIDS install/verify/uninstall behave identically under YottaDB (`vehu`) and
+   IRIS (`foia-t12`): the full MSL+VSL lifecycle live-package-gate runs 11/11 on
+   both, and the install-fidelity checkpoints fire on both. Residual: any
+   engine-specific `XINDEX` edge case surfaces through the same gates.
 
 ---
 

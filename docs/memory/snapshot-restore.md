@@ -11,9 +11,9 @@ class-1 leg of the patch-existing-routines proposal. Builds on
 
 **snapshot** `<kid> <out.kids> --engine ydb --transport docker`: parses the patch,
 reads each routine it ships (`build.RoutineNames()`) off the LIVE engine via
-`readRoutinePreimage` (new — same `runMScript`+`readRoutineBody` read path as
-wrap-rpc's `readRoutineSource`, but returns `(lines, present, err)` so an ABSENT
-routine = greenfield, present=false, NO error). Captured routines → `MakeBuildPairs`
+`readRoutinePreimage` (`runMScript`+`readRoutineBody`, returning
+`(lines, present, err)` so an ABSENT routine = greenfield, present=false, NO
+error). Captured routines → `MakeBuildPairs`
 → `WriteKID` as a pre-image build named `"<orig> PREIMAGE"` (override `--name`).
 HONESTY: `completeUndo=true` ONLY when class-1 pure-overwrite AND no greenfield
 adds AND no non-routine components; else WARNS "provenance, not a reversal
@@ -24,10 +24,10 @@ guarantee." Result carries class + captured[] + absent[] + nonRoutine.
 live routines (the gated step). `already-installed` (#9.7 identity exists) →
 ExitRefused (re-restore needs the prior snapshot uninstalled or a fresh `--name`).
 
-**Live-proven on vehu** (read-only legs): wrap-rpc preview generated the patched
-XWBBRK kids; `snapshot` read the real 213-line XWBBRK, wrote a re-parseable
-pre-image `.KID`, classified `completeUndo:true`; `restore` preview listed XWBBRK,
-`committed:false`. `--commit` deliberately NOT run (overwrites). vehu env:
+**Live-proven on vehu** (read-only legs): `snapshot` read the real 213-line
+XWBBRK off the engine, wrote a re-parseable pre-image `.KID`, classified
+`completeUndo:true`; `restore` preview listed XWBBRK, `committed:false`.
+`--commit` deliberately NOT run (overwrites). vehu env:
 `M_YDB_CONTAINER=vehu M_YDB_GBLDIR=/home/vehu/g/vehu.gld M_YDB_BIN=../m-ydb/dist/m-ydb
 M_YDB_ROUTINES='/home/vehu/{p,s,r}/r2.02_x86_64*(…) …/lib/gtm/libgtmutil.so'` +
 `--engine ydb --transport docker`.

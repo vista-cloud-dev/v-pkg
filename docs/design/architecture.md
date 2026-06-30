@@ -125,8 +125,9 @@ install, so they are volatile and must be handled carefully on round-trip
 
 ```mermaid
 flowchart TB
-    subgraph CLI["main.go — Kong command grammar"]
+    subgraph CLI["pkgcli.Commands — offline verbs (mounted by main.go / the v umbrella)"]
         parse["parse"]
+        classify["classify"]
         decompose["decompose"]
         assemble["assemble"]
         roundtrip["roundtrip"]
