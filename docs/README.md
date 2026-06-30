@@ -25,11 +25,7 @@ snapshot / restore / classify). Layout follows the org standard folder set
 - **`memory/`** — auto-memory (durable facts only); see
   [`memory/MEMORY.md`](memory/MEMORY.md) for the index.
 - **`archive/`** — retired / completed docs (frozen, kept for history), incl.
-  the landed `v-pkg-install-fidelity-spike.md` (Track A install fidelity) and the
-  `implementation-plan.md` tracker.
-
-## Live trackers
-
-- [`repo-consistency-audit.md`](repo-consistency-audit.md) — 2026-06-29
-  comprehensive doc/folder/file consistency audit + flagged actions (Tier-D;
-  archive once the flagged moves land).
+  the landed `v-pkg-install-fidelity-spike.md` (Track A install fidelity), the
+  `implementation-plan.md` tracker, and the completed
+  [`repo-consistency-audit.md`](archive/repo-consistency-audit.md) (2026-06-29
+  doc/folder/file consistency pass).

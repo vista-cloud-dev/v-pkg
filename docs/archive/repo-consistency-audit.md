@@ -12,7 +12,9 @@ refs, broken relative `.md` links) + three parallel deep-read auditors over
 (C) root files + `examples` + `scripts` + `testdata` + Go code. `go vet ./...`
 clean; offline gates (lint / build / test / contract) green.
 
-**Tier:** D (live status). Archive this file once the flagged actions land.
+**Status: COMPLETED — all §A/§B/§C actions landed (2026-06-29); archived.** This
+file is the frozen record of the pass: §A safe fixes (`4ecd41d`), §B1/B3/B4 +
+§B2 decision (`010d5ee`), §C content sweep (`228415a`). Tier D.
 
 ---
 

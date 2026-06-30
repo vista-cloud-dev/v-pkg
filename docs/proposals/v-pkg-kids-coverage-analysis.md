@@ -862,7 +862,7 @@ the Track B tiers are what make v-pkg able to *author* the full component range
   [`v-pkg-from-engine-capture.md`](v-pkg-from-engine-capture.md). The original
   `implementation-plan.md` tracker this fed has since been **archived**
   ([`../archive/implementation-plan.md`](../archive/implementation-plan.md)); the
-  live status is this doc plus [`../repo-consistency-audit.md`](../repo-consistency-audit.md).
+  live status is this doc plus the completed [`../archive/repo-consistency-audit.md`](../archive/repo-consistency-audit.md).
 
 ---
 
