@@ -233,7 +233,7 @@ func TestFinalInstallScript_QuesAnswers(t *testing.T) {
 }
 
 func TestVerifyScript(t *testing.T) {
-	got := VerifyScript("ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	got := VerifyScript("ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil)
 	for _, want := range []string{
 		`S XPDA=$O(^XPD(9.7,"B","ZZSKEL*1.0*1",0))`,
 		ResultMarker + `installed=`,
@@ -247,151 +247,51 @@ func TestVerifyScript(t *testing.T) {
 	}
 }
 
-// VerifyScript also probes each PARAMETER DEFINITION by NAME in #8989.51's "B"
-// index (XPDIK builds it via IX1^DIK on install).
-func TestVerifyScript_ParamDef(t *testing.T) {
-	got := VerifyScript("VSLBASE*1.0*1", []string{"VSLCFG"}, []string{"VSL GREETING"}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
-	for _, want := range []string{
-		`$D(^XTV(8989.51,"B","VSL GREETING"))`,
-		ResultMarker + `param:VSL GREETING=`,
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("VerifyScript (param) missing %q\n---\n%s", want, got)
-		}
-	}
+// componentCases ground the registry-driven generic component path against every
+// standard component global: each must presence-probe its "B" index and DIK-delete
+// by IEN from its own storage global. A new type becomes one row here, no new code.
+var componentCases = []struct {
+	file                           float64
+	fileStr, dataRoot, label, name string
+}{
+	{8989.51, "8989.51", "^XTV(8989.51,", "PARAMETER DEFINITION", "VSL GREETING"},
+	{19, "19", "^DIC(19,", "OPTION", "ZZOPT RUN ROUTINE"},
+	{19.1, "19.1", "^DIC(19.1,", "SECURITY KEY", "ZZKEY MANAGER"},
+	{101, "101", "^ORD(101,", "PROTOCOL", "ZZPROTO ACTION"},
+	{8994, "8994", "^XWB(8994,", "REMOTE PROCEDURE", "ZZRPC ECHO"},
+	{3.8, "3.8", "^XMB(3.8,", "MAIL GROUP", "ZZMG ALERTS"},
+	{409.61, "409.61", "^SD(409.61,", "LIST TEMPLATE", "ZZLM PATIENTS"},
+	{9.2, "9.2", "^DIC(9.2,", "HELP FRAME", "ZZHF-MAIN"},
+	{771, "771", "^HL(771,", "HL7 APPLICATION PARAMETER", "ZZHL_APP"},
+	{779.2, "779.2", "^HLD(779.2,", "HLO APPLICATION REGISTRY", "ZZHO_APP"},
+	{870, "870", "^HLCS(870,", "HL LOGICAL LINK", "ZZLINK"},
+	// New types (increment #1) ride the SAME generic path — no per-type code.
+	{0.402, "0.402", "^DIE(", "INPUT TEMPLATE", "ZZTMPL FILE #999000"},
+	{0.403, "0.403", "^DIST(.403,", "FORM", "ZZFORM"},
 }
 
-// VerifyScript also probes each OPTION by NAME in #19's "B" index (KRN^XPDIK
-// builds it when it files the option record).
-func TestVerifyScript_Option(t *testing.T) {
-	got := VerifyScript("ZZOPT*1.0*1", []string{"ZZOPTRT"}, nil, []string{"ZZOPT RUN ROUTINE"}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
-	for _, want := range []string{
-		`$D(^DIC(19,"B","ZZOPT RUN ROUTINE"))`,
-		ResultMarker + `option:ZZOPT RUN ROUTINE=`,
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("VerifyScript (option) missing %q\n---\n%s", want, got)
-		}
-	}
+func componentLit(i int) []kids.Component {
+	c := componentCases[i]
+	return []kids.Component{{File: c.file, FileStr: c.fileStr, DataRoot: c.dataRoot, Label: c.label, Names: []string{c.name}}}
 }
 
-// VerifyScript also probes each SECURITY KEY by NAME in #19.1's "B" index.
-func TestVerifyScript_Key(t *testing.T) {
-	got := VerifyScript("ZZKEY*1.0*1", []string{"ZZKEYRT"}, nil, nil, []string{"ZZKEY MANAGER"}, nil, nil, nil, nil, nil, nil, nil, nil, nil)
-	for _, want := range []string{
-		`$D(^DIC(19.1,"B","ZZKEY MANAGER"))`,
-		ResultMarker + `key:ZZKEY MANAGER=`,
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("VerifyScript (key) missing %q\n---\n%s", want, got)
-		}
-	}
-}
+// msliteral renders an M string literal the way kids.MString does, for the probe
+// assertions (quote-wrapped, embedded quotes doubled).
+func msliteral(s string) string { return `"` + strings.ReplaceAll(s, `"`, `""`) + `"` }
 
-// VerifyScript also probes each PROTOCOL by NAME in #101's "B" index (^ORD(101,).
-func TestVerifyScript_Protocol(t *testing.T) {
-	got := VerifyScript("ZZPROTO*1.0*1", []string{"ZZPRORT"}, nil, nil, nil, []string{"ZZPROTO ACTION"}, nil, nil, nil, nil, nil, nil, nil, nil)
-	for _, want := range []string{
-		`$D(^ORD(101,"B","ZZPROTO ACTION"))`,
-		ResultMarker + `protocol:ZZPROTO ACTION=`,
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("VerifyScript (protocol) missing %q\n---\n%s", want, got)
+// VerifyScript probes each entry component by NAME in its storage file's "B"
+// index, driven generically from the kids.Component registry — one
+// comp:<file>:<name> marker per record.
+func TestVerifyScript_Components(t *testing.T) {
+	for i, tc := range componentCases {
+		got := VerifyScript("ZZ*1.0*1", []string{"ZZRT"}, componentLit(i), nil)
+		probe := `$D(` + tc.dataRoot + `"B",` + msliteral(tc.name) + `)`
+		marker := ResultMarker + `comp:` + tc.fileStr + `:` + tc.name + `=`
+		if !strings.Contains(got, probe) {
+			t.Errorf("%s: VerifyScript missing presence probe %q\n---\n%s", tc.label, probe, got)
 		}
-	}
-}
-
-// VerifyScript also probes each REMOTE PROCEDURE by its #8994 "B" index entry.
-func TestVerifyScript_RPC(t *testing.T) {
-	got := VerifyScript("ZZRPC*1.0*1", []string{"ZZRPCRT"}, nil, nil, nil, nil, []string{"ZZRPC ECHO"}, nil, nil, nil, nil, nil, nil, nil)
-	for _, want := range []string{
-		`$D(^XWB(8994,"B","ZZRPC ECHO"))`,
-		ResultMarker + `rpc:ZZRPC ECHO=`,
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("VerifyScript (rpc) missing %q\n---\n%s", want, got)
-		}
-	}
-}
-
-// VerifyScript also probes each MAIL GROUP by its #3.8 "B" index entry.
-func TestVerifyScript_MailGroup(t *testing.T) {
-	got := VerifyScript("ZZMG*1.0*1", []string{"ZZMGRT"}, nil, nil, nil, nil, nil, []string{"ZZMG ALERTS"}, nil, nil, nil, nil, nil, nil)
-	for _, want := range []string{
-		`$D(^XMB(3.8,"B","ZZMG ALERTS"))`,
-		ResultMarker + `mailgroup:ZZMG ALERTS=`,
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("VerifyScript (mail group) missing %q\n---\n%s", want, got)
-		}
-	}
-}
-
-// VerifyScript also probes each LIST TEMPLATE by its #409.61 "B" index entry
-// (stored under ^SD(409.61,, not ^ORD).
-func TestVerifyScript_ListTemplate(t *testing.T) {
-	got := VerifyScript("ZZLM*1.0*1", []string{"ZZLMRT"}, nil, nil, nil, nil, nil, nil, []string{"ZZLM PATIENTS"}, nil, nil, nil, nil, nil)
-	for _, want := range []string{
-		`$D(^SD(409.61,"B","ZZLM PATIENTS"))`,
-		ResultMarker + `listtemplate:ZZLM PATIENTS=`,
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("VerifyScript (list template) missing %q\n---\n%s", want, got)
-		}
-	}
-}
-
-// VerifyScript also probes each HELP FRAME by its #9.2 "B" index entry (^DIC(9.2,).
-func TestVerifyScript_HelpFrame(t *testing.T) {
-	got := VerifyScript("ZZHF*1.0*1", []string{"ZZHFRT"}, nil, nil, nil, nil, nil, nil, nil, []string{"ZZHF-MAIN"}, nil, nil, nil, nil)
-	for _, want := range []string{
-		`$D(^DIC(9.2,"B","ZZHF-MAIN"))`,
-		ResultMarker + `helpframe:ZZHF-MAIN=`,
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("VerifyScript (help frame) missing %q\n---\n%s", want, got)
-		}
-	}
-}
-
-// VerifyScript also probes each HL7 APPLICATION PARAMETER by its #771 "B" index
-// entry (^HL(771,).
-func TestVerifyScript_HL7App(t *testing.T) {
-	got := VerifyScript("ZZHL*1.0*1", []string{"ZZHLRT"}, nil, nil, nil, nil, nil, nil, nil, nil, []string{"ZZHL_APP"}, nil, nil, nil)
-	for _, want := range []string{
-		`$D(^HL(771,"B","ZZHL_APP"))`,
-		ResultMarker + `hl7app:ZZHL_APP=`,
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("VerifyScript (hl7 app) missing %q\n---\n%s", want, got)
-		}
-	}
-}
-
-// VerifyScript also probes each HLO APPLICATION REGISTRY by its #779.2 "B" index
-// entry (^HLD(779.2,).
-func TestVerifyScript_HLOApp(t *testing.T) {
-	got := VerifyScript("ZZHO*1.0*1", []string{"ZZHORT"}, nil, nil, nil, nil, nil, nil, nil, nil, nil, []string{"ZZHO_APP"}, nil, nil)
-	for _, want := range []string{
-		`$D(^HLD(779.2,"B","ZZHO_APP"))`,
-		ResultMarker + `hloapp:ZZHO_APP=`,
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("VerifyScript (hlo app) missing %q\n---\n%s", want, got)
-		}
-	}
-}
-
-// VerifyScript also probes each HL LOGICAL LINK by its #870 "B" index entry
-// (^HLCS(870,).
-func TestVerifyScript_LogicalLink(t *testing.T) {
-	got := VerifyScript("ZZLL*1.0*1", []string{"ZZLLRT"}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, []string{"ZZLINK"}, nil)
-	for _, want := range []string{
-		`$D(^HLCS(870,"B","ZZLINK"))`,
-		ResultMarker + `logicallink:ZZLINK=`,
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("VerifyScript (logical link) missing %q\n---\n%s", want, got)
+		if !strings.Contains(got, marker) {
+			t.Errorf("%s: VerifyScript missing marker %q\n---\n%s", tc.label, marker, got)
 		}
 	}
 }
@@ -436,7 +336,7 @@ func TestVerifyContentScript_File(t *testing.T) {
 // VerifyScript also probes each installed FileMan FILE by its data dictionary
 // header node (^DD(file,0) present iff the DD installed).
 func TestVerifyScript_File(t *testing.T) {
-	got := VerifyScript("ZZVSLFS*1.0*1", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, []string{"999000"})
+	got := VerifyScript("ZZVSLFS*1.0*1", nil, nil, []string{"999000"})
 	for _, want := range []string{
 		`$D(^DD(999000,0))`,
 		ResultMarker + `file:999000=`,
@@ -448,7 +348,7 @@ func TestVerifyScript_File(t *testing.T) {
 }
 
 func TestUninstallScript(t *testing.T) {
-	got := UninstallScript("ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	got := UninstallScript("ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil)
 	for _, want := range []string{
 		`S X="ZZSKEL" X ^%ZOSF("DEL")`,                                        // routine delete
 		`S DA=$O(^XPD(9.7,"B","ZZSKEL*1.0*1",0)),DIK="^XPD(9.7," I DA D ^DIK`, // #9.7
@@ -461,109 +361,16 @@ func TestUninstallScript(t *testing.T) {
 	}
 }
 
-// UninstallScript also backs out each PARAMETER DEFINITION via FileMan DIK on
-// #8989.51 (delete by IEN resolved from the "B" index; DIK clears its xrefs).
-func TestUninstallScript_ParamDef(t *testing.T) {
-	got := UninstallScript("VSLBASE*1.0*1", []string{"VSLCFG"}, []string{"VSL GREETING"}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
-	want := `S DA=$O(^XTV(8989.51,"B","VSL GREETING",0)),DIK="^XTV(8989.51," I DA D ^DIK`
-	if !strings.Contains(got, want) {
-		t.Errorf("UninstallScript (param) missing %q\n---\n%s", want, got)
-	}
-}
-
-// UninstallScript also backs out each OPTION via FileMan DIK on #19 (delete by
-// IEN resolved from the "B" index; DIK clears its xrefs).
-func TestUninstallScript_Option(t *testing.T) {
-	got := UninstallScript("ZZOPT*1.0*1", []string{"ZZOPTRT"}, nil, []string{"ZZOPT RUN ROUTINE"}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
-	want := `S DA=$O(^DIC(19,"B","ZZOPT RUN ROUTINE",0)),DIK="^DIC(19," I DA D ^DIK`
-	if !strings.Contains(got, want) {
-		t.Errorf("UninstallScript (option) missing %q\n---\n%s", want, got)
-	}
-}
-
-// UninstallScript also backs out each SECURITY KEY via FileMan DIK on #19.1.
-func TestUninstallScript_Key(t *testing.T) {
-	got := UninstallScript("ZZKEY*1.0*1", []string{"ZZKEYRT"}, nil, nil, []string{"ZZKEY MANAGER"}, nil, nil, nil, nil, nil, nil, nil, nil, nil)
-	want := `S DA=$O(^DIC(19.1,"B","ZZKEY MANAGER",0)),DIK="^DIC(19.1," I DA D ^DIK`
-	if !strings.Contains(got, want) {
-		t.Errorf("UninstallScript (key) missing %q\n---\n%s", want, got)
-	}
-}
-
-// UninstallScript also backs out each PROTOCOL via FileMan DIK on #101 (^ORD(101,).
-func TestUninstallScript_Protocol(t *testing.T) {
-	got := UninstallScript("ZZPROTO*1.0*1", []string{"ZZPRORT"}, nil, nil, nil, []string{"ZZPROTO ACTION"}, nil, nil, nil, nil, nil, nil, nil, nil)
-	want := `S DA=$O(^ORD(101,"B","ZZPROTO ACTION",0)),DIK="^ORD(101," I DA D ^DIK`
-	if !strings.Contains(got, want) {
-		t.Errorf("UninstallScript (protocol) missing %q\n---\n%s", want, got)
-	}
-}
-
-// UninstallScript also backs out each REMOTE PROCEDURE via FileMan DIK on #8994
-// (^XWB(8994,).
-func TestUninstallScript_RPC(t *testing.T) {
-	got := UninstallScript("ZZRPC*1.0*1", []string{"ZZRPCRT"}, nil, nil, nil, nil, []string{"ZZRPC ECHO"}, nil, nil, nil, nil, nil, nil, nil)
-	want := `S DA=$O(^XWB(8994,"B","ZZRPC ECHO",0)),DIK="^XWB(8994," I DA D ^DIK`
-	if !strings.Contains(got, want) {
-		t.Errorf("UninstallScript (rpc) missing %q\n---\n%s", want, got)
-	}
-}
-
-// UninstallScript also backs out each MAIL GROUP via FileMan DIK on #3.8 (^XMB(3.8,).
-func TestUninstallScript_MailGroup(t *testing.T) {
-	got := UninstallScript("ZZMG*1.0*1", []string{"ZZMGRT"}, nil, nil, nil, nil, nil, []string{"ZZMG ALERTS"}, nil, nil, nil, nil, nil, nil)
-	want := `S DA=$O(^XMB(3.8,"B","ZZMG ALERTS",0)),DIK="^XMB(3.8," I DA D ^DIK`
-	if !strings.Contains(got, want) {
-		t.Errorf("UninstallScript (mail group) missing %q\n---\n%s", want, got)
-	}
-}
-
-// UninstallScript also backs out each LIST TEMPLATE via FileMan DIK on #409.61
-// (^SD(409.61,).
-func TestUninstallScript_ListTemplate(t *testing.T) {
-	got := UninstallScript("ZZLM*1.0*1", []string{"ZZLMRT"}, nil, nil, nil, nil, nil, nil, []string{"ZZLM PATIENTS"}, nil, nil, nil, nil, nil)
-	want := `S DA=$O(^SD(409.61,"B","ZZLM PATIENTS",0)),DIK="^SD(409.61," I DA D ^DIK`
-	if !strings.Contains(got, want) {
-		t.Errorf("UninstallScript (list template) missing %q\n---\n%s", want, got)
-	}
-}
-
-// UninstallScript also backs out each HELP FRAME via FileMan DIK on #9.2 (^DIC(9.2,).
-func TestUninstallScript_HelpFrame(t *testing.T) {
-	got := UninstallScript("ZZHF*1.0*1", []string{"ZZHFRT"}, nil, nil, nil, nil, nil, nil, nil, []string{"ZZHF-MAIN"}, nil, nil, nil, nil)
-	want := `S DA=$O(^DIC(9.2,"B","ZZHF-MAIN",0)),DIK="^DIC(9.2," I DA D ^DIK`
-	if !strings.Contains(got, want) {
-		t.Errorf("UninstallScript (help frame) missing %q\n---\n%s", want, got)
-	}
-}
-
-// UninstallScript also backs out each HL7 APPLICATION PARAMETER via FileMan DIK on
-// #771 (^HL(771,).
-func TestUninstallScript_HL7App(t *testing.T) {
-	got := UninstallScript("ZZHL*1.0*1", []string{"ZZHLRT"}, nil, nil, nil, nil, nil, nil, nil, nil, []string{"ZZHL_APP"}, nil, nil, nil)
-	want := `S DA=$O(^HL(771,"B","ZZHL_APP",0)),DIK="^HL(771," I DA D ^DIK`
-	if !strings.Contains(got, want) {
-		t.Errorf("UninstallScript (hl7 app) missing %q\n---\n%s", want, got)
-	}
-}
-
-// UninstallScript also backs out each HLO APPLICATION REGISTRY via FileMan DIK on
-// #779.2 (^HLD(779.2,) — DIK re-derives the #779.21 multiple's B/C/D xrefs.
-func TestUninstallScript_HLOApp(t *testing.T) {
-	got := UninstallScript("ZZHO*1.0*1", []string{"ZZHORT"}, nil, nil, nil, nil, nil, nil, nil, nil, nil, []string{"ZZHO_APP"}, nil, nil)
-	want := `S DA=$O(^HLD(779.2,"B","ZZHO_APP",0)),DIK="^HLD(779.2," I DA D ^DIK`
-	if !strings.Contains(got, want) {
-		t.Errorf("UninstallScript (hlo app) missing %q\n---\n%s", want, got)
-	}
-}
-
-// UninstallScript also backs out each HL LOGICAL LINK via FileMan DIK on #870
-// (^HLCS(870,).
-func TestUninstallScript_LogicalLink(t *testing.T) {
-	got := UninstallScript("ZZLL*1.0*1", []string{"ZZLLRT"}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, []string{"ZZLINK"}, nil)
-	want := `S DA=$O(^HLCS(870,"B","ZZLINK",0)),DIK="^HLCS(870," I DA D ^DIK`
-	if !strings.Contains(got, want) {
-		t.Errorf("UninstallScript (logical link) missing %q\n---\n%s", want, got)
+// UninstallScript backs out each entry component via FileMan DIK on its storage
+// file (delete by the IEN resolved from the "B" index; DIK clears its xrefs and
+// any compiled subfiles) — driven generically from the kids.Component registry.
+func TestUninstallScript_Components(t *testing.T) {
+	for i, tc := range componentCases {
+		got := UninstallScript("ZZ*1.0*1", []string{"ZZRT"}, componentLit(i), nil)
+		want := `S DA=$O(` + tc.dataRoot + `"B",` + msliteral(tc.name) + `,0)),DIK="` + tc.dataRoot + `" I DA D ^DIK`
+		if !strings.Contains(got, want) {
+			t.Errorf("%s: UninstallScript missing %q\n---\n%s", tc.label, want, got)
+		}
 	}
 }
 
@@ -571,7 +378,7 @@ func TestUninstallScript_LogicalLink(t *testing.T) {
 // + name from ^DIC before killing the DD (^DD/^DIC), the data global, and the
 // dict-of-files "B" pointer — KIDS ships no generic file uninstall.
 func TestUninstallScript_File(t *testing.T) {
-	got := UninstallScript("ZZVSLFS*1.0*1", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, []string{"999000"})
+	got := UninstallScript("ZZVSLFS*1.0*1", nil, nil, []string{"999000"})
 	for _, want := range []string{
 		`^DIC(999000,0,"GL")`,        // read the data global root first
 		`K ^DD(999000),^DIC(999000)`, // remove the data dictionary

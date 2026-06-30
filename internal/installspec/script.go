@@ -216,17 +216,13 @@ func FinalInstallScript(name, header string, nPairs int, runEnvCheck bool, ques 
 
 // VerifyScript returns M source that reports whether name is installed: the
 // #9.7 INSTALL presence + status (piece 9; 3 = "Install Completed"), per routine
-// whether it is loaded ($T probe), per PARAMETER DEFINITION whether it is present
-// in #8989.51 (the "B" index), per OPTION whether it is present in #19 (the "B"
-// index), per SECURITY KEY whether it is present in #19.1 (the "B" index), per
-// PROTOCOL whether it is present in #101 (the "B" index), per REMOTE PROCEDURE
-// whether it is present in #8994 (the "B" index), per MAIL GROUP whether it is
-// present in #3.8 (the "B" index), per LIST TEMPLATE whether it is present in
-// #409.61 (the "B" index), per HELP FRAME whether it is present in #9.2 (the "B"
-// index), per HL7 APPLICATION PARAMETER whether it is present in #771 (the "B"
-// index), and per FileMan FILE whether its data dictionary installed (^DD(file,0)
-// present). Each fact is a ResultMarker line.
-func VerifyScript(name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, hloApps, logicalLinks, files []string) string {
+// whether it is loaded ($T probe), per entry COMPONENT whether a record by that
+// .01 NAME is present in its storage file's "B" index, and per FileMan FILE
+// whether its data dictionary installed (^DD(file,0) present). Each fact is a
+// ResultMarker line. The component probes are driven generically from the
+// kids.Component registry (one `comp:<file>:<name>` marker per shipped record),
+// so a new component type needs no change here.
+func VerifyScript(name string, routines []string, comps []kids.Component, files []string) string {
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
 
@@ -237,38 +233,13 @@ func VerifyScript(name string, routines, paramDefs, options, keys, protocols, rp
 	for _, r := range routines {
 		w(`W "` + ResultMarker + `rtn:` + r + `=",$S($T(^` + r + `)]"":1,1:0),!`)
 	}
-	for _, p := range paramDefs {
-		w(`W "` + ResultMarker + `param:` + p + `=",$S($D(^XTV(8989.51,"B",` + kids.MString(p) + `)):1,1:0),!`)
-	}
-	for _, o := range options {
-		w(`W "` + ResultMarker + `option:` + o + `=",$S($D(^DIC(19,"B",` + kids.MString(o) + `)):1,1:0),!`)
-	}
-	for _, k := range keys {
-		w(`W "` + ResultMarker + `key:` + k + `=",$S($D(^DIC(19.1,"B",` + kids.MString(k) + `)):1,1:0),!`)
-	}
-	for _, pr := range protocols {
-		w(`W "` + ResultMarker + `protocol:` + pr + `=",$S($D(^ORD(101,"B",` + kids.MString(pr) + `)):1,1:0),!`)
-	}
-	for _, rp := range rpcs {
-		w(`W "` + ResultMarker + `rpc:` + rp + `=",$S($D(^XWB(8994,"B",` + kids.MString(rp) + `)):1,1:0),!`)
-	}
-	for _, mg := range mailGroups {
-		w(`W "` + ResultMarker + `mailgroup:` + mg + `=",$S($D(^XMB(3.8,"B",` + kids.MString(mg) + `)):1,1:0),!`)
-	}
-	for _, lt := range listTemplates {
-		w(`W "` + ResultMarker + `listtemplate:` + lt + `=",$S($D(^SD(409.61,"B",` + kids.MString(lt) + `)):1,1:0),!`)
-	}
-	for _, hf := range helpFrames {
-		w(`W "` + ResultMarker + `helpframe:` + hf + `=",$S($D(^DIC(9.2,"B",` + kids.MString(hf) + `)):1,1:0),!`)
-	}
-	for _, ha := range hl7Apps {
-		w(`W "` + ResultMarker + `hl7app:` + ha + `=",$S($D(^HL(771,"B",` + kids.MString(ha) + `)):1,1:0),!`)
-	}
-	for _, ho := range hloApps {
-		w(`W "` + ResultMarker + `hloapp:` + ho + `=",$S($D(^HLD(779.2,"B",` + kids.MString(ho) + `)):1,1:0),!`)
-	}
-	for _, ll := range logicalLinks {
-		w(`W "` + ResultMarker + `logicallink:` + ll + `=",$S($D(^HLCS(870,"B",` + kids.MString(ll) + `)):1,1:0),!`)
+	// Per entry component: a record by this .01 NAME is present iff it has a
+	// "B"-index entry under the type's storage global (KRN^XPDIK builds it on
+	// install). The "B" subscript + name hang off the type's DataRoot.
+	for _, c := range comps {
+		for _, n := range c.Names {
+			w(`W "` + ResultMarker + `comp:` + c.FileStr + `:` + n + `=",$S($D(` + c.DataRoot + `"B",` + kids.MString(n) + `)):1,1:0),!`)
+		}
 	}
 	for _, f := range files {
 		w(`W "` + ResultMarker + `file:` + f + `=",$S($D(^DD(` + f + `,0)):1,1:0),!`)
@@ -331,19 +302,17 @@ func VerifyContentScript(contents []kids.EntryContent, files []kids.FileContent)
 }
 
 // UninstallScript returns M source that reverses an install (T0a.4): delete each
-// routine (^%ZOSF("DEL") removes the .m + .o), each PARAMETER DEFINITION from
-// #8989.51 (FileMan DIK by IEN — clears its "B" and subfile xrefs), each OPTION
-// from #19 (FileMan DIK by IEN), each SECURITY KEY from #19.1 (FileMan DIK by
-// IEN), each PROTOCOL from #101 (FileMan DIK by IEN), each REMOTE PROCEDURE from
-// #8994 (FileMan DIK by IEN), each MAIL GROUP from #3.8 (FileMan DIK by IEN), each
-// LIST TEMPLATE from #409.61 (FileMan DIK by IEN), each HELP FRAME from #9.2
-// (FileMan DIK by IEN), each HL7 APPLICATION PARAMETER from #771 (FileMan DIK by
-// IEN), each FileMan FILE (its DD, data global, and dict-of-files pointer — KIDS
-// ships no generic file uninstall), and the #9.7 INSTALL and #9.6 BUILD entries via
-// DIK. The monotonic
-// #9.x / #8989.51 / #19 / #19.1 / #101 / #8994 / #3.8 / #409.61 / #9.2 / #771 IEN
-// counters are not rolled back (inherent to FileMan, not a leak).
-func UninstallScript(name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, hloApps, logicalLinks, files []string) string {
+// routine (^%ZOSF("DEL") removes the .m + .o), each entry COMPONENT record from
+// its storage file (FileMan DIK by the IEN resolved from the "B" index — clears
+// its xrefs and any compiled subfiles), each FileMan FILE (its DD, data global,
+// and dict-of-files pointer — KIDS ships no generic file uninstall), and the #9.7
+// INSTALL and #9.6 BUILD entries via DIK. The component deletes are driven
+// generically from the kids.Component registry (one `^DIK` per shipped record,
+// keyed on the type's storage global), so a new component type needs no change
+// here — closing the orphan-on-uninstall gap for every registered type. The
+// monotonic #9.x and per-file FileMan IEN counters are not rolled back (inherent
+// to FileMan, not a leak).
+func UninstallScript(name string, routines []string, comps []kids.Component, files []string) string {
 	var b strings.Builder
 	w := func(line string) { b.WriteString(line); b.WriteByte('\n') }
 
@@ -351,38 +320,14 @@ func UninstallScript(name string, routines, paramDefs, options, keys, protocols,
 	for _, r := range routines {
 		w(`S X=` + kids.MString(r) + ` X ^%ZOSF("DEL")`)
 	}
-	for _, p := range paramDefs {
-		w(`S DA=$O(^XTV(8989.51,"B",` + kids.MString(p) + `,0)),DIK="^XTV(8989.51," I DA D ^DIK`)
-	}
-	for _, o := range options {
-		w(`S DA=$O(^DIC(19,"B",` + kids.MString(o) + `,0)),DIK="^DIC(19," I DA D ^DIK`)
-	}
-	for _, k := range keys {
-		w(`S DA=$O(^DIC(19.1,"B",` + kids.MString(k) + `,0)),DIK="^DIC(19.1," I DA D ^DIK`)
-	}
-	for _, pr := range protocols {
-		w(`S DA=$O(^ORD(101,"B",` + kids.MString(pr) + `,0)),DIK="^ORD(101," I DA D ^DIK`)
-	}
-	for _, rp := range rpcs {
-		w(`S DA=$O(^XWB(8994,"B",` + kids.MString(rp) + `,0)),DIK="^XWB(8994," I DA D ^DIK`)
-	}
-	for _, mg := range mailGroups {
-		w(`S DA=$O(^XMB(3.8,"B",` + kids.MString(mg) + `,0)),DIK="^XMB(3.8," I DA D ^DIK`)
-	}
-	for _, lt := range listTemplates {
-		w(`S DA=$O(^SD(409.61,"B",` + kids.MString(lt) + `,0)),DIK="^SD(409.61," I DA D ^DIK`)
-	}
-	for _, hf := range helpFrames {
-		w(`S DA=$O(^DIC(9.2,"B",` + kids.MString(hf) + `,0)),DIK="^DIC(9.2," I DA D ^DIK`)
-	}
-	for _, ha := range hl7Apps {
-		w(`S DA=$O(^HL(771,"B",` + kids.MString(ha) + `,0)),DIK="^HL(771," I DA D ^DIK`)
-	}
-	for _, ho := range hloApps {
-		w(`S DA=$O(^HLD(779.2,"B",` + kids.MString(ho) + `,0)),DIK="^HLD(779.2," I DA D ^DIK`)
-	}
-	for _, ll := range logicalLinks {
-		w(`S DA=$O(^HLCS(870,"B",` + kids.MString(ll) + `,0)),DIK="^HLCS(870," I DA D ^DIK`)
+	// Per entry component: resolve the site IEN from the type's "B" index and DIK it
+	// by IEN (which also clears its cross-references and compiled subfiles). The "B"
+	// lookup root and the DIK ref are both the type's DataRoot.
+	for _, c := range comps {
+		for _, n := range c.Names {
+			nameLit := kids.MString(n)
+			w(`S DA=$O(` + c.DataRoot + `"B",` + nameLit + `,0)),DIK="` + c.DataRoot + `" I DA D ^DIK`)
+		}
 	}
 	// FileMan FILE back-out: read the data global root + name BEFORE killing the
 	// dictionary, then remove the DD (^DD/^DIC), the data global, and the

@@ -637,22 +637,16 @@ func countInstalled(reports []installReport) int {
 // --- verify -----------------------------------------------------------------
 
 type verifyResult struct {
-	Name          string          `json:"name"`
-	Installed     bool            `json:"installed"`
-	Status        int             `json:"status"`
-	Routines      map[string]bool `json:"routines"`
-	Params        map[string]bool `json:"params,omitempty"`          // #8989.51 PARAMETER DEFINITIONs present
-	Options       map[string]bool `json:"options,omitempty"`         // #19 OPTIONs present
-	Keys          map[string]bool `json:"keys,omitempty"`            // #19.1 SECURITY KEYs present
-	Protocols     map[string]bool `json:"protocols,omitempty"`       // #101 PROTOCOLs present
-	RPCs          map[string]bool `json:"rpcs,omitempty"`            // #8994 REMOTE PROCEDUREs present
-	MailGroups    map[string]bool `json:"mailGroups,omitempty"`      // #3.8 MAIL GROUPs present
-	ListTemplates map[string]bool `json:"listTemplates,omitempty"`   // #409.61 LIST TEMPLATEs present
-	HelpFrames    map[string]bool `json:"helpFrames,omitempty"`      // #9.2 HELP FRAMEs present
-	HL7Apps       map[string]bool `json:"hl7Applications,omitempty"` // #771 HL7 APPLICATION PARAMETERs present
-	HLOApps       map[string]bool `json:"hloApplications,omitempty"` // #779.2 HLO APPLICATION REGISTRYs present
-	LogicalLinks  map[string]bool `json:"logicalLinks,omitempty"`    // #870 HL LOGICAL LINKs present
-	Files         map[string]bool `json:"files,omitempty"`           // FileMan FILE data dictionaries present
+	Name      string          `json:"name"`
+	Installed bool            `json:"installed"`
+	Status    int             `json:"status"`
+	Routines  map[string]bool `json:"routines"`
+	// Components maps each shipped entry-component record ("<file>:<name>") ->
+	// present, across every registered type (OPTION #19, INPUT TEMPLATE #.402, …) —
+	// the registry-driven replacement for the per-type maps. Probed by the type's
+	// storage-file "B" index (KRN^XPDIK builds it on install).
+	Components map[string]bool `json:"components,omitempty"`
+	Files      map[string]bool `json:"files,omitempty"` // FileMan FILE data dictionaries present
 	// Drift maps each routine -> "applied" | "drifted" | "absent" when --drift is
 	// requested: does the LIVE routine still match the source this patch shipped?
 	// "drifted" = a later national patch overwrote our code (the FU-21 re-pin gate).
@@ -677,57 +671,7 @@ func (r verifyResult) ok() bool {
 			return false
 		}
 	}
-	for _, present := range r.Params {
-		if !present {
-			return false
-		}
-	}
-	for _, present := range r.Options {
-		if !present {
-			return false
-		}
-	}
-	for _, present := range r.Keys {
-		if !present {
-			return false
-		}
-	}
-	for _, present := range r.Protocols {
-		if !present {
-			return false
-		}
-	}
-	for _, present := range r.RPCs {
-		if !present {
-			return false
-		}
-	}
-	for _, present := range r.MailGroups {
-		if !present {
-			return false
-		}
-	}
-	for _, present := range r.ListTemplates {
-		if !present {
-			return false
-		}
-	}
-	for _, present := range r.HelpFrames {
-		if !present {
-			return false
-		}
-	}
-	for _, present := range r.HL7Apps {
-		if !present {
-			return false
-		}
-	}
-	for _, present := range r.HLOApps {
-		if !present {
-			return false
-		}
-	}
-	for _, present := range r.LogicalLinks {
+	for _, present := range r.Components {
 		if !present {
 			return false
 		}
@@ -835,49 +779,22 @@ func verifyContent(ctx context.Context, cl *mdriver.Client, contents []kids.Entr
 	return out, nil
 }
 
-func runVerify(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, hloApps, logicalLinks, files []string) (verifyResult, error) {
-	markers, _, err := runMScript(ctx, cl, rtnVerify, installspec.VerifyScript(name, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, hloApps, logicalLinks, files))
+func runVerify(ctx context.Context, cl *mdriver.Client, name string, routines []string, comps []kids.Component, files []string) (verifyResult, error) {
+	markers, _, err := runMScript(ctx, cl, rtnVerify, installspec.VerifyScript(name, routines, comps, files))
 	if err != nil {
 		return verifyResult{Name: name}, err
 	}
-	r := verifyResult{Name: name, Routines: map[string]bool{}, Params: map[string]bool{}, Options: map[string]bool{}, Keys: map[string]bool{}, Protocols: map[string]bool{}, RPCs: map[string]bool{}, MailGroups: map[string]bool{}, ListTemplates: map[string]bool{}, HelpFrames: map[string]bool{}, HL7Apps: map[string]bool{}, HLOApps: map[string]bool{}, LogicalLinks: map[string]bool{}, Files: map[string]bool{}}
+	r := verifyResult{Name: name, Routines: map[string]bool{}, Components: map[string]bool{}, Files: map[string]bool{}}
 	r.Installed = strings.TrimSpace(markers["installed"]) == "1"
 	r.Status, _ = strconv.Atoi(strings.TrimSpace(markers["status"]))
 	for _, rt := range routines {
 		r.Routines[rt] = strings.TrimSpace(markers["rtn:"+rt]) == "1"
 	}
-	for _, p := range paramDefs {
-		r.Params[p] = strings.TrimSpace(markers["param:"+p]) == "1"
-	}
-	for _, o := range options {
-		r.Options[o] = strings.TrimSpace(markers["option:"+o]) == "1"
-	}
-	for _, k := range keys {
-		r.Keys[k] = strings.TrimSpace(markers["key:"+k]) == "1"
-	}
-	for _, pr := range protocols {
-		r.Protocols[pr] = strings.TrimSpace(markers["protocol:"+pr]) == "1"
-	}
-	for _, rp := range rpcs {
-		r.RPCs[rp] = strings.TrimSpace(markers["rpc:"+rp]) == "1"
-	}
-	for _, mg := range mailGroups {
-		r.MailGroups[mg] = strings.TrimSpace(markers["mailgroup:"+mg]) == "1"
-	}
-	for _, lt := range listTemplates {
-		r.ListTemplates[lt] = strings.TrimSpace(markers["listtemplate:"+lt]) == "1"
-	}
-	for _, hf := range helpFrames {
-		r.HelpFrames[hf] = strings.TrimSpace(markers["helpframe:"+hf]) == "1"
-	}
-	for _, ha := range hl7Apps {
-		r.HL7Apps[ha] = strings.TrimSpace(markers["hl7app:"+ha]) == "1"
-	}
-	for _, ho := range hloApps {
-		r.HLOApps[ho] = strings.TrimSpace(markers["hloapp:"+ho]) == "1"
-	}
-	for _, ll := range logicalLinks {
-		r.LogicalLinks[ll] = strings.TrimSpace(markers["logicallink:"+ll]) == "1"
+	for _, c := range comps {
+		for _, n := range c.Names {
+			key := c.FileStr + ":" + n
+			r.Components[key] = strings.TrimSpace(markers["comp:"+key]) == "1"
+		}
 	}
 	for _, f := range files {
 		r.Files[f] = strings.TrimSpace(markers["file:"+f]) == "1"
@@ -901,7 +818,7 @@ func (c *verifyCmd) Run(cc *clikit.Context) error {
 		return c.noDriver(err)
 	}
 	ctx := context.Background()
-	res, err := runVerify(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), b.RPCNames(), b.MailGroupNames(), b.ListTemplateNames(), b.HelpFrameNames(), b.HL7AppNames(), b.HLOAppNames(), b.LogicalLinkNames(), fileNumStrings(b))
+	res, err := runVerify(ctx, cl, name, b.RoutineNames(), b.Components(), fileNumStrings(b))
 	if err != nil {
 		return clikit.Fail(clikit.ExitRuntime, "VERIFY_FAILED", err.Error(), "")
 	}
@@ -929,82 +846,12 @@ func (c *verifyCmd) Run(cc *clikit.Context) error {
 			}
 			fmt.Fprintf(cc.Stdout, "  %s %s\n", rt, mark)
 		}
-		for p, present := range res.Params {
+		for comp, present := range res.Components {
 			mark := cc.Success("ok")
 			if !present {
 				mark = cc.Failure("missing")
 			}
-			fmt.Fprintf(cc.Stdout, "  param %s %s\n", p, mark)
-		}
-		for o, present := range res.Options {
-			mark := cc.Success("ok")
-			if !present {
-				mark = cc.Failure("missing")
-			}
-			fmt.Fprintf(cc.Stdout, "  option %s %s\n", o, mark)
-		}
-		for k, present := range res.Keys {
-			mark := cc.Success("ok")
-			if !present {
-				mark = cc.Failure("missing")
-			}
-			fmt.Fprintf(cc.Stdout, "  key %s %s\n", k, mark)
-		}
-		for pr, present := range res.Protocols {
-			mark := cc.Success("ok")
-			if !present {
-				mark = cc.Failure("missing")
-			}
-			fmt.Fprintf(cc.Stdout, "  protocol %s %s\n", pr, mark)
-		}
-		for rp, present := range res.RPCs {
-			mark := cc.Success("ok")
-			if !present {
-				mark = cc.Failure("missing")
-			}
-			fmt.Fprintf(cc.Stdout, "  rpc %s %s\n", rp, mark)
-		}
-		for mg, present := range res.MailGroups {
-			mark := cc.Success("ok")
-			if !present {
-				mark = cc.Failure("missing")
-			}
-			fmt.Fprintf(cc.Stdout, "  mail group %s %s\n", mg, mark)
-		}
-		for lt, present := range res.ListTemplates {
-			mark := cc.Success("ok")
-			if !present {
-				mark = cc.Failure("missing")
-			}
-			fmt.Fprintf(cc.Stdout, "  list template %s %s\n", lt, mark)
-		}
-		for hf, present := range res.HelpFrames {
-			mark := cc.Success("ok")
-			if !present {
-				mark = cc.Failure("missing")
-			}
-			fmt.Fprintf(cc.Stdout, "  help frame %s %s\n", hf, mark)
-		}
-		for ha, present := range res.HL7Apps {
-			mark := cc.Success("ok")
-			if !present {
-				mark = cc.Failure("missing")
-			}
-			fmt.Fprintf(cc.Stdout, "  hl7 app %s %s\n", ha, mark)
-		}
-		for ho, present := range res.HLOApps {
-			mark := cc.Success("ok")
-			if !present {
-				mark = cc.Failure("missing")
-			}
-			fmt.Fprintf(cc.Stdout, "  hlo app %s %s\n", ho, mark)
-		}
-		for ll, present := range res.LogicalLinks {
-			mark := cc.Success("ok")
-			if !present {
-				mark = cc.Failure("missing")
-			}
-			fmt.Fprintf(cc.Stdout, "  logical link %s %s\n", ll, mark)
+			fmt.Fprintf(cc.Stdout, "  component %s %s\n", comp, mark)
 		}
 		for f, present := range res.Files {
 			mark := cc.Success("ok")
@@ -1054,8 +901,8 @@ type uninstallResult struct {
 	Uninstalled bool   `json:"uninstalled"`
 }
 
-func runUninstall(ctx context.Context, cl *mdriver.Client, name string, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, hloApps, logicalLinks, files []string) (uninstallResult, error) {
-	markers, _, err := runMScript(ctx, cl, rtnUninstall, installspec.UninstallScript(name, routines, paramDefs, options, keys, protocols, rpcs, mailGroups, listTemplates, helpFrames, hl7Apps, hloApps, logicalLinks, files))
+func runUninstall(ctx context.Context, cl *mdriver.Client, name string, routines []string, comps []kids.Component, files []string) (uninstallResult, error) {
+	markers, _, err := runMScript(ctx, cl, rtnUninstall, installspec.UninstallScript(name, routines, comps, files))
 	if err != nil {
 		return uninstallResult{Name: name}, err
 	}
@@ -1068,7 +915,7 @@ func runUninstall(ctx context.Context, cl *mdriver.Client, name string, routines
 // drop the snapshot's "<name> PREIMAGE" provenance entry — so the restore re-files
 // idempotently across cycles and the uninstall leaves no ghost build registered.
 func clearBuildFootprint(ctx context.Context, cl *mdriver.Client, name string) error {
-	_, err := runUninstall(ctx, cl, name, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	_, err := runUninstall(ctx, cl, name, nil, nil, nil)
 	return err
 }
 
@@ -1377,7 +1224,7 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 		// (2) DELETE the greenfield-added routine(s) + the build's non-routine
 		// components + its #9.7/#9.6 entries. The overwritten foreign routine is NOT
 		// in deleteSet, so it stays as just restored.
-		ur, uerr := runUninstall(ctx, cl, name, deleteSet, b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), b.RPCNames(), b.MailGroupNames(), b.ListTemplateNames(), b.HelpFrameNames(), b.HL7AppNames(), b.HLOAppNames(), b.LogicalLinkNames(), fileNumStrings(b))
+		ur, uerr := runUninstall(ctx, cl, name, deleteSet, b.Components(), fileNumStrings(b))
 		if uerr != nil {
 			return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", uerr.Error(), "")
 		}
@@ -1417,7 +1264,7 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 		// every routine (the original behavior); for a FORCED delete of a build with
 		// declared foreign overwrites it EXCLUDES those — they are left in place, never
 		// bricked, even under --force.
-		ur, uerr := runUninstall(ctx, cl, name, greenfieldDelete, b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), b.RPCNames(), b.MailGroupNames(), b.ListTemplateNames(), b.HelpFrameNames(), b.HL7AppNames(), b.HLOAppNames(), b.LogicalLinkNames(), fileNumStrings(b))
+		ur, uerr := runUninstall(ctx, cl, name, greenfieldDelete, b.Components(), fileNumStrings(b))
 		if uerr != nil {
 			return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", uerr.Error(), "")
 		}

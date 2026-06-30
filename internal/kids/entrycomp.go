@@ -207,6 +207,46 @@ var entryTypeByFile = map[float64]entryType{
 	hloAppFile:       hloAppEntryType,
 }
 
+// Component is one entry-component TYPE a build ships, for the registry-driven
+// generic presence-verify + uninstall-delete path: the file number, its KIDS
+// render (the marker-key disambiguator), the authoritative storage global root
+// (which yields BOTH the "B" presence index `<DataRoot>"B"` and the ^DIK delete
+// ref `<DataRoot>`), the FileMan file name (human label), and the shipped .01
+// NAMEs in build order. One Component per registered type the build actually
+// ships — the single place verify/uninstall learn "which records of which type by
+// which name", so a new type becomes one registry row, not new per-type code.
+type Component struct {
+	File     float64
+	FileStr  string
+	DataRoot string
+	Label    string
+	Names    []string
+}
+
+// Components returns one Component per registered entry type (entryTypeByFile)
+// the build ships, ordered by file number for deterministic output — the
+// registry-driven replacement for the eleven per-type XxxNames() accessors the
+// verify/uninstall scripts used to take as positional arguments.
+func (b *Build) Components() []Component {
+	files := make([]float64, 0, len(entryTypeByFile))
+	for f := range entryTypeByFile {
+		files = append(files, f)
+	}
+	sort.Float64s(files)
+	var out []Component
+	for _, f := range files {
+		names := b.entryNames(f)
+		if len(names) == 0 {
+			continue
+		}
+		et := entryTypeByFile[f]
+		out = append(out, Component{
+			File: f, FileStr: formatKIDSFloat(f), DataRoot: et.dataRoot, Label: et.name, Names: names,
+		})
+	}
+	return out
+}
+
 // EntryContent is what `v pkg verify` needs to assert a shipped KRN entry record
 // is filed CORRECTLY, not merely present: the .01 NAME (the "B" lookup key), the
 // data global it files into, the expected stored 0-node, and the 0-node ^-piece

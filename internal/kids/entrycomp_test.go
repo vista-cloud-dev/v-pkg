@@ -848,3 +848,46 @@ func TestEntryContents(t *testing.T) {
 		t.Errorf("hl7 Volatile = %v, want [7]", app.Volatile)
 	}
 }
+
+// TestComponents proves the registry-driven generic component extractor: for a
+// mixed build it returns one Component per shipped entry type — file-number
+// ascending, each carrying the type's storage global root (the "B" presence index
+// and the ^DIK delete ref) + its FileMan name + its shipped .01 NAMEs. This is the
+// single source `v pkg verify`/`uninstall` use instead of the per-type accessors.
+func TestComponents(t *testing.T) {
+	in := BuildInput{
+		InstallName: "ZZMIX*1.0*1",
+		Namespace:   "ZZMIX",
+		Options:     []Option{{Name: "ZZMIX RUN", MenuText: "ZZ Mix Run", TypeCode: "R", Routine: "EN^ZZMIXRT"}},
+		ParamDefs:   []ParamDef{{Name: "ZZMIX GREETING", DisplayText: "g", DataTypeCode: "F"}},
+	}
+	// Reparse-coerced subscripts (the live verify/uninstall path), so an int-19
+	// subscript is matched the same as the in-memory float.
+	b := newBuild()
+	for _, p := range MakeBuildPairs(in) {
+		b.Set(parseSubscriptLine(formatSubscript(p.Subs)), p.Value)
+	}
+	comps := b.Components()
+	want := []Component{
+		{File: 19, FileStr: "19", DataRoot: "^DIC(19,", Label: "OPTION", Names: []string{"ZZMIX RUN"}},
+		{File: 8989.51, FileStr: "8989.51", DataRoot: "^XTV(8989.51,", Label: "PARAMETER DEFINITION", Names: []string{"ZZMIX GREETING"}},
+	}
+	if len(comps) != len(want) {
+		t.Fatalf("Components() = %+v, want %d entries", comps, len(want))
+	}
+	for i, w := range want {
+		g := comps[i]
+		if g.File != w.File || g.FileStr != w.FileStr || g.DataRoot != w.DataRoot || g.Label != w.Label ||
+			len(g.Names) != len(w.Names) || g.Names[0] != w.Names[0] {
+			t.Errorf("Components()[%d] = %+v, want %+v", i, g, w)
+		}
+	}
+	// A routine-only build ships no entry components.
+	rb := newBuild()
+	for _, p := range MakeBuildPairs(BuildInput{InstallName: "ZZR*1.0*1", Namespace: "ZZR", Routines: []RoutineSrc{{Name: "ZZR", Lines: []string{"ZZR ;x", " quit"}}}}) {
+		rb.Set(p.Subs, p.Value)
+	}
+	if c := rb.Components(); len(c) != 0 {
+		t.Errorf("routine-only Components() = %+v, want none", c)
+	}
+}

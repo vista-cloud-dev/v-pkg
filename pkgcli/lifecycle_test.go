@@ -245,7 +245,7 @@ func TestRunVerify(t *testing.T) {
 	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
 		installspec.ResultMarker + "status=3\n" +
 		installspec.ResultMarker + "rtn:ZZSKEL=1\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	res, err := runVerify(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil)
 	if err != nil {
 		t.Fatalf("runVerify: %v", err)
 	}
@@ -254,235 +254,46 @@ func TestRunVerify(t *testing.T) {
 	}
 }
 
-// A verify carrying a PARAMETER DEFINITION reads its presence marker and folds it
-// into ok() — a missing param means the install is not fully verified.
-func TestRunVerify_ParamDef(t *testing.T) {
-	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
-		installspec.ResultMarker + "status=3\n" +
-		installspec.ResultMarker + "rtn:VSLCFG=1\n" +
-		installspec.ResultMarker + "param:VSL GREETING=1\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "VSLBASE*1.0*1",
-		[]string{"VSLCFG"}, []string{"VSL GREETING"}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("runVerify: %v", err)
+// A verify carrying entry components reads each one's generic comp:<file>:<name>
+// presence marker, keys it into res.Components, and folds it into ok() — a missing
+// record of ANY type defeats verification. One table covers every registered type
+// (the per-type maps are gone; a new type is a registry row, no new test).
+func TestRunVerify_Components(t *testing.T) {
+	cases := []struct {
+		file                    float64
+		fileStr, dataRoot, name string
+	}{
+		{8989.51, "8989.51", "^XTV(8989.51,", "VSL GREETING"},
+		{19, "19", "^DIC(19,", "ZZOPT RUN ROUTINE"},
+		{19.1, "19.1", "^DIC(19.1,", "ZZKEY MANAGER"},
+		{101, "101", "^ORD(101,", "ZZPROTO ACTION"},
+		{8994, "8994", "^XWB(8994,", "ZZRPC ECHO"},
+		{3.8, "3.8", "^XMB(3.8,", "ZZMG ALERTS"},
+		{409.61, "409.61", "^SD(409.61,", "ZZLM PATIENTS"},
+		{9.2, "9.2", "^DIC(9.2,", "ZZHF-MAIN"},
+		{771, "771", "^HL(771,", "ZZHL_APP"},
+		{779.2, "779.2", "^HLD(779.2,", "ZZHO_APP"},
+		{870, "870", "^HLCS(870,", "ZZLINK"},
+		{0.402, "0.402", "^DIE(", "ZZTMPL FILE #999000"}, // new type, same path
 	}
-	if !res.Params["VSL GREETING"] || !res.ok() {
-		t.Errorf("res = %+v, want param present and ok()", res)
-	}
-	// A missing param defeats ok().
-	res.Params["VSL GREETING"] = false
-	if res.ok() {
-		t.Error("ok() must be false when a param def is missing")
-	}
-}
-
-// A verify carrying an OPTION reads its presence marker and folds it into ok() —
-// a missing option means the install is not fully verified.
-func TestRunVerify_Option(t *testing.T) {
-	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
-		installspec.ResultMarker + "status=3\n" +
-		installspec.ResultMarker + "rtn:ZZOPTRT=1\n" +
-		installspec.ResultMarker + "option:ZZOPT RUN ROUTINE=1\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZOPT*1.0*1",
-		[]string{"ZZOPTRT"}, nil, []string{"ZZOPT RUN ROUTINE"}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("runVerify: %v", err)
-	}
-	if !res.Options["ZZOPT RUN ROUTINE"] || !res.ok() {
-		t.Errorf("res = %+v, want option present and ok()", res)
-	}
-	res.Options["ZZOPT RUN ROUTINE"] = false
-	if res.ok() {
-		t.Error("ok() must be false when an option is missing")
-	}
-}
-
-// A verify carrying a SECURITY KEY reads its presence marker and folds it into
-// ok() — a missing key means the install is not fully verified.
-func TestRunVerify_Key(t *testing.T) {
-	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
-		installspec.ResultMarker + "status=3\n" +
-		installspec.ResultMarker + "rtn:ZZKEYRT=1\n" +
-		installspec.ResultMarker + "key:ZZKEY MANAGER=1\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZKEY*1.0*1",
-		[]string{"ZZKEYRT"}, nil, nil, []string{"ZZKEY MANAGER"}, nil, nil, nil, nil, nil, nil, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("runVerify: %v", err)
-	}
-	if !res.Keys["ZZKEY MANAGER"] || !res.ok() {
-		t.Errorf("res = %+v, want key present and ok()", res)
-	}
-	res.Keys["ZZKEY MANAGER"] = false
-	if res.ok() {
-		t.Error("ok() must be false when a key is missing")
-	}
-}
-
-// A verify carrying a PROTOCOL reads its presence marker and folds it into ok() —
-// a missing protocol means the install is not fully verified.
-func TestRunVerify_Protocol(t *testing.T) {
-	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
-		installspec.ResultMarker + "status=3\n" +
-		installspec.ResultMarker + "rtn:ZZPRORT=1\n" +
-		installspec.ResultMarker + "protocol:ZZPROTO ACTION=1\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZPROTO*1.0*1",
-		[]string{"ZZPRORT"}, nil, nil, nil, []string{"ZZPROTO ACTION"}, nil, nil, nil, nil, nil, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("runVerify: %v", err)
-	}
-	if !res.Protocols["ZZPROTO ACTION"] || !res.ok() {
-		t.Errorf("res = %+v, want protocol present and ok()", res)
-	}
-	res.Protocols["ZZPROTO ACTION"] = false
-	if res.ok() {
-		t.Error("ok() must be false when a protocol is missing")
-	}
-}
-
-// A verify carrying a REMOTE PROCEDURE reads its presence marker and folds it into
-// ok() — a missing RPC means the install is not fully verified.
-func TestRunVerify_RPC(t *testing.T) {
-	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
-		installspec.ResultMarker + "status=3\n" +
-		installspec.ResultMarker + "rtn:ZZRPCRT=1\n" +
-		installspec.ResultMarker + "rpc:ZZRPC ECHO=1\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZRPC*1.0*1",
-		[]string{"ZZRPCRT"}, nil, nil, nil, nil, []string{"ZZRPC ECHO"}, nil, nil, nil, nil, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("runVerify: %v", err)
-	}
-	if !res.RPCs["ZZRPC ECHO"] || !res.ok() {
-		t.Errorf("res = %+v, want rpc present and ok()", res)
-	}
-	res.RPCs["ZZRPC ECHO"] = false
-	if res.ok() {
-		t.Error("ok() must be false when an rpc is missing")
-	}
-}
-
-// A verify carrying a MAIL GROUP reads its presence marker and folds it into ok()
-// — a missing mail group means the install is not fully verified.
-func TestRunVerify_MailGroup(t *testing.T) {
-	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
-		installspec.ResultMarker + "status=3\n" +
-		installspec.ResultMarker + "rtn:ZZMGRT=1\n" +
-		installspec.ResultMarker + "mailgroup:ZZMG ALERTS=1\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZMG*1.0*1",
-		[]string{"ZZMGRT"}, nil, nil, nil, nil, nil, []string{"ZZMG ALERTS"}, nil, nil, nil, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("runVerify: %v", err)
-	}
-	if !res.MailGroups["ZZMG ALERTS"] || !res.ok() {
-		t.Errorf("res = %+v, want mail group present and ok()", res)
-	}
-	res.MailGroups["ZZMG ALERTS"] = false
-	if res.ok() {
-		t.Error("ok() must be false when a mail group is missing")
-	}
-}
-
-// A verify carrying a LIST TEMPLATE reads its presence marker and folds it into
-// ok() — a missing list template means the install is not fully verified.
-func TestRunVerify_ListTemplate(t *testing.T) {
-	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
-		installspec.ResultMarker + "status=3\n" +
-		installspec.ResultMarker + "rtn:ZZLMRT=1\n" +
-		installspec.ResultMarker + "listtemplate:ZZLM PATIENTS=1\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZLM*1.0*1",
-		[]string{"ZZLMRT"}, nil, nil, nil, nil, nil, nil, []string{"ZZLM PATIENTS"}, nil, nil, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("runVerify: %v", err)
-	}
-	if !res.ListTemplates["ZZLM PATIENTS"] || !res.ok() {
-		t.Errorf("res = %+v, want list template present and ok()", res)
-	}
-	res.ListTemplates["ZZLM PATIENTS"] = false
-	if res.ok() {
-		t.Error("ok() must be false when a list template is missing")
-	}
-}
-
-// A verify carrying a HELP FRAME reads its presence marker and folds it into ok()
-// — a missing help frame means the install is not fully verified.
-func TestRunVerify_HelpFrame(t *testing.T) {
-	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
-		installspec.ResultMarker + "status=3\n" +
-		installspec.ResultMarker + "rtn:ZZHFRT=1\n" +
-		installspec.ResultMarker + "helpframe:ZZHF-MAIN=1\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZHF*1.0*1",
-		[]string{"ZZHFRT"}, nil, nil, nil, nil, nil, nil, nil, []string{"ZZHF-MAIN"}, nil, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("runVerify: %v", err)
-	}
-	if !res.HelpFrames["ZZHF-MAIN"] || !res.ok() {
-		t.Errorf("res = %+v, want help frame present and ok()", res)
-	}
-	res.HelpFrames["ZZHF-MAIN"] = false
-	if res.ok() {
-		t.Error("ok() must be false when a help frame is missing")
-	}
-}
-
-// A verify carrying an HL7 APPLICATION PARAMETER reads its presence marker and
-// folds it into ok() — a missing hl7 application means the install is not verified.
-func TestRunVerify_HL7App(t *testing.T) {
-	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
-		installspec.ResultMarker + "status=3\n" +
-		installspec.ResultMarker + "rtn:ZZHLRT=1\n" +
-		installspec.ResultMarker + "hl7app:ZZHL_APP=1\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZHL*1.0*1",
-		[]string{"ZZHLRT"}, nil, nil, nil, nil, nil, nil, nil, nil, []string{"ZZHL_APP"}, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("runVerify: %v", err)
-	}
-	if !res.HL7Apps["ZZHL_APP"] || !res.ok() {
-		t.Errorf("res = %+v, want hl7 app present and ok()", res)
-	}
-	res.HL7Apps["ZZHL_APP"] = false
-	if res.ok() {
-		t.Error("ok() must be false when an hl7 application is missing")
-	}
-}
-
-// A verify carrying an HLO APPLICATION REGISTRY reads its presence marker and folds
-// it into ok() — a missing hlo application means the install is not fully verified.
-func TestRunVerify_HLOApp(t *testing.T) {
-	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
-		installspec.ResultMarker + "status=3\n" +
-		installspec.ResultMarker + "rtn:ZZHORT=1\n" +
-		installspec.ResultMarker + "hloapp:ZZHO_APP=1\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZHO*1.0*1",
-		[]string{"ZZHORT"}, nil, nil, nil, nil, nil, nil, nil, nil, nil, []string{"ZZHO_APP"}, nil, nil)
-	if err != nil {
-		t.Fatalf("runVerify: %v", err)
-	}
-	if !res.HLOApps["ZZHO_APP"] || !res.ok() {
-		t.Errorf("res = %+v, want hlo app present and ok()", res)
-	}
-	res.HLOApps["ZZHO_APP"] = false
-	if res.ok() {
-		t.Error("ok() must be false when an hlo application is missing")
-	}
-}
-
-// A verify carrying an HL LOGICAL LINK reads its presence marker and folds it into
-// ok() — a missing logical link means the install is not fully verified.
-func TestRunVerify_LogicalLink(t *testing.T) {
-	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
-		installspec.ResultMarker + "status=3\n" +
-		installspec.ResultMarker + "rtn:ZZLLRT=1\n" +
-		installspec.ResultMarker + "logicallink:ZZLINK=1\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZLL*1.0*1",
-		[]string{"ZZLLRT"}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, []string{"ZZLINK"}, nil)
-	if err != nil {
-		t.Fatalf("runVerify: %v", err)
-	}
-	if !res.LogicalLinks["ZZLINK"] || !res.ok() {
-		t.Errorf("res = %+v, want logical link present and ok()", res)
-	}
-	res.LogicalLinks["ZZLINK"] = false
-	if res.ok() {
-		t.Error("ok() must be false when a logical link is missing")
+	for _, tc := range cases {
+		key := tc.fileStr + ":" + tc.name
+		f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
+			installspec.ResultMarker + "status=3\n" +
+			installspec.ResultMarker + "rtn:ZZRT=1\n" +
+			installspec.ResultMarker + "comp:" + key + "=1\n"}
+		comps := []kids.Component{{File: tc.file, FileStr: tc.fileStr, DataRoot: tc.dataRoot, Names: []string{tc.name}}}
+		res, err := runVerify(context.Background(), fakeClient(f), "ZZ*1.0*1", []string{"ZZRT"}, comps, nil)
+		if err != nil {
+			t.Fatalf("%s: runVerify: %v", key, err)
+		}
+		if !res.Components[key] || !res.ok() {
+			t.Errorf("%s: res = %+v, want component present and ok()", key, res)
+		}
+		res.Components[key] = false
+		if res.ok() {
+			t.Errorf("%s: ok() must be false when a component is missing", key)
+		}
 	}
 }
 
@@ -492,7 +303,7 @@ func TestRunVerify_File(t *testing.T) {
 	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=1\n" +
 		installspec.ResultMarker + "status=3\n" +
 		installspec.ResultMarker + "file:999000=1\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZVSLFS*1.0*1", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, []string{"999000"})
+	res, err := runVerify(context.Background(), fakeClient(f), "ZZVSLFS*1.0*1", nil, nil, []string{"999000"})
 	if err != nil {
 		t.Fatalf("runVerify: %v", err)
 	}
@@ -509,7 +320,7 @@ func TestRunVerify_NotInstalled(t *testing.T) {
 	f := &fakeDriver{runStdout: installspec.ResultMarker + "installed=0\n" +
 		installspec.ResultMarker + "status=\n" +
 		installspec.ResultMarker + "rtn:ZZSKEL=0\n"}
-	res, err := runVerify(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	res, err := runVerify(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil)
 	if err != nil {
 		t.Fatalf("runVerify: %v", err)
 	}
@@ -578,7 +389,7 @@ func TestVerifyResultOK_ContentGate(t *testing.T) {
 
 func TestRunUninstall(t *testing.T) {
 	f := &fakeDriver{runStdout: installspec.ResultMarker + "uninstalled=1\n"}
-	res, err := runUninstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	res, err := runUninstall(context.Background(), fakeClient(f), "ZZSKEL*1.0*1", []string{"ZZSKEL"}, nil, nil)
 	if err != nil {
 		t.Fatalf("runUninstall: %v", err)
 	}
