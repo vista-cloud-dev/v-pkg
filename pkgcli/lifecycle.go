@@ -1031,6 +1031,16 @@ func runUninstall(ctx context.Context, cl *mdriver.Client, name string, routines
 	return uninstallResult{Name: name, Uninstalled: strings.TrimSpace(markers["uninstalled"]) == "1"}, nil
 }
 
+// clearBuildFootprint removes a build's #9.7/#9.6 registration BY INSTALL NAME
+// without touching any routine or component (an all-empty UninstallScript deletes
+// only the ^XPD(9.7/9.6,"B",name) index). The partitioned uninstall uses it to
+// drop the snapshot's "<name> PREIMAGE" provenance entry — so the restore re-files
+// idempotently across cycles and the uninstall leaves no ghost build registered.
+func clearBuildFootprint(ctx context.Context, cl *mdriver.Client, name string) error {
+	_, err := runUninstall(ctx, cl, name, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	return err
+}
+
 // fileNumStrings renders the build's FileMan file numbers as the strings the
 // install scripts splice into M (an integer file number, e.g. "999000").
 func fileNumStrings(b *kids.Build) []string {
@@ -1055,6 +1065,15 @@ const (
 	// actBackout: install a provided authored back-out (the class-2 reversal —
 	// run the patch's own inverse for its data/side-effects).
 	actBackout
+	// actPartition: the BB1 reversal for a build that BOTH overwrote a foreign
+	// routine AND added greenfield routines (the v-rpc-tap shape: it splices the
+	// national XWBPRS *and* ships VSLRT*). A single restore would orphan the adds;
+	// a single delete would brick the foreign national routine. So partition the
+	// build's routines against the pre-image and run BOTH halves, ordered: restore
+	// the overwritten foreign routine(s) from the pre-image FIRST, then delete the
+	// greenfield-added routine(s) — F-I/R21, so a live caller never reaches a
+	// callee that was deleted before its caller was un-spliced.
+	actPartition
 	// actRefuse: no safe back-out is possible from the inputs — refuse rather
 	// than silently delete-and-orphan (the proposal's core safety fix).
 	actRefuse
@@ -1068,9 +1087,35 @@ func (a uninstallAction) String() string {
 		return "restore"
 	case actBackout:
 		return "backout"
+	case actPartition:
+		return "partition"
 	default:
 		return "refuse"
 	}
+}
+
+// partitionRoutines splits a build's routines into the set to RESTORE from a
+// pre-image and the set to DELETE. The pre-image (captured at install time by
+// `captureRoutinePreimages`) holds exactly the routines that PRE-EXISTED and were
+// overwritten — so a build routine present in the pre-image is overwritten-foreign
+// (restore it) and one absent from the pre-image is greenfield-added (delete it).
+// This is the heart of the partitioned uninstall (BB1): without it a build that
+// both overwrites a national routine and adds new ones has no safe single reversal.
+// Build order is preserved within each partition; pre-image routines not in the
+// build are ignored (only the build's own routines are ever touched).
+func partitionRoutines(buildRoutines, preimageRoutines []string) (restore, del []string) {
+	pre := make(map[string]bool, len(preimageRoutines))
+	for _, r := range preimageRoutines {
+		pre[r] = true
+	}
+	for _, r := range buildRoutines {
+		if pre[r] {
+			restore = append(restore, r)
+		} else {
+			del = append(del, r)
+		}
+	}
+	return restore, del
 }
 
 // decideUninstall picks the back-out strategy from the patch's reversibility
@@ -1080,11 +1125,19 @@ func (a uninstallAction) String() string {
 // needs its pre-image restored, not deleted. So a reversal artifact (--restore /
 // --backout) always wins; absent one, a side-effecting patch is refused unless
 // --force, and a class-1 patch falls back to the greenfield delete.
-func decideUninstall(class kids.ReversibilityClass, restoreKid, backoutKid string, force bool) (uninstallAction, string) {
+//
+// hasGreenfieldAdds (BB1) is only meaningful WITH a pre-image: it reports whether
+// the build adds routines the pre-image does not carry. When a --restore pre-image
+// is in play AND the build also adds greenfield routines, a plain restore would
+// orphan those adds, so we partition (restore the overwritten + delete the added).
+func decideUninstall(class kids.ReversibilityClass, restoreKid, backoutKid string, force, hasGreenfieldAdds bool) (uninstallAction, string) {
 	if restoreKid != "" && backoutKid != "" {
 		return actRefuse, "specify only one of --restore / --backout"
 	}
 	if restoreKid != "" {
+		if hasGreenfieldAdds {
+			return actPartition, "restore the overwritten routine(s) from the pre-image, then delete the greenfield-added routine(s) — ordered so the foreign routine is reinstated before its callees are removed"
+		}
 		return actRestore, "restore the provided pre-image snapshot"
 	}
 	if backoutKid != "" {
@@ -1110,15 +1163,17 @@ type uninstallCmd struct {
 }
 
 type uninstallReport struct {
-	Name         string `json:"name"`
-	Class        string `json:"class"`
-	Action       string `json:"action"`
-	Reason       string `json:"reason"`
-	AutoDetected bool   `json:"autoDetected,omitempty"` // pre-image found via the sidecar convention
-	Done         bool   `json:"done"`
-	Status       int    `json:"status,omitempty"`       // #9.7 status for restore/backout installs
-	VerifyClean  string `json:"verifyClean,omitempty"`  // "" | "clean" | "dirty" (when --verify)
-	Deregistered bool   `json:"deregistered,omitempty"` // #9.4 patch-history footprint cleared (when --deregister)
+	Name         string   `json:"name"`
+	Class        string   `json:"class"`
+	Action       string   `json:"action"`
+	Reason       string   `json:"reason"`
+	AutoDetected bool     `json:"autoDetected,omitempty"` // pre-image found via the sidecar convention
+	Restored     []string `json:"restored,omitempty"`     // overwritten-foreign routines re-applied from the pre-image (actPartition)
+	Deleted      []string `json:"deleted,omitempty"`      // greenfield-added routines deleted (actPartition)
+	Done         bool     `json:"done"`
+	Status       int      `json:"status,omitempty"`       // #9.7 status for restore/backout installs
+	VerifyClean  string   `json:"verifyClean,omitempty"`  // "" | "clean" | "dirty" (when --verify)
+	Deregistered bool     `json:"deregistered,omitempty"` // #9.4 patch-history footprint cleared (when --deregister)
 }
 
 func (c *uninstallCmd) Run(cc *clikit.Context) error {
@@ -1137,7 +1192,25 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 	// Auto-detect a paired pre-image at the conventional sidecar path so
 	// `uninstall <patch.kid>` reverses cleanly without re-specifying --restore.
 	restore, autoDetected := resolveAutoRestore(c.Restore, c.Backout, c.KidFile, fileExists(defaultPreimagePath(c.KidFile)))
-	action, reason := decideUninstall(rev.Class, restore, c.Backout, c.Force)
+
+	// When a pre-image is in play, load it now and partition the build's routines
+	// against it: routines the pre-image captured were overwritten (restore them),
+	// routines the build adds that the pre-image lacks are greenfield (delete them).
+	// A non-empty delete set means the build BOTH overwrote a foreign routine AND
+	// added greenfield ones (the v-rpc-tap shape) — the actPartition case (BB1).
+	var preBuild *kids.Build
+	var preName string
+	var restoreSet, deleteSet []string
+	if restore != "" {
+		var lerr error
+		preName, preBuild, lerr = loadBuild(restore)
+		if lerr != nil {
+			return clikit.Fail(clikit.ExitRuntime, "READ_FAILED", lerr.Error(), "")
+		}
+		restoreSet, deleteSet = partitionRoutines(b.RoutineNames(), preBuild.RoutineNames())
+	}
+
+	action, reason := decideUninstall(rev.Class, restore, c.Backout, c.Force, len(deleteSet) > 0)
 	res := uninstallReport{Name: name, Class: rev.ClassName, Action: action.String(), Reason: reason, AutoDetected: autoDetected}
 
 	if action == actRefuse {
@@ -1183,6 +1256,60 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 				}
 			}
 		}
+	case actPartition:
+		// Drop any stale snapshot provenance first: the restore re-installs the
+		// pre-image build (install name "<name> PREIMAGE"), and a leftover #9.7 by
+		// that name from a prior cycle makes install a no-op — the pre-image would
+		// NOT be put back. Clearing the #9.7/#9.6 footprint (no routine touched)
+		// makes the restore idempotent across repeated install/uninstall cycles.
+		if cerr := clearBuildFootprint(ctx, cl, preName); cerr != nil {
+			return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", cerr.Error(), "")
+		}
+		// (1) RESTORE the overwritten foreign routine(s) FIRST — re-install the
+		// pre-image so the national routine (e.g. XWBPRS) is byte-restored and its
+		// splice to the greenfield routines is gone BEFORE they are deleted.
+		ir, ierr := runInstall(ctx, cl, preName, preName+" via v pkg uninstall --partition (restore)", preBuild.Pairs(), false, nil, nil)
+		if ierr != nil {
+			return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", ierr.Error(), "")
+		}
+		res.Status = ir.Status
+		res.Restored = restoreSet
+		if !ir.Installed {
+			// Stop BEFORE the delete — never remove the greenfield callees while the
+			// foreign caller may still be spliced to them (F-I/R21 ordering).
+			return clikit.Fail(clikit.ExitRuntime, "NOT_UNINSTALLED",
+				fmt.Sprintf("partitioned uninstall aborted: pre-image restore of %s did not complete (status %d) — greenfield routines left intact", preName, ir.Status), "")
+		}
+		// (2) DELETE the greenfield-added routine(s) + the build's non-routine
+		// components + its #9.7/#9.6 entries. The overwritten foreign routine is NOT
+		// in deleteSet, so it stays as just restored.
+		ur, uerr := runUninstall(ctx, cl, name, deleteSet, b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), b.RPCNames(), b.MailGroupNames(), b.ListTemplateNames(), b.HelpFrameNames(), b.HL7AppNames(), b.HLOAppNames(), b.LogicalLinkNames(), fileNumStrings(b))
+		if uerr != nil {
+			return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", uerr.Error(), "")
+		}
+		res.Deleted = deleteSet
+		res.Done = ur.Uninstalled
+		// (3) Drop the snapshot's own #9.7/#9.6 provenance so the uninstall leaves no
+		// "<name> PREIMAGE" ghost build registered on the engine.
+		if res.Done {
+			if cerr := clearBuildFootprint(ctx, cl, preName); cerr != nil {
+				return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", cerr.Error(), "")
+			}
+		}
+		// verify-clean: confirm the restored foreign routine(s) now match the pre-image.
+		if c.Verify && res.Done {
+			drift, derr := checkDrift(ctx, cl, preBuild)
+			if derr != nil {
+				return clikit.Fail(clikit.ExitRuntime, "UNINSTALL_FAILED", derr.Error(), "")
+			}
+			res.VerifyClean = "clean"
+			for _, state := range drift {
+				if state != "applied" {
+					res.VerifyClean = "dirty"
+					break
+				}
+			}
+		}
 	default: // actDelete
 		ur, uerr := runUninstall(ctx, cl, name, b.RoutineNames(), b.ParamDefNames(), b.OptionNames(), b.KeyNames(), b.ProtocolNames(), b.RPCNames(), b.MailGroupNames(), b.ListTemplateNames(), b.HelpFrameNames(), b.HL7AppNames(), b.HLOAppNames(), b.LogicalLinkNames(), fileNumStrings(b))
 		if uerr != nil {
@@ -1209,6 +1336,10 @@ func (c *uninstallCmd) Run(cc *clikit.Context) error {
 		fmt.Fprintf(cc.Stdout, "%s [%s] %s\n", cc.Accent(name), rev.ClassName, cc.Faint(reason))
 		if res.AutoDetected {
 			fmt.Fprintf(cc.Stdout, "  %s pre-image: %s\n", cc.Faint("auto-detected"), defaultPreimagePath(c.KidFile))
+		}
+		if action == actPartition {
+			fmt.Fprintf(cc.Stdout, "  %s restore (foreign): %s\n", cc.Accent("1."), joinOr(res.Restored, "(none)"))
+			fmt.Fprintf(cc.Stdout, "  %s delete (greenfield): %s\n", cc.Accent("2."), joinOr(res.Deleted, "(none)"))
 		}
 		if res.Done {
 			fmt.Fprintln(cc.Stdout, cc.Success(action.String()+" complete for "+name))
